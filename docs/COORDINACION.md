@@ -53,3 +53,9 @@ Origen: artefacto https://claude.ai/artifact/8YGnscSgBTwEUm9DF4opHe, versión `1
 - Sin recursos subidos al artefacto; la única dependencia externa es Manrope en Google Fonts.
 - No se modificaron landing, CRM ni aplicaciones; ningún archivo importado se editó.
 - Verificación visual: no realizada en esta importación. Los `.dc.html` necesitan el entorno del lienzo (`support.js`) y no se renderizan fuera de él; la revisión visual se hizo dentro del artefacto, no en el repositorio.
+
+## Interfaz de Conversaciones — Codex
+Usuario autorizó iniciar el prototipo navegable. Rama codex/interfaz-conversaciones. Archivos reservados: interfaz/. Datos ficticios; sin servicios externos. Fuentes del lienzo intactas. Estado: en desarrollo; revisión por Claude pendiente.
+
+Verificación de interfaz por Codex: búsqueda de Mateo, selección y marcado como leído, mensaje simulado y persistencia tras recarga, actualización de etapa, guardado de nota, sugerencia editable, resolución y vista móvil a 390×844 comprobadas en Chrome. Vista de escritorio revisada. Sin conexión a servicios. Revisión por Claude pendiente; no integrada en main.
+
