@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>LAZO · Paleta y tipografía</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#2443CC}a:hover{color:#14216E}
+</style>
+</helmet>
+<div style="width: 980px; height: 560px; box-sizing: border-box; padding: 48px 56px; display: flex; flex-direction: column; gap: 32px; background: #FFFFFF; color: #101828; font-family: 'Manrope', system-ui, sans-serif">
+<span style="font-size: 13px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; color: #475467">Paleta de color</span>
+
+<div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px">
+<div style="display: flex; flex-direction: column; align-items: center; gap: 10px"><div style="width: 88px; height: 88px; border-radius: 999px; background: #345CFF"></div><span style="font-size: 14px; font-weight: 700">Azul eléctrico</span><span style="font-size: 13px; font-weight: 500; color: #475467; margin-top: -6px">#345CFF</span></div>
+<div style="display: flex; flex-direction: column; align-items: center; gap: 10px"><div style="width: 88px; height: 88px; border-radius: 999px; background: #6A8DFF"></div><span style="font-size: 14px; font-weight: 700">Azul cielo</span><span style="font-size: 13px; font-weight: 500; color: #475467; margin-top: -6px">#6A8DFF</span></div>
+<div style="display: flex; flex-direction: column; align-items: center; gap: 10px"><div style="width: 88px; height: 88px; border-radius: 999px; background: #35D6C1"></div><span style="font-size: 14px; font-weight: 700">Turquesa</span><span style="font-size: 13px; font-weight: 500; color: #475467; margin-top: -6px">#35D6C1</span></div>
+<div style="display: flex; flex-direction: column; align-items: center; gap: 10px"><div style="width: 88px; height: 88px; box-sizing: border-box; border-radius: 999px; background: #F5F7FB; border: 1px solid #E4E7EC"></div><span style="font-size: 14px; font-weight: 700">Hielo</span><span style="font-size: 13px; font-weight: 500; color: #475467; margin-top: -6px">#F5F7FB</span></div>
+<div style="display: flex; flex-direction: column; align-items: center; gap: 10px"><div style="width: 88px; height: 88px; border-radius: 999px; background: #101828"></div><span style="font-size: 14px; font-weight: 700">Noche</span><span style="font-size: 13px; font-weight: 500; color: #475467; margin-top: -6px">#101828</span></div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 10px">
+<div style="height: 48px; border-radius: 14px; background: linear-gradient(90deg, #2A50F0 0%, #4A86FF 50%, #35D6C1 100%)"></div>
+<div style="display: flex; justify-content: space-between"><span style="font-size: 13px; font-weight: 700">Degradado de marca</span><span style="font-size: 13px; font-weight: 500; color: #475467">#2A50F0 → #4A86FF → #35D6C1</span></div>
+</div>
+
+<div style="display: flex; align-items: center; gap: 24px; padding-top: 24px; border-top: 1px solid #E4E7EC">
+<span style="font-size: 64px; font-weight: 700; line-height: 1">Aa</span>
+<div style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 20px; font-weight: 700">Manrope</span><span style="font-size: 14px; font-weight: 500; color: #475467">Bold para títulos · Medium para interfaz · Regular para texto</span></div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":980,"height":560}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

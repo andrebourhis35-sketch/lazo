@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>LAZO · Refinamiento del isotipo</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#345CFF}a:hover{color:#101828}
+</style>
+</helmet>
+<div style="width: 2552px; height: 1310px; box-sizing: border-box; padding: 56px; display: flex; flex-direction: column; gap: 16px; background: #FFFFFF; color: #101828; font-family: 'Manrope', system-ui, sans-serif">
+<svg width="0" height="0" style="position: absolute" aria-hidden="true" focusable="false">
+<defs>
+<radialGradient id="sphA" cx="0.36" cy="0.3" r="0.78"><stop offset="0" stop-color="#6A8DFF"></stop><stop offset="0.48" stop-color="#345CFF"></stop><stop offset="1" stop-color="#101828"></stop></radialGradient>
+<radialGradient id="sphC" cx="0.38" cy="0.32" r="0.9"><stop offset="0" stop-color="#6A8DFF"></stop><stop offset="0.55" stop-color="#345CFF"></stop><stop offset="1" stop-color="#101828"></stop></radialGradient>
+<radialGradient id="hi" cx="0.36" cy="0.26" r="0.42"><stop offset="0" stop-color="#F5F7FB" stop-opacity="0.5"></stop><stop offset="1" stop-color="#F5F7FB" stop-opacity="0"></stop></radialGradient>
+<radialGradient id="hiC" cx="0.36" cy="0.26" r="0.45"><stop offset="0" stop-color="#F5F7FB" stop-opacity="0.28"></stop><stop offset="1" stop-color="#F5F7FB" stop-opacity="0"></stop></radialGradient>
+<radialGradient id="rim" cx="0.72" cy="0.92" r="0.55"><stop offset="0" stop-color="#35D6C1" stop-opacity="0.38"></stop><stop offset="1" stop-color="#35D6C1" stop-opacity="0"></stop></radialGradient>
+<linearGradient id="ringG" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#345CFF"></stop><stop offset="0.5" stop-color="#6A8DFF"></stop><stop offset="1" stop-color="#35D6C1"></stop></linearGradient>
+<linearGradient id="ringShade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F5F7FB" stop-opacity="0.28"></stop><stop offset="0.5" stop-color="#F5F7FB" stop-opacity="0"></stop><stop offset="1" stop-color="#101828" stop-opacity="0.3"></stop></linearGradient>
+<path id="ringA" fill-rule="evenodd" d="M-168 0 A168 54 0 1 0 168 0 A168 54 0 1 0 -168 0 Z M-146 -4 A146 34 0 1 1 146 -4 A146 34 0 1 1 -146 -4 Z"></path>
+<path id="ringB" fill-rule="evenodd" d="M-172 0 A172 60 0 1 0 172 0 A172 60 0 1 0 -172 0 Z M-171 -6 A153 46 0 1 1 135 -6 A153 46 0 1 1 -171 -6 Z"></path>
+<path id="arcBack" d="M-158 0 A158 44 0 0 1 158 0"></path>
+<path id="arcFront" d="M158 0 A158 44 0 0 1 -158 0"></path>
+<clipPath id="frontClip"><rect x="-220" y="-1" width="440" height="140"></rect></clipPath>
+<clipPath id="clipA"><circle cx="200" cy="160" r="92"></circle></clipPath>
+<clipPath id="clipB"><circle cx="196" cy="150" r="90"></circle></clipPath>
+<clipPath id="clipC"><circle cx="200" cy="160" r="88"></circle></clipPath>
+
+<g id="symA3d">
+<g transform="translate(200 160) rotate(-16)"><use href="#ringA" fill="url(#ringG)"></use><use href="#ringA" fill="#101828" opacity="0.45"></use></g>
+<circle cx="200" cy="160" r="92" fill="url(#sphA)"></circle>
+<circle cx="200" cy="160" r="92" fill="url(#hi)"></circle>
+<circle cx="200" cy="160" r="92" fill="url(#rim)"></circle>
+<g clip-path="url(#clipA)"><g transform="translate(200 168) rotate(-16)" clip-path="url(#frontClip)"><use href="#ringA" fill="#101828" opacity="0.3"></use></g></g>
+<g transform="translate(200 160) rotate(-16)" clip-path="url(#frontClip)"><use href="#ringA" fill="url(#ringG)"></use><use href="#ringA" fill="url(#ringShade)"></use><ellipse cx="0" cy="-4" rx="146" ry="34" fill="none" stroke="#F5F7FB" stroke-opacity="0.5" stroke-width="1.5"></ellipse></g>
+</g>
+
+<g id="symB3d">
+<g transform="translate(204 168) rotate(-22)"><use href="#ringB" fill="url(#ringG)"></use><use href="#ringB" fill="#101828" opacity="0.45"></use></g>
+<circle cx="196" cy="150" r="90" fill="url(#sphA)"></circle>
+<circle cx="196" cy="150" r="90" fill="url(#hi)"></circle>
+<circle cx="196" cy="150" r="90" fill="url(#rim)"></circle>
+<g clip-path="url(#clipB)"><g transform="translate(204 176) rotate(-22)" clip-path="url(#frontClip)"><use href="#ringB" fill="#101828" opacity="0.3"></use></g></g>
+<g transform="translate(204 168) rotate(-22)" clip-path="url(#frontClip)"><use href="#ringB" fill="url(#ringG)"></use><use href="#ringB" fill="url(#ringShade)"></use><ellipse cx="-18" cy="-6" rx="153" ry="46" fill="none" stroke="#F5F7FB" stroke-opacity="0.5" stroke-width="1.5"></ellipse></g>
+</g>
+
+<g id="symC3d">
+<g transform="translate(200 160) rotate(-18)" fill="none" stroke-linecap="round"><use href="#arcBack" stroke="url(#ringG)" stroke-width="11" opacity="0.6"></use></g>
+<circle cx="200" cy="160" r="88" fill="url(#sphC)"></circle>
+<circle cx="200" cy="160" r="88" fill="url(#hiC)"></circle>
+<g clip-path="url(#clipC)"><g transform="translate(200 160) rotate(-18)" fill="none"><use href="#arcFront" stroke="currentColor" stroke-width="25"></use></g></g>
+<g transform="translate(200 160) rotate(-18)" fill="none" stroke-linecap="round"><use href="#arcFront" stroke="url(#ringG)" stroke-width="11"></use></g>
+</g>
+
+<g id="flatA">
+<g transform="translate(200 160) rotate(-16)"><use href="#ringA" fill="#6A8DFF"></use></g>
+<circle cx="200" cy="160" r="92" fill="#345CFF"></circle>
+<g transform="translate(200 160) rotate(-16)" clip-path="url(#frontClip)"><use href="#ringA" fill="currentColor" stroke="currentColor" stroke-width="12" stroke-linejoin="round"></use><use href="#ringA" fill="#35D6C1"></use></g>
+</g>
+<g id="flatB">
+<g transform="translate(204 168) rotate(-22)"><use href="#ringB" fill="#6A8DFF"></use></g>
+<circle cx="196" cy="150" r="90" fill="#345CFF"></circle>
+<g transform="translate(204 168) rotate(-22)" clip-path="url(#frontClip)"><use href="#ringB" fill="currentColor" stroke="currentColor" stroke-width="12" stroke-linejoin="round"></use><use href="#ringB" fill="#35D6C1"></use></g>
+</g>
+<g id="flatC">
+<g transform="translate(200 160) rotate(-18)" fill="none" stroke-linecap="round"><use href="#arcBack" stroke="#6A8DFF" stroke-width="11"></use></g>
+<circle cx="200" cy="160" r="88" fill="#345CFF"></circle>
+<g clip-path="url(#clipC)"><g transform="translate(200 160) rotate(-18)" fill="none"><use href="#arcFront" stroke="currentColor" stroke-width="25"></use></g></g>
+<g transform="translate(200 160) rotate(-18)" fill="none" stroke-linecap="round"><use href="#arcFront" stroke="#35D6C1" stroke-width="11"></use></g>
+</g>
+
+<g id="monoA">
+<g transform="translate(200 160) rotate(-16)"><use href="#ringA" fill="#101828"></use></g>
+<circle cx="200" cy="160" r="92" fill="#101828"></circle>
+<g transform="translate(200 160) rotate(-16)" clip-path="url(#frontClip)"><use href="#ringA" fill="currentColor" stroke="currentColor" stroke-width="12" stroke-linejoin="round"></use><use href="#ringA" fill="#101828"></use></g>
+</g>
+<g id="monoB">
+<g transform="translate(204 168) rotate(-22)"><use href="#ringB" fill="#101828"></use></g>
+<circle cx="196" cy="150" r="90" fill="#101828"></circle>
+<g transform="translate(204 168) rotate(-22)" clip-path="url(#frontClip)"><use href="#ringB" fill="currentColor" stroke="currentColor" stroke-width="12" stroke-linejoin="round"></use><use href="#ringB" fill="#101828"></use></g>
+</g>
+<g id="monoC">
+<g transform="translate(200 160) rotate(-18)" fill="none" stroke-linecap="round"><use href="#arcBack" stroke="#101828" stroke-width="11"></use></g>
+<circle cx="200" cy="160" r="88" fill="#101828"></circle>
+<g clip-path="url(#clipC)"><g transform="translate(200 160) rotate(-18)" fill="none"><use href="#arcFront" stroke="currentColor" stroke-width="25"></use></g></g>
+<g transform="translate(200 160) rotate(-18)" fill="none" stroke-linecap="round"><use href="#arcFront" stroke="#101828" stroke-width="11"></use></g>
+</g>
+
+<g id="word" fill="none" stroke="currentColor" stroke-width="17">
+<path d="M12 0 V100"></path>
+<circle cx="64" cy="70" r="21.5"></circle>
+<path d="M85.5 40 V100"></path>
+<path d="M106 48.5 H156 C150 62 122 80 108 91.5 H158" stroke-linejoin="round"></path>
+<circle cx="202" cy="70" r="21.5"></circle>
+</g>
+</defs>
+</svg>
+
+<div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; padding-bottom: 20px; border-bottom: 1px solid #E4E7EC">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 13px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; color: #475467">Dirección aprobada · G Órbita</span>
+<h1 style="margin: 0; font-size: 40px; font-weight: 700; line-height: 1.1">Refinamiento del isotipo</h1>
+</div>
+<span style="font-size: 15px; font-weight: 500; color: #475467">Mismo tamaño, misma luz, misma paleta: #345CFF · #6A8DFF · #35D6C1 · #101828 · #F5F7FB</span>
+</div>
+
+<div style="display: grid; grid-template-columns: 260px 300px 300px 560px 300px 300px 300px; gap: 20px; font-size: 13px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #475467">
+<span></span><span>Fondo oscuro</span><span>Fondo claro</span><span>Imagotipo</span><span>Plana 2D</span><span>Monocromática</span><span>Ícono de app</span>
+</div>
+
+<div style="display: grid; grid-template-columns: 260px 300px 300px 560px 300px 300px 300px; grid-template-rows: repeat(3, 340px); gap: 20px">
+
+<div style="display: flex; flex-direction: column; justify-content: center; gap: 6px"><span style="font-size: 56px; font-weight: 700; line-height: 1; color: #345CFF">A</span><span style="font-size: 22px; font-weight: 700">Órbita refinada</span></div>
+<div style="border-radius: 20px; background: #101828; display: flex; align-items: center; justify-content: center"><svg width="250" height="167" viewBox="20 40 360 240" role="img" aria-label="A sobre fondo oscuro" style="color: #101828"><use href="#symA3d"></use></svg></div>
+<div style="border-radius: 20px; background: #F5F7FB; display: flex; align-items: center; justify-content: center"><svg width="250" height="167" viewBox="20 40 360 240" role="img" aria-label="A sobre fondo claro" style="color: #F5F7FB"><use href="#symA3d"></use></svg></div>
+<div style="border-radius: 20px; background: #F5F7FB; display: flex; align-items: center; justify-content: center; gap: 18px"><svg width="180" height="120" viewBox="20 40 360 240" aria-hidden="true" style="color: #F5F7FB"><use href="#symA3d"></use></svg><svg width="186" height="79" viewBox="0 -2 236 102" role="img" aria-label="Imagotipo A: lazo" style="color: #101828"><use href="#word"></use></svg></div>
+<div style="border-radius: 20px; background: #F5F7FB; display: flex; align-items: center; justify-content: center"><svg width="250" height="167" viewBox="20 40 360 240" role="img" aria-label="A versión plana" style="color: #F5F7FB"><use href="#flatA"></use></svg></div>
+<div style="border-radius: 20px; background: #F5F7FB; display: flex; align-items: center; justify-content: center"><svg width="250" height="167" viewBox="20 40 360 240" role="img" aria-label="A versión monocromática" style="color: #F5F7FB"><use href="#monoA"></use></svg></div>
+<div style="border-radius: 20px; background: #F5F7FB; display: flex; align-items: center; justify-content: center; gap: 24px">
+<div style="width: 150px; height: 150px; border-radius: 36px; background: radial-gradient(circle at 30% 18%, rgba(52,92,255,0.35) 0%, rgba(16,24,40,0) 62%), #101828; box-shadow: 0 18px 36px rgba(16,24,40,0.25); display: flex; align-items: center; justify-content: center"><svg width="128" height="85" viewBox="20 40 360 240" role="img" aria-label="Ícono de app A" style="color: #101828"><use href="#symA3d"></use></svg></div>
+<div style="width: 48px; height: 48px; border-radius: 12px; background: #101828; display: flex; align-items: center; justify-content: center"><svg width="42" height="28" viewBox="20 40 360 240" aria-hidden="true" style="color: #101828"><use href="#symA3d"></use></svg></div>
+</div>
+
+<div style="display: flex; flex-direction: column; justify-content: center; gap: 6px"><span style="font-size: 56px; font-weight: 700; line-height: 1; color: #345CFF">B</span><span style="font-size: 22px; font-weight: 700">Órbita distintiva</span></div>
+<div style="border-radius: 20px; background: #101828; display: flex; align-items: center; justify-content: center"><svg width="250" height="167" viewBox="20 40 360 240" role="img" aria-label="B sobre fondo oscuro" style="color: #101828"><use href="#symB3d"></use></svg></div>
+<div style="border-radius: 20px; background: #F5F7FB; display: flex; align-items: center; justify-content: center"><svg width="250" height="167" viewBox="20 40 360 240" role="img" aria-label="B sobre fondo claro" style="color: #F5F7FB"><use href="#symB3d"></use></svg></div>
+<div style="border-radius: 20px; background: #F5F7FB; display: flex; align-items: center; justify-content: center; gap: 18px"><svg width="180" height="120" viewBox="20 40 360 240" aria-hidden="true" style="color: #F5F7FB"><use href="#symB3d"></use></svg><svg width="186" height="79" viewBox="0 -2 236 102" role="img" aria-label="Imagotipo B: lazo" style="color: #101828"><use href="#word"></use></svg></div>
+<div style="border-radius: 20px; background: #F5F7FB; display: flex; align-items: center; justify-content: center"><svg width="250" height="167" viewBox="20 40 360 240" role="img" aria-label="B versión plana" style="color: #F5F7FB"><use href="#flatB"></use></svg></div>
+<div style="border-radius: 20px; background: #F5F7FB; display: flex; align-items: center; justify-content: center"><svg width="250" height="167" viewBox="20 40 360 240" role="img" aria-label="B versión monocromática" style="color: #F5F7FB"><use href="#monoB"></use></svg></div>
+<div style="border-radius: 20px; background: #F5F7FB; display: flex; align-items: center; justify-content: center; gap: 24px">
+<div style="width: 150px; height: 150px; border-radius: 36px; background: radial-gradient(circle at 30% 18%, rgba(52,92,255,0.35) 0%, rgba(16,24,40,0) 62%), #101828; box-shadow: 0 18px 36px rgba(16,24,40,0.25); display: flex; align-items: center; justify-content: center"><svg width="128" height="85" viewBox="20 40 360 240" role="img" aria-label="Ícono de app B" style="color: #101828"><use href="#symB3d"></use></svg></div>
+<div style="width: 48px; height: 48px; border-radius: 12px; background: #101828; display: flex; align-items: center; justify-content: center"><svg width="42" height="28" viewBox="20 40 360 240" aria-hidden="true" style="color: #101828"><use href="#symB3d"></use></svg></div>
+</div>
+
+<div style="display: flex; flex-direction: column; justify-content: center; gap: 6px"><span style="font-size: 56px; font-weight: 700; line-height: 1; color: #345CFF">C</span><span style="font-size: 22px; font-weight: 700">Órbita minimalista premium</span></div>
+<div style="border-radius: 20px; background: #101828; display: flex; align-items: center; justify-content: center"><svg width="250" height="167" viewBox="20 40 360 240" role="img" aria-label="C sobre fondo oscuro" style="color: #101828"><use href="#symC3d"></use></svg></div>
+<div style="border-radius: 20px; background: #F5F7FB; display: flex; align-items: center; justify-content: center"><svg width="250" height="167" viewBox="20 40 360 240" role="img" aria-label="C sobre fondo claro" style="color: #F5F7FB"><use href="#symC3d"></use></svg></div>
+<div style="border-radius: 20px; background: #F5F7FB; display: flex; align-items: center; justify-content: center; gap: 18px"><svg width="180" height="120" viewBox="20 40 360 240" aria-hidden="true" style="color: #F5F7FB"><use href="#symC3d"></use></svg><svg width="186" height="79" viewBox="0 -2 236 102" role="img" aria-label="Imagotipo C: lazo" style="color: #101828"><use href="#word"></use></svg></div>
+<div style="border-radius: 20px; background: #F5F7FB; display: flex; align-items: center; justify-content: center"><svg width="250" height="167" viewBox="20 40 360 240" role="img" aria-label="C versión plana" style="color: #F5F7FB"><use href="#flatC"></use></svg></div>
+<div style="border-radius: 20px; background: #F5F7FB; display: flex; align-items: center; justify-content: center"><svg width="250" height="167" viewBox="20 40 360 240" role="img" aria-label="C versión monocromática" style="color: #F5F7FB"><use href="#monoC"></use></svg></div>
+<div style="border-radius: 20px; background: #F5F7FB; display: flex; align-items: center; justify-content: center; gap: 24px">
+<div style="width: 150px; height: 150px; border-radius: 36px; background: radial-gradient(circle at 30% 18%, rgba(52,92,255,0.35) 0%, rgba(16,24,40,0) 62%), #101828; box-shadow: 0 18px 36px rgba(16,24,40,0.25); display: flex; align-items: center; justify-content: center"><svg width="128" height="85" viewBox="20 40 360 240" role="img" aria-label="Ícono de app C" style="color: #101828"><use href="#symC3d"></use></svg></div>
+<div style="width: 48px; height: 48px; border-radius: 12px; background: #101828; display: flex; align-items: center; justify-content: center"><svg width="42" height="28" viewBox="20 40 360 240" aria-hidden="true" style="color: #101828"><use href="#symC3d"></use></svg></div>
+</div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":2552,"height":1310}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>
