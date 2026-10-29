@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>LAZO · Alternativas del isotipo</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#2443CC}a:hover{color:#14216E}
+</style>
+</helmet>
+<div style="width: 1960px; height: 560px; box-sizing: border-box; padding: 48px 56px; display: flex; gap: 48px; background: #FFFFFF; color: #101828; font-family: 'Manrope', system-ui, sans-serif">
+<svg width="0" height="0" style="position: absolute" aria-hidden="true">
+<defs>
+<radialGradient id="sph" cx="0.35" cy="0.28" r="0.8"><stop offset="0" stop-color="#E4EBFF"></stop><stop offset="0.16" stop-color="#8EA8FF"></stop><stop offset="0.45" stop-color="#3D6BFF"></stop><stop offset="0.78" stop-color="#1C2DB8"></stop><stop offset="1" stop-color="#0B1150"></stop></radialGradient>
+<radialGradient id="sphRim" cx="0.8" cy="0.85" r="0.55"><stop offset="0" stop-color="#35D6C1" stop-opacity="0.6"></stop><stop offset="1" stop-color="#35D6C1" stop-opacity="0"></stop></radialGradient>
+<linearGradient id="rib" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#2A50F0"></stop><stop offset="0.5" stop-color="#4A86FF"></stop><stop offset="1" stop-color="#35D6C1"></stop></linearGradient>
+<linearGradient id="ribGloss" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF" stop-opacity="0.35"></stop><stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0.15"></stop><stop offset="0.8" stop-color="#FFFFFF" stop-opacity="0"></stop><stop offset="1" stop-color="#0B1150" stop-opacity="0.3"></stop></linearGradient>
+<path id="ribPath" fill-rule="evenodd" d="M-170 0 A170 62 0 1 0 170 0 A170 62 0 1 0 -170 0 Z M-140 -6 A140 34 0 1 1 140 -6 A140 34 0 1 1 -140 -6 Z"></path>
+<clipPath id="frontClip"><rect x="-200" y="-2" width="400" height="120"></rect></clipPath>
+<clipPath id="bClip"><rect x="205" y="196" width="70" height="80"></rect></clipPath>
+<filter id="soft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="8"></feGaussianBlur></filter>
+<g id="ribbonFull"><use href="#ribPath" fill="url(#rib)"></use><use href="#ribPath" fill="url(#ribGloss)"></use></g>
+</defs>
+</svg>
+
+<div style="width: 220px; flex-shrink: 0; display: flex; flex-direction: column; gap: 14px">
+<span style="font-size: 13px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; color: #475467; line-height: 1.6">Alternativas<br>del isotipo</span>
+<p style="margin: 0; font-size: 15px; font-weight: 500; line-height: 1.5; color: #475467">Misma familia: esfera, órbita y degradado azul a turquesa.</p>
+</div>
+
+<div style="flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px">
+
+<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px">
+<svg width="320" height="253" viewBox="0 0 480 380" role="img" aria-label="Alternativa A: órbita abierta">
+<circle cx="240" cy="190" r="100" fill="url(#sph)"></circle>
+<circle cx="240" cy="190" r="100" fill="url(#sphRim)"></circle>
+<ellipse cx="204" cy="138" rx="36" ry="18" fill="#FFFFFF" opacity="0.6" filter="url(#soft)" transform="rotate(-30 204 138)"></ellipse>
+<g transform="translate(240 200) rotate(-10)" clip-path="url(#frontClip)"><use href="#ribbonFull"></use></g>
+</svg>
+<span style="font-size: 17px; font-weight: 600">A. Órbita abierta</span>
+</div>
+
+<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px">
+<svg width="320" height="253" viewBox="0 0 480 380" role="img" aria-label="Alternativa B: conexión fluida, dos órbitas entrelazadas">
+<g id="bLeft" transform="translate(185 200) rotate(-24) scale(0.66)"><use href="#ribbonFull"></use></g>
+<g transform="translate(295 180) rotate(24) scale(0.66)"><use href="#ribbonFull"></use></g>
+<g clip-path="url(#bClip)"><use href="#bLeft"></use></g>
+</svg>
+<span style="font-size: 17px; font-weight: 600">B. Conexión fluida</span>
+</div>
+
+<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px">
+<svg width="320" height="253" viewBox="0 0 480 380" role="img" aria-label="Alternativa C: lazo ascendente con un nodo en su punto más alto">
+<g transform="translate(230 210) rotate(-34) scale(0.9)"><use href="#ribbonFull"></use></g>
+<circle cx="357" cy="124" r="40" fill="url(#sph)"></circle>
+<ellipse cx="344" cy="108" rx="14" ry="8" fill="#FFFFFF" opacity="0.65" filter="url(#soft)"></ellipse>
+</svg>
+<span style="font-size: 17px; font-weight: 600">C. Lazo ascendente</span>
+</div>
+
+<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px">
+<svg width="320" height="253" viewBox="0 0 480 380" role="img" aria-label="Alternativa D: versión plana en dos colores">
+<g transform="translate(240 190) rotate(-14)"><use href="#ribPath" fill="#2A50F0"></use></g>
+<circle cx="240" cy="190" r="100" fill="#345CFF"></circle>
+<g transform="translate(240 190) rotate(-14)" clip-path="url(#frontClip)"><use href="#ribPath" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="16"></use><use href="#ribPath" fill="#35D6C1"></use></g>
+</svg>
+<span style="font-size: 17px; font-weight: 600">D. Versión plana</span>
+</div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1960,"height":560}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>
