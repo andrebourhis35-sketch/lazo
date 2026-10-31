@@ -53,3 +53,9 @@ Origen: artefacto https://claude.ai/artifact/8YGnscSgBTwEUm9DF4opHe, versión `1
 - Sin recursos subidos al artefacto; la única dependencia externa es Manrope en Google Fonts.
 - No se modificaron landing, CRM ni aplicaciones; ningún archivo importado se editó.
 - Verificación visual: no realizada en esta importación. Los `.dc.html` necesitan el entorno del lienzo (`support.js`) y no se renderizan fuera de él; la revisión visual se hizo dentro del artefacto, no en el repositorio.
+
+## Revisión de Codex y vista previa
+
+PR #1 integrado en main (032d8eb). Codex verificó los hashes de los 21 archivos en Git, las referencias de 5 páginas y 20 tableros y el alcance de la importación. No se verificó directamente el origen privado del artefacto.
+
+Codex preparó preview/isotipo.html y preview/README.md en codex/vista-previa-isotipo, PR #2. SVG y composición conservados, sin cambios a las fuentes originales. Apertura y aspecto general verificados en Chrome. Controles para ajuste y tamaño real disponibles. Revisión por Claude pendiente antes de integrar; aprobación del isotipo por el usuario pendiente. No modificar estos archivos simultáneamente.
