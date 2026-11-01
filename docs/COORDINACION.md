@@ -102,3 +102,5 @@ Un abogado debe revisar el texto después, en especial la adecuación a la Ley N
 - npm test en app-meta/: 15/15 pruebas pasan con Meta simulada; ninguna llamada real a Meta.
 - Copia local para esta fase: C:\Users\acer\lazo-meta. app-meta/.env creado a partir del ejemplo y exclusión Git comprobada; valores privados pendientes de entrada del usuario. Nunca leer ni registrar su contenido.
 - Próximo paso: usuario completa token, WABA ID, Phone Number ID y Graph API en su archivo local. Luego prueba real con su teléfono, confirmación humana de recepción, dos grabaciones y formulario. Ninguno de esos pasos se declara completado. No se envió la revisión ni se publicó la app Meta.
+
+- Asistencia de credenciales: ventana local privada preparada fuera del repositorio para que el usuario complete los cuatro valores sin PowerShell. Token oculto, guardado local en .env excluido de Git y sin llamadas a Meta. Pendiente de entrada y confirmación del usuario; no inspeccionar formulario ni contenido del archivo.
