@@ -4,7 +4,8 @@ Marca cada punto antes de enviar. Los nombres de los campos pueden variar: conf�
 
 ## Datos que debes completar (no están en el repositorio)
 
-- [x] Nombre legal de la LLC, estado de constitución, dirección y correo de contacto (completados el 1 de noviembre de 2026).
+- [x] Titular: La Boutique du Monde E.I.R.L., empresa constituida en Perú, con RUC 20610684760, domicilio en Av. Brasil 3730, Magdalena del Mar, Lima 15087, Perú; correo contacto@espacio-sereno.com. Es la empresa verificada en Meta.
+- [ ] Adecuación a la Ley N.º 29733 de Protección de Datos Personales del Perú, pendiente del abogado.
 - [ ] Demás marcadores de `docs/legal/` (plazos, base jurídica, ley aplicable y otros), pendientes del abogado.
 - [ ] Revisión de las tres páginas legales por un abogado.
 - [ ] `app-meta/.env` con token, WABA ID, Phone Number ID y versión de Graph API (solo en tu equipo).
@@ -17,7 +18,7 @@ Marca cada punto antes de enviar. Los nombres de los campos pueden variar: conf�
 - [ ] **Eliminación de datos:** elige "URL de instrucciones" y usa `https://andrebourhis35-sketch.github.io/lazo/legal/eliminacion-datos.html`. La app no tiene callback de eliminación.
 - [ ] **Ícono de la app (1024×1024):** `branding/app-meta/icono-app-1024-PROVISIONAL.png`. Provisional: el isotipo A sigue pendiente de aprobación.
 - [ ] **Categoría:** propuesta "Negocios y páginas" (o la más cercana a mensajería para empresas que ofrezca el panel). Decisión tuya.
-- [ ] **Verificación del negocio** de la LLC completada en el Administrador comercial, si el panel la exige para acceso avanzado.
+- [x] **Verificación del negocio:** La Boutique du Monde E.I.R.L. (RUC 20610684760) es la empresa verificada en Meta. Comprueba que la app esté asociada a ese portafolio comercial.
 
 Aviso: GitHub Pages desde `/docs` también publica el resto de esa carpeta, incluido `docs/COORDINACION.md`. Si no quieres que sea público, publica Pages desde otra rama o carpeta que solo contenga `legal/`.
 
