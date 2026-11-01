@@ -86,3 +86,12 @@ A petición del usuario, Claude completó en la rama `claude/politicas-completas
 
 Un abogado debe revisar el texto después, en especial la adecuación a la Ley N.º 29733 y su reglamento, las transferencias internacionales y las cláusulas de los términos. La rama `gh-pages` se regenerará desde `main` cuando el usuario integre este cambio.
 
+## Continuación de revisión Meta — Codex (1 de noviembre de 2026)
+
+- main actualizado en 888642e; checkout separado para conservar cambios locales anteriores.
+- Rama codex/proveedores-correo-meta: privacidad identifica Zoho Mail como proveedor del correo y GoDaddy únicamente como registrador del dominio, según el usuario.
+- Lista de revisión actualizada a legal.espacio-sereno.com, rama gh-pages y categoría Messaging indicada por el usuario.
+- PR #3 pausado. No se modifican interfaz/ ni branding/lienzo/.
+- Al integrar, sincronizar solo docs/legal/ hacia legal/ en gh-pages y conservar CNAME.
+- Credenciales, prueba real, grabaciones y revisión Meta: pendientes. No se han recibido ni mostrado tokens.
+
