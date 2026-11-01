@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LAZO · Mensajería de WhatsApp</title>
+<link rel="icon" href="marca.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap">
+<link rel="stylesheet" href="styles.css">
+<script src="app.js" defer></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <img src="marca.svg" alt="" width="48" height="48">
+    <img src="logotipo.svg" alt="lazo" class="wordmark" width="84" height="36">
+    <span class="provisional" title="El isotipo A refinado está pendiente de aprobación">Isotipo provisional</span>
+  </div>
+  <div id="connection" class="connection" role="status">Comprobando configuración…</div>
+</header>
+
+<main>
+  <section class="intro">
+    <h1>Mensajería de WhatsApp Business</h1>
+    <p>Envía mensajes a tus clientes y gestiona tus plantillas con la API oficial de WhatsApp Cloud.</p>
+  </section>
+
+  <div id="config-errors" class="alert" hidden></div>
+
+  <div class="grid">
+    <section class="card" aria-labelledby="send-title">
+      <h2 id="send-title"><span class="step">1</span>Enviar mensaje</h2>
+      <form id="send-form" novalidate>
+        <label for="to">Número de destino</label>
+        <input id="to" name="to" type="tel" inputmode="tel" autocomplete="off" placeholder="51987654321" required>
+        <p class="hint">Con código de país, sin espacios. Durante el desarrollo, usa un número de prueba registrado en tu app.</p>
+
+        <fieldset>
+          <legend>Tipo de mensaje</legend>
+          <label class="choice"><input type="radio" name="type" value="template" checked> Plantilla</label>
+          <label class="choice"><input type="radio" name="type" value="text"> Texto</label>
+        </fieldset>
+
+        <div id="template-fields">
+          <label for="send-template">Plantilla aprobada</label>
+          <select id="send-template">
+            <option value="hello_world|en_US">hello_world · en_US</option>
+          </select>
+          <p class="hint">Solo aparecen las plantillas con estado APPROVED.</p>
+        </div>
+
+        <div id="text-fields" hidden>
+          <label for="text">Texto</label>
+          <textarea id="text" rows="4" maxlength="4096" placeholder="Hola, gracias por escribirnos."></textarea>
+          <p class="hint">WhatsApp solo entrega texto libre si el destinatario te escribió en las últimas 24 horas.</p>
+        </div>
+
+        <button type="submit" class="primary">Enviar mensaje</button>
+      </form>
+    </section>
+
+    <section class="card" aria-labelledby="create-title">
+      <h2 id="create-title"><span class="step">2</span>Crear plantilla</h2>
+      <form id="create-form" novalidate>
+        <label for="tpl-name">Nombre</label>
+        <input id="tpl-name" autocomplete="off" placeholder="confirmacion_cita" pattern="[a-z0-9_]+" required>
+        <p class="hint">Minúsculas, números y guion bajo.</p>
+
+        <div class="row">
+          <div>
+            <label for="tpl-language">Idioma</label>
+            <select id="tpl-language">
+              <option value="es">Español (es)</option>
+              <option value="es_MX">Español · México (es_MX)</option>
+              <option value="es_AR">Español · Argentina (es_AR)</option>
+              <option value="es_ES">Español · España (es_ES)</option>
+              <option value="en_US">Inglés · EE. UU. (en_US)</option>
+            </select>
+          </div>
+          <div>
+            <label for="tpl-category">Categoría</label>
+            <select id="tpl-category">
+              <option value="UTILITY">Utilidad (UTILITY)</option>
+              <option value="MARKETING">Marketing (MARKETING)</option>
+            </select>
+          </div>
+        </div>
+
+        <label for="tpl-body">Cuerpo</label>
+        <textarea id="tpl-body" rows="4" maxlength="1024" placeholder="Hola {{1}}, tu cita está confirmada para el {{2}}." required></textarea>
+
+        <label for="tpl-examples">Valores de ejemplo <span class="optional">uno por línea, uno por cada variable</span></label>
+        <textarea id="tpl-examples" rows="2" placeholder="Lucía&#10;5 de noviembre a las 10:00"></textarea>
+
+        <label for="tpl-footer">Pie <span class="optional">opcional</span></label>
+        <input id="tpl-footer" maxlength="60" placeholder="Responde STOP para dejar de recibir mensajes">
+
+        <button type="submit" class="primary">Enviar a revisión de Meta</button>
+      </form>
+    </section>
+  </div>
+
+  <section class="card" aria-labelledby="list-title">
+    <div class="card-head">
+      <h2 id="list-title"><span class="step">3</span>Plantillas de la cuenta</h2>
+      <button id="refresh" type="button" class="secondary">Actualizar</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th scope="col">Nombre</th><th scope="col">Idioma</th><th scope="col">Categoría</th><th scope="col">Estado</th></tr></thead>
+        <tbody id="templates"><tr><td colspan="4" class="muted">Sin datos todavía.</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="log-title">
+    <h2 id="log-title">Registro de actividad</h2>
+    <ol id="log" class="log" aria-live="polite"></ol>
+  </section>
+</main>
+
+<footer class="footer">
+  <span>LAZO · Conecta conversaciones. Impulsa ventas.</span>
+  <span>Las credenciales se guardan solo en el servidor.</span>
+</footer>
+</body>
+</html>
