@@ -95,3 +95,10 @@ Un abogado debe revisar el texto después, en especial la adecuación a la Ley N
 - Al integrar, sincronizar solo docs/legal/ hacia legal/ en gh-pages y conservar CNAME.
 - Credenciales, prueba real, grabaciones y revisión Meta: pendientes. No se han recibido ni mostrado tokens.
 
+## Resultado de configuración Meta — Codex (1 de noviembre de 2026)
+
+- PR #8 integrado en main fbc842a tras revisión independiente sin hallazgos. PR #9 integrado en gh-pages a718810; contenido regenerado desde main/docs/legal y CNAME conservado byte a byte. Política pública devuelve HTTP 200 y muestra Zoho Mail/correo y GoDaddy/registro del dominio. Las otras dos páginas legales responden HTTP 200.
+- Usuario confirmó que la app Meta es MiCRM, ID 1542490610948026. Nombre visible conservado. URLs de privacidad, términos e instrucciones de eliminación guardadas y releídas tras recarga. Correo contacto@espacio-sereno.com confirmado visualmente. Categoría Mensajes e ícono orbital provisional ya estaban configurados; se conservaron.
+- npm test en app-meta/: 15/15 pruebas pasan con Meta simulada; ninguna llamada real a Meta.
+- Copia local para esta fase: C:\Users\acer\lazo-meta. app-meta/.env creado a partir del ejemplo y exclusión Git comprobada; valores privados pendientes de entrada del usuario. Nunca leer ni registrar su contenido.
+- Próximo paso: usuario completa token, WABA ID, Phone Number ID y Graph API en su archivo local. Luego prueba real con su teléfono, confirmación humana de recepción, dos grabaciones y formulario. Ninguno de esos pasos se declara completado. No se envió la revisión ni se publicó la app Meta.
