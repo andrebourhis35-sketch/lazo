@@ -64,12 +64,12 @@ Alcance: solo lo necesario para enviar la revisión. No autoriza ampliar el prod
 
 | Responsable | Trabajo | Archivos | Rama | Estado |
 |---|---|---|---|---|
-| Claude | App mínima (backend Node.js + interfaz) | app-meta/ | claude/app-revision-meta | Revisado por Codex (`/codex:review --base main`, 2 hallazgos P2 corregidos); 15 pruebas locales con Meta simulada |
+| Claude | App mínima (backend Node.js + interfaz) | app-meta/ | claude/app-revision-meta | Revisado por Codex (`/codex:review --base main`): 2 hallazgos P2 corregidos; segunda revisión sin hallazgos. 15 pruebas locales con Meta simulada; sin pruebas contra Meta real |
 | Claude | Ícono 1024×1024 provisional desde el isotipo A | branding/app-meta/ | claude/app-revision-meta | Generado y revisado a la vista; provisional |
 | Claude | Guion de videos y lista de verificación | docs/meta-revision/ | claude/app-revision-meta | Listo para revisión |
 | Claude | Configuración del repositorio (LF, credenciales fuera del repo) | .gitattributes, .gitignore, este tablero | claude/app-revision-meta | Listo |
 | Codex | Páginas legales (borradores para revisión de abogado) | docs/legal/ | claude/app-revision-meta (delegado por Claude) | Borradores entregados; Claude comprobó LF, HTML y enlaces; pendiente de abogado |
-| Codex | Revisión del PR con `/codex:review --base main` (la ejecuta el usuario) | — | — | Pendiente |
+| Codex | Revisión del PR con `/codex:review --base main` (la ejecuta el usuario) | — | — | Hecha dos veces el 1 de noviembre de 2026; la segunda, sin hallazgos |
 | Usuario | Aprobar isotipo definitivo; completar datos legales; credenciales en `.env` local | — | — | Pendiente |
 
 Las fuentes de `branding/lienzo/`, la landing, el CRM de diseño e `interfaz/` no se modifican.
