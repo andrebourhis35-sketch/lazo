@@ -4,7 +4,8 @@ Marca cada punto antes de enviar. Los nombres de los campos pueden variar: conf�
 
 ## Datos que debes completar (no están en el repositorio)
 
-- [ ] `[NOMBRE LEGAL DE LA LLC]`, `[ESTADO DE CONSTITUCIÓN]`, `[DIRECCIÓN]`, `[EMAIL DE CONTACTO]` y los demás marcadores de `docs/legal/`.
+- [x] Nombre legal de la LLC, estado de constitución, dirección y correo de contacto (completados el 1 de noviembre de 2026).
+- [ ] Demás marcadores de `docs/legal/` (plazos, base jurídica, ley aplicable y otros), pendientes del abogado.
 - [ ] Revisión de las tres páginas legales por un abogado.
 - [ ] `app-meta/.env` con token, WABA ID, Phone Number ID y versión de Graph API (solo en tu equipo).
 - [ ] Correo de contacto de la app en el panel.
