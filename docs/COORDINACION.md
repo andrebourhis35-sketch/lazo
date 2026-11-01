@@ -79,3 +79,10 @@ Las fuentes de `branding/lienzo/`, la landing, el CRM de diseño e `interfaz/` n
 Según indicó el usuario, el titular de la app ante Meta es la empresa verificada en Meta: La Boutique du Monde E.I.R.L., empresa constituida en Perú, con RUC 20610684760, con domicilio en Av. Brasil 3730, Magdalena del Mar, Lima 15087, Perú. Correo de contacto: contacto@espacio-sereno.com.
 
 Las páginas de `docs/legal/` ya no mencionan a OpenChapter LLC (rama `claude/titular-verificado`). Siguen siendo borrador: los marcadores legales pendientes y la adecuación a la Ley N.º 29733 quedan para el abogado. `README.md` todavía describe a la propietaria como "LLC constituida en Estados Unidos"; no se modificó en este cambio.
+
+## Políticas legales completas (1 de noviembre de 2026)
+
+A petición del usuario, Claude completó en la rama `claude/politicas-completas` las páginas de `docs/legal/` (índice, privacidad, términos y eliminación de datos) con los datos reales que aportó: titular, proveedores, conservación, plazo de respuesta, edad mínima, ley aplicable y jurisdicción. Las páginas ya no tienen marcadores ni avisos de borrador, para poder publicarlas en la revisión de Meta.
+
+Un abogado debe revisar el texto después, en especial la adecuación a la Ley N.º 29733 y su reglamento, las transferencias internacionales y las cláusulas de los términos. La rama `gh-pages` se regenerará desde `main` cuando el usuario integre este cambio.
+
