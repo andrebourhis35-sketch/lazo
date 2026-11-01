@@ -6,9 +6,9 @@ El isotipo que se usa aquí es **provisional**: el isotipo A refinado sigue pend
 
 ## Funciones
 
-1. **Enviar mensaje** (`whatsapp_business_messaging`): envía la plantilla `hello_world` (u otra aprobada) o un texto a un número de WhatsApp.
+1. **Enviar mensaje** (`whatsapp_business_messaging`): envía la plantilla `hello_world`, otra plantilla aprobada (con un campo de valor por cada variable `{{n}}` del cuerpo) o un texto a un número de WhatsApp.
 2. **Crear plantilla** (`whatsapp_business_management`): crea una plantilla con cuerpo, variables `{{n}}` con ejemplos y pie opcional. Categorías: UTILITY o MARKETING.
-3. **Listar plantillas** (`whatsapp_business_management`): muestra nombre, idioma, categoría, estado y motivo de rechazo.
+3. **Listar plantillas** (`whatsapp_business_management`): muestra nombre, idioma, categoría, estado y motivo de rechazo. Recorre todas las páginas de la Graph API, hasta 2000 plantillas; si hay más, la interfaz lo avisa.
 
 Llamadas a la Graph API oficial (`https://graph.facebook.com/<GRAPH_API_VERSION>/…`):
 
@@ -59,5 +59,6 @@ Las pruebas sustituyen la Graph API por una simulación: **no** llaman a Meta. C
 
 - Texto libre: WhatsApp solo lo entrega si el destinatario escribió en las últimas 24 horas. Para el primer contacto, usa una plantilla (`hello_world`).
 - No recibe mensajes (no hay webhook) y no guarda datos: lo enviado queda en Meta y en WhatsApp.
-- Plantillas: solo cuerpo y pie de texto. Sin encabezados multimedia, botones ni categoría AUTHENTICATION.
+- Crear plantillas: solo cuerpo y pie de texto. Sin encabezados multimedia, botones ni categoría AUTHENTICATION.
+- Enviar plantillas: solo las aprobadas cuyas únicas variables son numéricas (`{{1}}`) y están en el cuerpo. No aparecen en el selector las que tienen encabezado multimedia o con variables, botones con variables, variables con nombre (`{{cliente}}`) o categoría AUTHENTICATION.
 - Pensada para ejecutarse en local durante la grabación de los videos. No está preparada para producción.

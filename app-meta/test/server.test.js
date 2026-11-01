@@ -29,10 +29,22 @@ async function fakeFetch(url, init) {
     return Response.json({ messaging_product: 'whatsapp', contacts: [{ input: '51987654321', wa_id: '51987654321' }], messages: [{ id: 'wamid.PRUEBA' }] });
   }
   if (pathname.endsWith('/message_templates') && init.method === 'GET') {
+    // Dos páginas: la segunda se pide con el cursor "after".
+    if (new URL(url).searchParams.get('after') === 'CURSOR2') {
+      return Response.json({ data: [
+        { id: '3', name: 'cita', status: 'APPROVED', category: 'UTILITY', language: 'es',
+          components: [{ type: 'BODY', text: 'Hola {{1}}, tu cita es el {{2}}. {{1}}' }] },
+        { id: '4', name: 'con_imagen', status: 'APPROVED', category: 'MARKETING', language: 'es',
+          components: [{ type: 'HEADER', format: 'IMAGE' }, { type: 'BODY', text: 'Oferta' }] },
+        { id: '5', name: 'nombrada', status: 'APPROVED', category: 'UTILITY', language: 'es',
+          components: [{ type: 'BODY', text: 'Hola {{cliente}}' }] },
+      ], paging: { cursors: { before: 'B', after: 'FIN' } } });
+    }
     return Response.json({ data: [
-      { id: '1', name: 'hello_world', status: 'APPROVED', category: 'UTILITY', language: 'en_US' },
+      { id: '1', name: 'hello_world', status: 'APPROVED', category: 'UTILITY', language: 'en_US',
+        components: [{ type: 'HEADER', format: 'TEXT', text: 'Hello World' }, { type: 'BODY', text: 'Welcome' }] },
       { id: '2', name: 'promo', status: 'REJECTED', category: 'MARKETING', language: 'es', rejected_reason: 'PROMOTIONAL' },
-    ] });
+    ], paging: { cursors: { before: 'A', after: 'CURSOR2' }, next: 'https://graph.facebook.com/siguiente' } });
   }
   if (pathname.endsWith('/message_templates') && init.method === 'POST') {
     return Response.json({ id: '987', status: 'PENDING', category: 'UTILITY' });
@@ -91,13 +103,43 @@ test('rechaza número no válido sin llamar a Meta', async () => {
   assert.equal(calls.length, 0);
 });
 
-test('lista plantillas con estado y motivo de rechazo', async () => {
+test('lista todas las páginas de plantillas con estado y motivo de rechazo', async () => {
   calls.length = 0;
   const res = await fetch(`${base}/api/templates`);
-  const { templates } = await res.json();
-  assert.equal(templates.length, 2);
-  assert.equal(templates[1].rejectedReason, 'PROMOTIONAL');
+  const { templates, truncated } = await res.json();
+  assert.equal(calls.length, 2);
   assert.match(calls[0].url, /^https:\/\/graph\.facebook\.com\/v99\.0\/1111222233334444\/message_templates\?fields=/);
+  assert.equal(new URL(calls[1].url).searchParams.get('after'), 'CURSOR2');
+  assert.equal(truncated, false);
+  assert.deepEqual(templates.map((t) => t.name), ['hello_world', 'promo', 'cita', 'con_imagen', 'nombrada']);
+  assert.equal(templates[1].rejectedReason, 'PROMOTIONAL');
+});
+
+test('marca qué plantillas puede enviar la app y cuántas variables tienen', async () => {
+  const { templates } = await (await fetch(`${base}/api/templates`)).json();
+  const byName = Object.fromEntries(templates.map((t) => [t.name, t]));
+  assert.deepEqual([byName.hello_world.sendable, byName.hello_world.bodyVariables], [true, 0]);
+  assert.equal(byName.promo.sendable, false);
+  assert.deepEqual([byName.cita.sendable, byName.cita.bodyVariables], [true, 2]);
+  assert.equal(byName.con_imagen.sendable, false);
+  assert.equal(byName.nombrada.sendable, false);
+});
+
+test('envía plantilla con variables como parámetros del cuerpo', async () => {
+  calls.length = 0;
+  const res = await post('/api/messages', { to: '51987654321', type: 'template', templateName: 'cita', language: 'es', parameters: [' Lucía ', 'lunes'] });
+  assert.equal(res.status, 200);
+  assert.deepEqual(calls[0].body.template, {
+    name: 'cita', language: { code: 'es' },
+    components: [{ type: 'body', parameters: [{ type: 'text', text: 'Lucía' }, { type: 'text', text: 'lunes' }] }],
+  });
+});
+
+test('rechaza parámetros vacíos sin llamar a Meta', async () => {
+  calls.length = 0;
+  const res = await post('/api/messages', { to: '51987654321', type: 'template', templateName: 'cita', language: 'es', parameters: ['Lucía', ' '] });
+  assert.equal(res.status, 400);
+  assert.equal(calls.length, 0);
 });
 
 test('crea plantilla con variables y ejemplos', async () => {

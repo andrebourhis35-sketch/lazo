@@ -38,7 +38,7 @@ Para que el paso opcional funcione, haz que el teléfono destinatario escriba an
 | 1:50–2:20 | La tabla se actualiza sola y muestra la nueva plantilla con estado PENDING o APPROVED. | "La empresa ve el estado de cada plantilla sin salir de LAZO." |
 | 2:20–2:45 | Opcional: muestra la misma plantilla en el Administrador de WhatsApp de Meta como comprobación. | "La plantilla creada aparece en la cuenta de WhatsApp Business." |
 
-Usa un nombre de plantilla nuevo en cada intento: Meta rechaza nombres repetidos en el mismo idioma. Si la plantilla queda aprobada antes de terminar, puedes cerrar enviándola desde la sección 1.
+Usa un nombre de plantilla nuevo en cada intento: Meta rechaza nombres repetidos en el mismo idioma. Si la plantilla queda aprobada antes de terminar, puedes cerrar enviándola desde la sección 1: al elegirla aparecen los campos "Valor de {{1}}" y "Valor de {{2}}".
 
 ## Después de grabar
 

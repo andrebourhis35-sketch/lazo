@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { maskId } from './config.js';
 import { createMetaClient, MetaApiError } from './meta.js';
-import { validateSendMessage, validateTemplate } from './validation.js';
+import { describeTemplate, validateSendMessage, validateTemplate } from './validation.js';
 
 const PUBLIC_DIR = fileURLToPath(new URL('../public/', import.meta.url));
 const MAX_BODY_BYTES = 16 * 1024;
@@ -100,16 +100,8 @@ export function createApp(config, { fetchImpl = fetch } = {}) {
 
     'GET /api/templates': async () => {
       requireReady();
-      const data = await meta.listTemplates();
-      const templates = (data?.data ?? []).map((t) => ({
-        id: t.id,
-        name: t.name,
-        status: t.status,
-        category: t.category,
-        language: t.language,
-        rejectedReason: t.rejected_reason && t.rejected_reason !== 'NONE' ? t.rejected_reason : null,
-      }));
-      return { templates };
+      const { templates, truncated } = await meta.listTemplates();
+      return { templates: templates.map(describeTemplate), truncated };
     },
 
     'POST /api/templates': async (req) => {

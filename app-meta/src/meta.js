@@ -1,6 +1,8 @@
 // Cliente mínimo de la WhatsApp Cloud API (Graph API oficial de Meta).
 
 const GRAPH_BASE = 'https://graph.facebook.com';
+// Límite de seguridad: 20 páginas de 100 plantillas.
+const MAX_TEMPLATE_PAGES = 20;
 
 export class MetaApiError extends Error {
   constructor(message, { status, code, subcode, fbtraceId } = {}) {
@@ -68,14 +70,29 @@ export function createMetaClient({ token, graphVersion, wabaId, phoneNumberId, f
       } else {
         payload.type = 'template';
         payload.template = { name: msg.templateName, language: { code: msg.language } };
+        if (msg.parameters?.length) {
+          payload.template.components = [{
+            type: 'body',
+            parameters: msg.parameters.map((text) => ({ type: 'text', text })),
+          }];
+        }
       }
       return request('POST', `${phoneNumberId}/messages`, { body: payload });
     },
 
-    listTemplates() {
-      return request('GET', `${wabaId}/message_templates`, {
-        query: { fields: 'id,name,status,category,language,rejected_reason', limit: '100' },
-      });
+    /** Devuelve todas las plantillas siguiendo los cursores de paginación de la Graph API. */
+    async listTemplates() {
+      const templates = [];
+      let after = null;
+      for (let page = 0; page < MAX_TEMPLATE_PAGES; page++) {
+        const query = { fields: 'id,name,status,category,language,rejected_reason,components', limit: '100' };
+        if (after) query.after = after;
+        const data = await request('GET', `${wabaId}/message_templates`, { query });
+        templates.push(...(data?.data ?? []));
+        after = data?.paging?.next ? data?.paging?.cursors?.after : null;
+        if (!after) return { templates, truncated: false };
+      }
+      return { templates, truncated: true };
     },
 
     createTemplate(template) {

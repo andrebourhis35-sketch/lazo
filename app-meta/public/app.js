@@ -102,20 +102,48 @@ function renderTemplates(templates) {
     }
   }
 
-  // Plantillas aprobadas disponibles para enviar; hello_world siempre como opción.
+  // Plantillas que la app puede enviar; hello_world (sin variables) siempre como opción.
   const select = $('send-template');
   const previous = select.value;
-  const options = new Map([['hello_world|en_US', 'hello_world · en_US']]);
+  const options = new Map([['hello_world|en_US', { label: 'hello_world · en_US', variables: 0 }]]);
   for (const t of templates) {
-    if (t.status === 'APPROVED') options.set(`${t.name}|${t.language}`, `${t.name} · ${t.language}`);
+    if (t.sendable) {
+      const vars = t.bodyVariables ? ` · ${t.bodyVariables} variable(s)` : '';
+      options.set(`${t.name}|${t.language}`, { label: `${t.name} · ${t.language}${vars}`, variables: t.bodyVariables });
+    }
   }
-  select.replaceChildren(...[...options].map(([value, label]) => new Option(label, value)));
+  templateVariables = new Map([...options].map(([value, o]) => [value, o.variables]));
+  select.replaceChildren(...[...options].map(([value, o]) => new Option(o.label, value)));
   if (options.has(previous)) select.value = previous;
+  renderTemplateParams();
+}
+
+// Número de variables del cuerpo de cada plantilla enviable, por "nombre|idioma".
+let templateVariables = new Map([['hello_world|en_US', 0]]);
+
+function renderTemplateParams() {
+  const box = $('template-params');
+  const count = templateVariables.get($('send-template').value) ?? 0;
+  const values = [...box.querySelectorAll('input')].map((i) => i.value);
+  box.replaceChildren();
+  for (let n = 1; n <= count; n++) {
+    const label = document.createElement('label');
+    label.htmlFor = `param-${n}`;
+    label.textContent = `Valor de {{${n}}}`;
+    const input = document.createElement('input');
+    input.id = `param-${n}`;
+    input.required = true;
+    input.maxLength = 1024;
+    input.autocomplete = 'off';
+    input.value = values[n - 1] ?? '';
+    box.append(label, input);
+  }
 }
 
 async function loadTemplates() {
-  const { templates } = await api('GET', '/api/templates');
+  const { templates, truncated } = await api('GET', '/api/templates');
   renderTemplates(templates);
+  $('templates-truncated').hidden = !truncated;
   log('ok', `Plantillas actualizadas: ${templates.length}.`);
 }
 
@@ -127,6 +155,8 @@ document.querySelectorAll('input[name="type"]').forEach((radio) => {
   });
 });
 
+$('send-template').addEventListener('change', renderTemplateParams);
+
 $('send-form').addEventListener('submit', (event) => {
   event.preventDefault();
   const button = event.submitter;
@@ -137,7 +167,8 @@ $('send-form').addEventListener('submit', (event) => {
       payload.text = $('text').value;
     } else {
       const [templateName, language] = $('send-template').value.split('|');
-      Object.assign(payload, { templateName, language });
+      const parameters = [...$('template-params').querySelectorAll('input')].map((i) => i.value);
+      Object.assign(payload, { templateName, language, parameters });
     }
     const result = await api('POST', '/api/messages', payload);
     log('ok', `Mensaje aceptado por WhatsApp para ${result.to}. ID:`, result.messageId);

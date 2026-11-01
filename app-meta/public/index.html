@@ -46,7 +46,8 @@
           <select id="send-template">
             <option value="hello_world|en_US">hello_world · en_US</option>
           </select>
-          <p class="hint">Solo aparecen las plantillas con estado APPROVED.</p>
+          <p class="hint">Solo aparecen las plantillas aprobadas (APPROVED) cuyas únicas variables están en el cuerpo.</p>
+          <div id="template-params"></div>
         </div>
 
         <div id="text-fields" hidden>
@@ -105,6 +106,7 @@
       <h2 id="list-title"><span class="step">3</span>Plantillas de la cuenta</h2>
       <button id="refresh" type="button" class="secondary">Actualizar</button>
     </div>
+    <p id="templates-truncated" class="hint" hidden>La cuenta tiene más de 2000 plantillas: solo se muestran las primeras 2000.</p>
     <div class="table-wrap">
       <table>
         <thead><tr><th scope="col">Nombre</th><th scope="col">Idioma</th><th scope="col">Categoría</th><th scope="col">Estado</th></tr></thead>

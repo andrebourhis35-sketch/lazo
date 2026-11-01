@@ -4,6 +4,7 @@
 const TEMPLATE_NAME = /^[a-z0-9_]{1,512}$/;
 const LANGUAGE_CODE = /^[a-z]{2,3}(_[A-Z]{2})?$/;
 const VARIABLE = /\{\{\s*(\d+)\s*\}\}/g;
+const NAMED_VARIABLE = /\{\{\s*[a-z_][a-z0-9_]*\s*\}\}/;
 const CATEGORIES = new Set(['UTILITY', 'MARKETING']);
 
 const fail = (error) => ({ ok: false, error });
@@ -36,7 +37,12 @@ export function validateSendMessage(body) {
     const language = isText(body.language) ? body.language.trim() : '';
     if (!TEMPLATE_NAME.test(name)) return fail('Nombre de plantilla no válido.');
     if (!LANGUAGE_CODE.test(language)) return fail('Código de idioma no válido (por ejemplo, es o en_US).');
-    return { ok: true, value: { to: phone.value, type: 'template', templateName: name, language } };
+    const raw = body.parameters ?? [];
+    if (!Array.isArray(raw) || raw.length > 20) return fail('Parámetros de plantilla no válidos.');
+    const parameters = raw.map((p) => (isText(p) ? p.trim() : ''));
+    if (parameters.some((p) => !p)) return fail('Completa el valor de cada variable de la plantilla.');
+    if (parameters.some((p) => p.length > 1024)) return fail('Cada valor de variable admite hasta 1024 caracteres.');
+    return { ok: true, value: { to: phone.value, type: 'template', templateName: name, language, parameters } };
   }
 
   return fail('El tipo de mensaje debe ser "text" o "template".');
@@ -87,4 +93,35 @@ export function validateTemplate(body) {
   if (footer) components.push({ type: 'FOOTER', text: footer });
 
   return { ok: true, value: { name, language, category, components } };
+}
+
+/**
+ * Resume una plantilla de la Graph API para la interfaz.
+ * Solo se puede enviar desde la app si sus únicas variables están en el cuerpo:
+ * encabezados multimedia o con variables y botones con variables necesitan datos que esta app no pide.
+ */
+export function describeTemplate(t) {
+  const components = Array.isArray(t.components) ? t.components : [];
+  const body = components.find((c) => c.type === 'BODY');
+  const bodyVariables = body?.text ? new Set(findVariables(body.text)).size : 0;
+
+  const header = components.find((c) => c.type === 'HEADER');
+  const headerUnsupported = header && (header.format !== 'TEXT' || findVariables(header.text ?? '').length > 0);
+  const buttons = components.find((c) => c.type === 'BUTTONS')?.buttons ?? [];
+  const supportedButton = (b) => b.type === 'QUICK_REPLY' || b.type === 'PHONE_NUMBER'
+    || (b.type === 'URL' && findVariables(b.url ?? '').length === 0);
+  const buttonsUnsupported = buttons.some((b) => !supportedButton(b));
+  // Variables con nombre ({{cliente}}) requieren parameter_name: no las admite esta app.
+  const namedVariables = components.some((c) => NAMED_VARIABLE.test(c.text ?? ''));
+
+  return {
+    id: t.id,
+    name: t.name,
+    status: t.status,
+    category: t.category,
+    language: t.language,
+    rejectedReason: t.rejected_reason && t.rejected_reason !== 'NONE' ? t.rejected_reason : null,
+    bodyVariables,
+    sendable: t.status === 'APPROVED' && t.category !== 'AUTHENTICATION' && !headerUnsupported && !buttonsUnsupported && !namedVariables,
+  };
 }

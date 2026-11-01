@@ -64,7 +64,7 @@ Alcance: solo lo necesario para enviar la revisión. No autoriza ampliar el prod
 
 | Responsable | Trabajo | Archivos | Rama | Estado |
 |---|---|---|---|---|
-| Claude | App mínima (backend Node.js + interfaz) | app-meta/ | claude/app-revision-meta | Listo; 12 pruebas locales con Meta simulada; pendiente de revisión de Codex |
+| Claude | App mínima (backend Node.js + interfaz) | app-meta/ | claude/app-revision-meta | Revisado por Codex (`/codex:review --base main`, 2 hallazgos P2 corregidos); 15 pruebas locales con Meta simulada |
 | Claude | Ícono 1024×1024 provisional desde el isotipo A | branding/app-meta/ | claude/app-revision-meta | Generado y revisado a la vista; provisional |
 | Claude | Guion de videos y lista de verificación | docs/meta-revision/ | claude/app-revision-meta | Listo para revisión |
 | Claude | Configuración del repositorio (LF, credenciales fuera del repo) | .gitattributes, .gitignore, este tablero | claude/app-revision-meta | Listo |
