@@ -12,14 +12,14 @@ Marca cada punto antes de enviar. Los nombres de los campos pueden variar: conf�
 
 ## Configuración básica de la app
 
-- [ ] **URL de la política de privacidad:** `https://andrebourhis35-sketch.github.io/lazo/legal/privacidad.html`. Funcionará solo si activas GitHub Pages desde `main` y carpeta `/docs`, después de integrar el PR. Ábrela en una ventana privada para comprobarla.
-- [ ] **URL de las condiciones del servicio:** `https://andrebourhis35-sketch.github.io/lazo/legal/terminos.html`
-- [ ] **Eliminación de datos:** elige "URL de instrucciones" y usa `https://andrebourhis35-sketch.github.io/lazo/legal/eliminacion-datos.html`. La app no tiene callback de eliminación.
+- [ ] **URL de la política de privacidad:** `https://legal.espacio-sereno.com/legal/privacidad.html`. Publicada desde la rama `gh-pages`, que contiene únicamente `legal/` y `CNAME`. Ábrela sin iniciar sesión para comprobarla.
+- [ ] **URL de las condiciones del servicio:** `https://legal.espacio-sereno.com/legal/terminos.html`
+- [ ] **Eliminación de datos:** elige "URL de instrucciones" y usa `https://legal.espacio-sereno.com/legal/eliminacion-datos.html`. La app no tiene callback de eliminación.
 - [ ] **Ícono de la app (1024×1024):** `branding/app-meta/icono-app-1024-PROVISIONAL.png`. Provisional: el isotipo A sigue pendiente de aprobación.
-- [ ] **Categoría:** propuesta "Negocios y páginas" (o la más cercana a mensajería para empresas que ofrezca el panel). Decisión tuya.
+- [ ] **Categoría:** Messaging (Mensajería), según la indicación del usuario; confirmar la opción disponible en el panel.
 - [x] **Verificación del negocio:** La Boutique du Monde E.I.R.L. (RUC 20610684760) es la empresa verificada en Meta. Comprueba que la app esté asociada a ese portafolio comercial.
 
-Aviso: GitHub Pages desde `/docs` también publica el resto de esa carpeta, incluido `docs/COORDINACION.md`. Si no quieres que sea público, publica Pages desde otra rama o carpeta que solo contenga `legal/`.
+Publicación: regenerar `gh-pages` desde `main/docs/legal` después de integrar cambios legales, conservando `CNAME` con `legal.espacio-sereno.com`. No copiar otros documentos a esa rama.
 
 ## Permiso `whatsapp_business_messaging`
 
@@ -45,3 +45,4 @@ Aviso: GitHub Pages desde `/docs` también publica el resto de esa carpeta, incl
 - [ ] Ningún video ni captura muestra el token o `.env`.
 - [ ] La app usada en los videos es la de `app-meta/`, ejecutada con `npm start`.
 - [ ] Instrucciones para el revisor: explica que la app se ejecuta en local y que los videos muestran el flujo completo. Ofrece credenciales de prueba solo si el formulario las pide, y nunca tu token.
+
