@@ -8,7 +8,6 @@
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--fondo); color: var(--texto); font-family: "Manrope", system-ui, sans-serif; font-size: 18px; line-height: 1.7; overflow-wrap: anywhere; }
-.aviso { padding: 1rem max(1rem, calc((100% - 900px) / 2)); border-bottom: 4px solid var(--turquesa); background: var(--texto); color: var(--fondo); font-weight: 700; }
 header, main, footer { width: min(100% - 2rem, 900px); margin-inline: auto; }
 header { padding-block: 1.5rem; border-bottom: 2px solid var(--azul-claro); }
 .marca { display: inline-block; margin-bottom: 1rem; font-size: 2rem; font-weight: 800; text-decoration: none; }
@@ -21,7 +20,6 @@ h1 { font-size: clamp(2rem, 5vw, 2.8rem); line-height: 1.2; }
 h2 { margin-top: 2rem; font-size: 1.4rem; line-height: 1.4; }
 li { margin-block: .65rem; }
 ul, ol { padding-left: 1.6rem; }
-.marcador { padding: .1em .3em; background: var(--turquesa); color: var(--texto); border: 1px solid var(--texto); border-radius: 4px; font-weight: 700; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
 footer { padding-block: 1.5rem 2rem; border-top: 2px solid var(--azul-claro); }
 @media (max-width: 480px) {
   body { font-size: 16px; }

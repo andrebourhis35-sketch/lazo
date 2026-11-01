@@ -5,9 +5,8 @@ Marca cada punto antes de enviar. Los nombres de los campos pueden variar: conf�
 ## Datos que debes completar (no están en el repositorio)
 
 - [x] Titular: La Boutique du Monde E.I.R.L., empresa constituida en Perú, con RUC 20610684760, domicilio en Av. Brasil 3730, Magdalena del Mar, Lima 15087, Perú; correo contacto@espacio-sereno.com. Es la empresa verificada en Meta.
-- [ ] Adecuación a la Ley N.º 29733 de Protección de Datos Personales del Perú, pendiente del abogado.
-- [ ] Demás marcadores de `docs/legal/` (plazos, base jurídica, ley aplicable y otros), pendientes del abogado.
-- [ ] Revisión de las tres páginas legales por un abogado.
+- [x] Páginas legales completas y sin marcadores (1 de noviembre de 2026): base del tratamiento, proveedores, transferencias internacionales, conservación máxima de 90 días, respuesta en 10 días hábiles, mayores de 18 años, ley peruana (Ley N.º 29733) y jurisdicción de Lima.
+- [ ] Revisión del texto por un abogado después de publicarlo, incluida la adecuación a la Ley N.º 29733.
 - [ ] `app-meta/.env` con token, WABA ID, Phone Number ID y versión de Graph API (solo en tu equipo).
 - [ ] Correo de contacto de la app en el panel.
 
@@ -42,7 +41,7 @@ Aviso: GitHub Pages desde `/docs` también publica el resto de esa carpeta, incl
 
 ## Antes de enviar
 
-- [ ] Las tres URL legales abren sin iniciar sesión y sin marcadores pendientes.
+- [ ] Las tres URL legales abren sin iniciar sesión y muestran la versión de `gh-pages` regenerada después de integrar este cambio.
 - [ ] Ningún video ni captura muestra el token o `.env`.
 - [ ] La app usada en los videos es la de `app-meta/`, ejecutada con `npm start`.
 - [ ] Instrucciones para el revisor: explica que la app se ejecuta en local y que los videos muestran el flujo completo. Ofrece credenciales de prueba solo si el formulario las pide, y nunca tu token.
