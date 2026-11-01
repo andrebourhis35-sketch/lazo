@@ -1,0 +1,7 @@
+# Credenciales: nunca subir
+.env
+.env.*
+!.env.example
+
+# Dependencias y salidas locales
+node_modules/

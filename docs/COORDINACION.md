@@ -53,3 +53,23 @@ Origen: artefacto https://claude.ai/artifact/8YGnscSgBTwEUm9DF4opHe, versión `1
 - Sin recursos subidos al artefacto; la única dependencia externa es Manrope en Google Fonts.
 - No se modificaron landing, CRM ni aplicaciones; ningún archivo importado se editó.
 - Verificación visual: no realizada en esta importación. Los `.dc.html` necesitan el entorno del lienzo (`support.js`) y no se renderizan fuera de él; la revisión visual se hizo dentro del artefacto, no en el repositorio.
+
+## Autorización del usuario: app mínima para la revisión de Meta (1 de noviembre de 2026)
+
+Texto de la autorización, registrado tal como lo dio el usuario:
+
+> Autorizo desarrollar una aplicación mínima de LAZO cuyo único objetivo es cumplir los requisitos de la revisión de apps de Meta para los permisos whatsapp_business_messaging y whatsapp_business_management. Esto es una excepción acotada a la regla de no tocar aplicaciones. La landing y el CRM de diseño no se modifican. El isotipo A refinado sigue pendiente de aprobación: úsalo solo como provisional y márcalo así.
+
+Alcance: solo lo necesario para enviar la revisión. No autoriza ampliar el producto ni integrar `interfaz/` (PR #3).
+
+| Responsable | Trabajo | Archivos | Rama | Estado |
+|---|---|---|---|---|
+| Claude | App mínima (backend Node.js + interfaz) | app-meta/ | claude/app-revision-meta | Listo; 12 pruebas locales con Meta simulada; pendiente de revisión de Codex |
+| Claude | Ícono 1024×1024 provisional desde el isotipo A | branding/app-meta/ | claude/app-revision-meta | Generado y revisado a la vista; provisional |
+| Claude | Guion de videos y lista de verificación | docs/meta-revision/ | claude/app-revision-meta | Listo para revisión |
+| Claude | Configuración del repositorio (LF, credenciales fuera del repo) | .gitattributes, .gitignore, este tablero | claude/app-revision-meta | Listo |
+| Codex | Páginas legales (borradores para revisión de abogado) | docs/legal/ | claude/app-revision-meta (delegado por Claude) | Borradores entregados; Claude comprobó LF, HTML y enlaces; pendiente de abogado |
+| Codex | Revisión del PR con `/codex:review --base main` (la ejecuta el usuario) | — | — | Pendiente |
+| Usuario | Aprobar isotipo definitivo; completar datos legales; credenciales en `.env` local | — | — | Pendiente |
+
+Las fuentes de `branding/lienzo/`, la landing, el CRM de diseño e `interfaz/` no se modifican.
