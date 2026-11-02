@@ -106,3 +106,5 @@ Un abogado debe revisar el texto después, en especial la adecuación a la Ley N
 - Asistencia de credenciales: ventana local privada preparada fuera del repositorio para que el usuario complete los cuatro valores sin PowerShell. Token oculto, guardado local en .env excluido de Git y sin llamadas a Meta. Pendiente de entrada y confirmación del usuario; no inspeccionar formulario ni contenido del archivo.
 
 - Usuario informó que guardó el token nuevo. La app local se reinició y consulta real de plantillas de la cuenta seleccionada respondió correctamente: 0 plantillas, sin truncamiento (1 de noviembre de 2026). No se envió ningún mensaje ni se confirmó recepción. Pendiente identificar número emisor de prueba, registrar destinatario propio y comprobar disponibilidad de plantilla; no activar pagos.
+
+- 2 de noviembre: el usuario seleccionó número de prueba y confirmó destinatario verificado. Tras actualizar el token caducado, la consulta real a Meta respondió HTTP 200 con hello_world, en_US, APPROVED. App local abierta; envío y recepción siguen pendientes de confirmación humana.
