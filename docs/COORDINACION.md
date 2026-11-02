@@ -108,3 +108,5 @@ Un abogado debe revisar el texto después, en especial la adecuación a la Ley N
 - Usuario informó que guardó el token nuevo. La app local se reinició y consulta real de plantillas de la cuenta seleccionada respondió correctamente: 0 plantillas, sin truncamiento (1 de noviembre de 2026). No se envió ningún mensaje ni se confirmó recepción. Pendiente identificar número emisor de prueba, registrar destinatario propio y comprobar disponibilidad de plantilla; no activar pagos.
 
 - 2 de noviembre: el usuario seleccionó número de prueba y confirmó destinatario verificado. Tras actualizar el token caducado, la consulta real a Meta respondió HTTP 200 con hello_world, en_US, APPROVED. App local abierta; envío y recepción siguen pendientes de confirmación humana.
+
+- 2 de noviembre: LAZO registró aceptación por Meta de hello_world a las 10:23 y el usuario confirmó recepción real mediante captura de WhatsApp. El error previo 131030 quedó superado. Se preparó en la interfaz una plantilla de demostración para el video de management; todavía no se envió a revisión de Meta. Grabaciones y formulario pendientes.
