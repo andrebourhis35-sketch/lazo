@@ -1,0 +1,20 @@
+# Ejemplo para una instancia de revision independiente. No incluir credenciales.
+# Sustituir el dominio por el dominio de revision elegido y verificar DNS/TLS.
+revision-lazo.espacio-sereno.com {
+    tls {
+        issuer acme {
+            disable_tlsalpn_challenge
+        }
+    }
+    # Archivo separado fuera de Git: directiva basicauth con usuario y hash bcrypt.
+    import /etc/caddy/lazo-meta-review-auth.caddy
+    header {
+        Strict-Transport-Security "max-age=31536000"
+        X-Robots-Tag "noindex, nofollow, noarchive"
+        -Server
+    }
+    reverse_proxy 127.0.0.1:3027 {
+        header_up Host localhost:3027
+        header_up -Authorization
+    }
+}

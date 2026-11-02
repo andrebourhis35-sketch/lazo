@@ -90,6 +90,9 @@ export function createApp(config, { fetchImpl = fetch } = {}) {
       requireReady();
       const check = validateSendMessage(await readJson(req));
       if (!check.ok) throw new HttpError(400, check.error);
+      if (config.reviewMode && check.value.to !== config.reviewRecipient) {
+        throw new HttpError(403, 'En la revisión solo se puede enviar al destinatario de prueba autorizado.');
+      }
       const data = await meta.sendMessage(check.value);
       return {
         messageId: data?.messages?.[0]?.id ?? null,

@@ -103,6 +103,34 @@ test('rechaza número no válido sin llamar a Meta', async () => {
   assert.equal(calls.length, 0);
 });
 
+test('modo revisión solo envía al destinatario de prueba configurado', async () => {
+  let requestsToMeta = 0;
+  const restricted = await startServer(loadConfig({
+    ...ENV,
+    LAZO_REVIEW_MODE: '1',
+    LAZO_REVIEW_RECIPIENT: '51987654321',
+  }), { fetchImpl: async (...args) => { requestsToMeta++; return fakeFetch(...args); } });
+  try {
+    const url = `http://127.0.0.1:${restricted.address().port}/api/messages`;
+    const request = (to) => fetch(url, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to, type: 'template', templateName: 'hello_world', language: 'en_US' }),
+    });
+    assert.equal((await request('51912345678')).status, 403);
+    assert.equal(requestsToMeta, 0);
+    assert.equal((await request('+51 987 654 321')).status, 200);
+    assert.equal(requestsToMeta, 1);
+  } finally {
+    await new Promise((resolve) => restricted.close(resolve));
+  }
+});
+
+test('modo revisión falla de forma segura si falta el destinatario', () => {
+  assert.equal(loadConfig({ ...ENV, LAZO_REVIEW_MODE: '1' }).ready, false);
+  assert.equal(loadConfig({ ...ENV, LAZO_REVIEW_MODE: 'yes' }).ready, false);
+  assert.equal(loadConfig({ ...ENV, LAZO_REVIEW_MODE: '1', LAZO_REVIEW_RECIPIENT: '51987654321' }).ready, true);
+});
+
 test('lista todas las páginas de plantillas con estado y motivo de rechazo', async () => {
   calls.length = 0;
   const res = await fetch(`${base}/api/templates`);

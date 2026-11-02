@@ -54,6 +54,7 @@ Las pruebas sustituyen la Graph API por una simulación: **no** llaman a Meta. C
 - El servidor escucha solo en `127.0.0.1`. Rechaza cabeceras `Host` ajenas (protección frente a DNS rebinding) y exige `Content-Type: application/json` en los POST, así que otra web abierta en el navegador no puede enviar mensajes desde aquí.
 - Solo sirve una lista cerrada de archivos de `public/`. Envía cabeceras CSP, `nosniff`, `no-referrer` y `X-Frame-Options: DENY`.
 - Límite de 16 KB por solicitud y de 15 s por llamada a Meta.
+- El arranque `node src/index.js --review` exige `LAZO_REVIEW_RECIPIENT` y rechaza los envíos a otros números. Esto no añade autenticación: una instancia alojada necesita además acceso HTTPS protegido, como se describe en `deploy/README.md`.
 
 ## Límites conocidos
 
