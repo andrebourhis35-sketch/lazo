@@ -112,3 +112,5 @@ Un abogado debe revisar el texto después, en especial la adecuación a la Ley N
 - 2 de noviembre: LAZO registró aceptación por Meta de hello_world a las 10:23 y el usuario confirmó recepción real mediante captura de WhatsApp. El error previo 131030 quedó superado. Se preparó en la interfaz una plantilla de demostración para el video de management; todavía no se envió a revisión de Meta. Grabaciones y formulario pendientes.
 
 - Prueba de plantilla: Meta rechazó el ejemplo original con código 100 porque una variable quedaba al final del cuerpo. Se agregó texto después de {{2}} en el formulario y en el guion; pendiente nuevo envío y resultado de Meta.
+
+- La plantilla corregida confirmacion_cita_lazo_demo_02 fue enviada desde LAZO a Meta; el registro y listado muestran PENDING. El usuario informó que tiene un video; falta confirmar cuál o cuáles y revisar los archivos antes de adjuntarlos.
