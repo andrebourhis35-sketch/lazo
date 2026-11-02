@@ -33,7 +33,7 @@ Para que el paso opcional funcione, haz que el teléfono destinatario escriba an
 |---|---|---|
 | 0:00–0:15 | La app LAZO abierta. | "Este video muestra cómo usamos whatsapp_business_management." |
 | 0:15–0:40 | Sección 3, "Plantillas de la cuenta". Pulsa "Actualizar" y muestra la lista con sus estados. | "LAZO consulta las plantillas de la cuenta de WhatsApp Business y su estado de aprobación." |
-| 0:40–1:30 | Sección 2, "Crear plantilla". Nombre `confirmacion_cita_demo`, idioma Español (es), categoría Utilidad. Cuerpo: `Hola {{1}}, tu cita está confirmada para el {{2}}.` Ejemplos: `Lucía` y `5 de noviembre a las 10:00`. Pie: `LAZO`. | "La empresa crea una plantilla de mensaje desde LAZO." |
+| 0:40–1:30 | Sección 2, "Crear plantilla". Nombre `confirmacion_cita_demo`, idioma Español (es), categoría Utilidad. Cuerpo: `Hola {{1}}, tu cita está confirmada para el {{2}}. Gracias por confiar en nosotros.` Ejemplos: `Lucía` y `5 de noviembre a las 10:00`. Pie: `LAZO`. | "La empresa crea una plantilla de mensaje desde LAZO." |
 | 1:30–1:50 | Pulsa "Enviar a revisión de Meta". El Registro muestra la plantilla enviada con su ID y estado. | "La plantilla se envía a revisión de Meta mediante la API." |
 | 1:50–2:20 | La tabla se actualiza sola y muestra la nueva plantilla con estado PENDING o APPROVED. | "La empresa ve el estado de cada plantilla sin salir de LAZO." |
 | 2:20–2:45 | Opcional: muestra la misma plantilla en el Administrador de WhatsApp de Meta como comprobación. | "La plantilla creada aparece en la cuenta de WhatsApp Business." |
