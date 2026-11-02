@@ -10,6 +10,10 @@ if (existsSync(envPath)) {
   console.warn('No se encontró app-meta/.env. Copia .env.example como .env y completa los valores.');
 }
 
+// Una instalación de revisión siempre exige destinatario de prueba, aunque el
+// archivo de entorno no defina el modo o contenga un valor distinto.
+if (process.argv.includes('--review')) process.env.LAZO_REVIEW_MODE = '1';
+
 const config = loadConfig();
 if (!config.ready) {
   console.warn('Configuración incompleta. La interfaz abrirá, pero no llamará a Meta:');

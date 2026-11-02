@@ -7,6 +7,7 @@ const REQUIRED = [
 
 export const GRAPH_VERSION_PATTERN = /^v\d+\.\d+$/;
 const NUMERIC_ID_PATTERN = /^\d+$/;
+const PHONE_PATTERN = /^\d{8,15}$/;
 
 /**
  * Lee la configuración desde variables de entorno.
@@ -35,6 +36,15 @@ export function loadConfig(env = process.env) {
     errors.push('WHATSAPP_PHONE_NUMBER_ID debe ser numérico');
   }
 
+  const reviewMode = value('LAZO_REVIEW_MODE');
+  if (reviewMode && reviewMode !== '1') {
+    errors.push('LAZO_REVIEW_MODE debe ser 1 o estar ausente');
+  }
+  const reviewRecipient = value('LAZO_REVIEW_RECIPIENT');
+  if (reviewMode === '1' && !PHONE_PATTERN.test(reviewRecipient)) {
+    errors.push('LAZO_REVIEW_RECIPIENT debe tener entre 8 y 15 dígitos');
+  }
+
   const portText = value('PORT') || '3000';
   const port = Number(portText);
   if (!Number.isInteger(port) || port < 0 || port > 65535) {
@@ -45,6 +55,8 @@ export function loadConfig(env = process.env) {
     token: value('WHATSAPP_ACCESS_TOKEN'),
     wabaId,
     phoneNumberId,
+    reviewMode: reviewMode === '1',
+    reviewRecipient,
     graphVersion,
     port,
     host: '127.0.0.1',
