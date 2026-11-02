@@ -95,3 +95,26 @@ Un abogado debe revisar el texto después, en especial la adecuación a la Ley N
 - Al integrar, sincronizar solo docs/legal/ hacia legal/ en gh-pages y conservar CNAME.
 - Credenciales, prueba real, grabaciones y revisión Meta: pendientes. No se han recibido ni mostrado tokens.
 
+## Resultado de configuración Meta — Codex (1 de noviembre de 2026)
+
+- PR #8 integrado en main fbc842a tras revisión independiente sin hallazgos. PR #9 integrado en gh-pages a718810; contenido regenerado desde main/docs/legal y CNAME conservado byte a byte. Política pública devuelve HTTP 200 y muestra Zoho Mail/correo y GoDaddy/registro del dominio. Las otras dos páginas legales responden HTTP 200.
+- Usuario confirmó que la app Meta es MiCRM, ID 1542490610948026. Nombre visible conservado. URLs de privacidad, términos e instrucciones de eliminación guardadas y releídas tras recarga. Correo contacto@espacio-sereno.com confirmado visualmente. Categoría Mensajes e ícono orbital provisional ya estaban configurados; se conservaron.
+- npm test en app-meta/: 15/15 pruebas pasan con Meta simulada; ninguna llamada real a Meta.
+- Copia local para esta fase: C:\Users\acer\lazo-meta. app-meta/.env creado a partir del ejemplo y exclusión Git comprobada; valores privados pendientes de entrada del usuario. Nunca leer ni registrar su contenido.
+- Próximo paso: usuario completa token, WABA ID, Phone Number ID y Graph API en su archivo local. Luego prueba real con su teléfono, confirmación humana de recepción, dos grabaciones y formulario. Ninguno de esos pasos se declara completado. No se envió la revisión ni se publicó la app Meta.
+
+- Asistencia de credenciales: ventana local privada preparada fuera del repositorio para que el usuario complete los cuatro valores sin PowerShell. Token oculto, guardado local en .env excluido de Git y sin llamadas a Meta. Pendiente de entrada y confirmación del usuario; no inspeccionar formulario ni contenido del archivo.
+
+- Usuario informó que guardó el token nuevo. La app local se reinició y consulta real de plantillas de la cuenta seleccionada respondió correctamente: 0 plantillas, sin truncamiento (1 de noviembre de 2026). No se envió ningún mensaje ni se confirmó recepción. Pendiente identificar número emisor de prueba, registrar destinatario propio y comprobar disponibilidad de plantilla; no activar pagos.
+
+- 2 de noviembre: el usuario seleccionó número de prueba y confirmó destinatario verificado. Tras actualizar el token caducado, la consulta real a Meta respondió HTTP 200 con hello_world, en_US, APPROVED. App local abierta; envío y recepción siguen pendientes de confirmación humana.
+
+- 2 de noviembre: LAZO registró aceptación por Meta de hello_world a las 10:23 y el usuario confirmó recepción real mediante captura de WhatsApp. El error previo 131030 quedó superado. Se preparó en la interfaz una plantilla de demostración para el video de management; todavía no se envió a revisión de Meta. Grabaciones y formulario pendientes.
+
+- Prueba de plantilla: Meta rechazó el ejemplo original con código 100 porque una variable quedaba al final del cuerpo. Se agregó texto después de {{2}} en el formulario y en el guion; pendiente nuevo envío y resultado de Meta.
+
+- La plantilla corregida confirmacion_cita_lazo_demo_02 fue enviada desde LAZO a Meta; el registro y listado muestran PENDING. El usuario informó que tiene un video; falta confirmar cuál o cuáles y revisar los archivos antes de adjuntarlos.
+
+- 2 de noviembre: el usuario confirmó que grabó ambos videos y los subió en la solicitud de Meta. En la interfaz se verificó el video de envío y se comprobó la sección de gestión de plantillas completa, incluido su video y la prueba API. Meta seguía mostrando 0 de 1 pruebas requeridas para mensajería, pese a la recepción real confirmada; el panel indica hasta 24 horas de demora.
+- El usuario confirmó el uso permitido de public_profile. En tratamiento de datos se guardó que no hubo entregas por solicitudes de seguridad nacional y que no hay procedimientos establecidos de los enumerados; la pregunta sobre proveedores sigue pendiente de identificación precisa, con Sí seleccionado provisionalmente y sin proveedores agregados.
+- El usuario señaló que la app seguía llamándose MiCRM. Se cambió el nombre visible en Meta a LAZO y se verificó después de recargar; ID de app sin cambios. La app local de prueba no está preparada para exponerla públicamente. Pendientes: determinar acceso del revisor, proveedores efectivos y reconocimiento de la llamada de mensajería. Solicitud no enviada.
