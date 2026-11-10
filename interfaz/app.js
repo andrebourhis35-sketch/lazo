@@ -26,4 +26,3 @@ $('reset').addEventListener('click',()=>{chats=structuredClone(seed);active=1;fi
 $('details-toggle').addEventListener('click',()=>{const inbox=document.querySelector('.inbox');if(innerWidth<=1200){const open=inbox.classList.toggle('show-details');$('details-toggle').setAttribute('aria-expanded',open)}else{const hidden=inbox.classList.toggle('hide-details');$('details-toggle').setAttribute('aria-expanded',!hidden)}});
 $('back').addEventListener('click',()=>document.querySelector('.app').classList.remove('chat-open'));
 document.addEventListener('keydown',e=>{if(e.key==='/'&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)){e.preventDefault();$('search').focus()}if(e.key==='Escape'){document.querySelector('.inbox').classList.remove('show-details');document.querySelector('.app').classList.remove('chat-open')}});$('details-toggle').setAttribute('aria-expanded',innerWidth>1200);render();
-
