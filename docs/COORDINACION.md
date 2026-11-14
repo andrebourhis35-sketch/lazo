@@ -167,3 +167,11 @@ Un abogado debe revisar el texto después, en especial la adecuación a la Ley N
 - Evidencia: Chrome, vista de escritorio y viewport 390×844; alta de Contacto QA, búsqueda por correo, apertura de conversación vacía, mensaje local, nota, cambio de etapa desde ficha y Ventas; tras recargar se conservaron contacto, mensaje, nota y etapa. Restablecer demo recuperó los seis registros originales. Consola capturada sin errores ni advertencias.
 - Pruebas: 4/4 pruebas Node del modelo (persistencia de altas, almacenamiento corrupto, cambio de columna sin duplicar, validación de campos); comprobación de sintaxis de los tres scripts y git diff --check. No hubo llamadas reales a WhatsApp ni cambios en la instancia de revisión.
 - Entrega: vista previa local en http://127.0.0.1:8774/. Rama preparada para PR; no integrada ni desplegada en OVH. Próxima fase: revisión de la experiencia y después cuentas, permisos y almacenamiento de servidor.
+
+## Publicar interfaz en OVH — Codex (14 de noviembre de 2026)
+
+- El usuario autoriza comprobar si está publicada y publicarla si falta. El dominio servía el prototipo antiguo de Conversaciones; /interfaz/ devolvía 404.
+- Reserva: interfaz/index.html, docs/COORDINACION.md y documentación de publicación, rama codex/publicacion-interfaz-ovh. Responsable: Codex.
+- Revisión independiente del PR #23 en f2f7c22: sin hallazgos bloqueantes; cuatro pruebas pasan, scripts compatibles y alcance limitado al prototipo. PR integrado en main 911ee12.
+- Se prepara una publicación estática en la raíz del dominio y en /interfaz/, con respaldo y cambio atómico de la versión activa. Pendientes verificación HTTPS pública y recorrido en navegador.
+- La primera publicación devolvió HTTP 200 en ambas rutas y los 14 archivos coincidieron por SHA-256 desde este equipo. Para asegurar la actualización en navegadores que conservan los recursos del prototipo anterior, se añaden versiones a las URLs de scripts, estilos e imagen en interfaz/index.html antes de la verificación final.
