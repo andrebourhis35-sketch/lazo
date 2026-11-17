@@ -1,5 +1,6 @@
 import { randomUUID, createHmac, timingSafeEqual } from 'node:crypto';
 import { now, token, requireThat, text, phone, HttpError, vault } from './core.js';
+import { mediaFiles } from './media.js';
 
 const rank = { queued: 0, unknown: 0, accepted: 1, sent: 2, failed: 2.5, delivered: 3, read: 4 };
 export function laterStatus(before, after) {
@@ -12,6 +13,7 @@ export function validSignature(raw, signature, secret) {
 
 export function whatsapp(store, config, fetchImpl = fetch) {
   const secrets = vault(config.masterKey);
+  const media=mediaFiles(store,config,fetchImpl,credentials);
   function credentials(company) {
     const row = store.get('SELECT * FROM connections WHERE company_id=?', company);
     return row ? { ...row, ...secrets.open(row.config, company) } : null;
@@ -73,10 +75,14 @@ export function whatsapp(store, config, fetchImpl = fetch) {
     requireThat(typeof data.clientId==='string'&&/^[a-zA-Z\d-]{12,80}$/.test(data.clientId),'Identificador de envío no válido.');
     const old=store.get('SELECT * FROM messages WHERE company_id=? AND client_id=?',company,data.clientId);
     if(old) {requireThat(old.contact_id===contactId,'El identificador del envío ya pertenece a otra conversación.',409);return old;}
-    let payload,body,type=data.type;
+    let payload,body,type=data.type,attachment=null;
     if(type==='text') {
       requireThat(contact.last_inbound>now()-24*60*60*1000,'Para iniciar o reabrir una conversación, utiliza una plantilla aprobada.');
       body=text(data.text,4000,true);payload={type:'text',text:{preview_url:false,body}};
+    } else if(type==='image'||type==='document') {
+      requireThat(contact.last_inbound>now()-24*60*60*1000,'Para enviar un archivo, espera un mensaje del contacto o usa una plantilla aprobada.');
+      requireThat(data.file&&((type==='image'&&data.file.mime?.startsWith('image/'))||(type==='document'&&data.file.mime==='application/pdf')),'Archivo no válido.');
+      body=text(data.text||'',1024);
     } else {
       requireThat(type==='template','Tipo de mensaje no válido.');
       const available=await templates(company);
@@ -94,7 +100,16 @@ export function whatsapp(store, config, fetchImpl = fetch) {
     if(reserved){requireThat(reserved.contact_id===contactId,'El identificador del envío ya pertenece a otra conversación.',409);return reserved;}
     const id=randomUUID(),time=now();
     store.run("INSERT INTO messages(id,company_id,contact_id,direction,body,type,status,client_id,created,updated) VALUES(?,?,?,'out',?,?,'queued',?,?,?)",id,company,contactId,body,type,data.clientId,time,time);
+    let sending=false;
     try {
+      if(type==='image'||type==='document') {
+        attachment=media.saveUpload(company,data.file);
+        store.run('UPDATE messages SET attachment_id=? WHERE company_id=? AND id=?',attachment,company,id);
+        const uploaded=await media.upload(company,attachment,c);
+        payload={type,[type]:{id:uploaded.id,...(body?{caption:body}:{}),...(type==='document'?{filename:uploaded.filename}:{})}};
+        if(!body)store.run('UPDATE messages SET body=? WHERE company_id=? AND id=?',type==='image'?'Imagen':uploaded.filename,company,id);
+      }
+      sending=true;
       const result=await graph(c,`${c.phone_id}/messages`,'POST',{messaging_product:'whatsapp',recipient_type:'individual',to:contact.phone,...payload});
       const waId=result.messages?.[0]?.id;
       requireThat(typeof waId==='string','Meta no confirmó el identificador del mensaje.',502);
@@ -104,7 +119,7 @@ export function whatsapp(store, config, fetchImpl = fetch) {
       store.run('UPDATE contacts SET resolved=0,updated=? WHERE company_id=? AND id=?',now(),company,contactId);
       store.audit(company,actor,'message.sent');
     } catch(error) {
-      store.run('UPDATE messages SET status=?,error_code=?,updated=? WHERE id=? AND company_id=?',error.metaCode?'failed':'unknown',error.metaCode||null,now(),id,company);
+      store.run('UPDATE messages SET status=?,error_code=?,updated=? WHERE id=? AND company_id=?',!sending||error.metaCode?'failed':'unknown',error.metaCode||null,now(),id,company);
       throw error;
     }
     return store.get('SELECT * FROM messages WHERE company_id=? AND id=?',company,id);
@@ -138,8 +153,9 @@ export function whatsapp(store, config, fetchImpl = fetch) {
             const name=value.contacts?.find(p=>p.wa_id===msg.from)?.profile?.name||msg.from;
             contact=store.addContact(c.company_id,{name:String(name).slice(0,80),phone:msg.from},user.user_id);
           }
-          const body=msg.type==='text'?String(msg.text?.body||'').slice(0,4000):`[Mensaje recibido: ${String(msg.type||'desconocido').slice(0,30)}]`;
-          store.run("INSERT INTO messages(id,company_id,contact_id,direction,body,type,status,wa_id,created,updated) VALUES(?,?,?,'in',?,?,'received',?,?,?)",randomUUID(),c.company_id,contact.id,body,msg.type||'other',msg.id,created,now());
+          const part=msg[msg.type],attachment=media.incoming(c.company_id,msg.type,part,created);
+          const body=msg.type==='text'?String(msg.text?.body||'').slice(0,4000):attachment?String(part.caption||part.filename||(msg.type==='image'?'Imagen':'Documento PDF')).slice(0,1024):`[Mensaje recibido: ${String(msg.type||'desconocido').slice(0,30)}]`;
+          store.run("INSERT INTO messages(id,company_id,contact_id,direction,body,type,status,wa_id,created,updated,attachment_id) VALUES(?,?,?,'in',?,?,'received',?,?,?,?)",randomUUID(),c.company_id,contact.id,body,msg.type||'other',msg.id,created,now(),attachment);
           store.run('UPDATE contacts SET unread=unread+1,resolved=0,last_inbound=MAX(last_inbound,?),updated=MAX(updated,?) WHERE id=? AND company_id=?',created,created,contact.id,c.company_id);
         }
         for(const status of value.statuses||[]) {
@@ -160,5 +176,5 @@ export function whatsapp(store, config, fetchImpl = fetch) {
     await graph(c,`${c.waba_id}/subscribed_apps`,'POST',{});
     store.audit(company,actor,'whatsapp.subscribed');return {ok:true};
   }
-  return {credentials,safe,connect,send,templates,verify,receive,subscribe,saveRaw};
+  return {credentials,safe,connect,send,templates,verify,receive,subscribe,saveRaw,media};
 }

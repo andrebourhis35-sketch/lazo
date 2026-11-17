@@ -45,6 +45,17 @@ export function vault(masterKey) {
   const key = Buffer.from(masterKey, 'base64');
   if (key.length !== 32) throw new Error('LAZO_MASTER_KEY debe contener una clave de 32 bytes en base64.');
   return {
+    sealBytes(value, context) {
+      const iv = randomBytes(12), cipher = createCipheriv('aes-256-gcm', key, iv);
+      cipher.setAAD(Buffer.from(context));
+      const encrypted = Buffer.concat([cipher.update(value), cipher.final()]);
+      return Buffer.concat([iv, cipher.getAuthTag(), encrypted]);
+    },
+    openBytes(value, context) {
+      const data = Buffer.from(value), cipher = createDecipheriv('aes-256-gcm', key, data.subarray(0, 12));
+      cipher.setAuthTag(data.subarray(12, 28)); cipher.setAAD(Buffer.from(context));
+      return Buffer.concat([cipher.update(data.subarray(28)), cipher.final()]);
+    },
     seal(value, context) {
       const iv = randomBytes(12);
       const cipher = createCipheriv('aes-256-gcm', key, iv);
