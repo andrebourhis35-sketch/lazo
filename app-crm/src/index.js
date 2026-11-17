@@ -12,8 +12,12 @@ if(env.WHATSAPP_ACCESS_TOKEN&&env.WHATSAPP_PHONE_NUMBER_ID&&env.WHATSAPP_BUSINES
   if(!config.initialWhatsApp.verifyToken)throw new Error('Falta LAZO_WEBHOOK_VERIFY_TOKEN.');
 }
 const server=createServer(config);
+// An interrupted send must not be silently retried after a process restart.
+server.lazo.store.run("UPDATE messages SET status='unknown',updated=? WHERE status='queued'",Date.now());
 server.listen(Number(env.PORT||3031),'127.0.0.1',()=>console.log('LAZO CRM: servicio iniciado en la interfaz local.'));
 server.lazo.store.purge();
 const timer=setInterval(()=>server.lazo.store.purge(),3600000);timer.unref();
-function stop(){clearInterval(timer);server.close(()=>{server.lazo.store.close();process.exit(0);});setTimeout(()=>process.exit(1),20000).unref();}
+const mediaTimer=setInterval(()=>{void server.lazo.wa.media.warm().catch(()=>{});},30000);mediaTimer.unref();
+void server.lazo.wa.media.warm().catch(()=>{});
+function stop(){clearInterval(timer);clearInterval(mediaTimer);server.close(async()=>{await server.lazo.wa.media.stop();server.lazo.store.close();process.exit(0);});setTimeout(()=>process.exit(1),20000).unref();}
 process.on('SIGTERM',stop);process.on('SIGINT',stop);

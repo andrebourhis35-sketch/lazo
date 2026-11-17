@@ -22,6 +22,7 @@ export function authentication(store, config) {
     store.tx(()=>{
       requireThat(bootstrapAvailable(),'La plataforma ya tiene administrador.',409);
       store.run('INSERT INTO companies(id,name,created) VALUES(?,?,?)',workspace,company,now());
+      store.ensureWorkspace(workspace);
       store.run('INSERT INTO users(id,email,name,password,created) VALUES(?,?,?,?,?)',user,mail,name,hash,now());
       store.run("INSERT INTO memberships VALUES(?,?,'owner')",workspace,user);
       store.run("INSERT INTO meta VALUES('bootstrapped','1')");
@@ -82,7 +83,7 @@ export function authentication(store, config) {
   function newCompany(s,data) {
     requireThat(s.role==='owner','Solo el propietario puede crear otra empresa.',403);
     const company=randomUUID(),name=text(data.name,100,true);
-    store.tx(()=>{store.run('INSERT INTO companies VALUES(?,?,?)',company,name,now());store.run("INSERT INTO memberships VALUES(?,?,'owner')",company,s.user_id);store.audit(company,s.user_id,'company.created');});
+    store.tx(()=>{store.run('INSERT INTO companies VALUES(?,?,?)',company,name,now());store.ensureWorkspace(company);store.run("INSERT INTO memberships VALUES(?,?,'owner')",company,s.user_id);store.audit(company,s.user_id,'company.created');});
     return {id:company,name};
   }
   return {bootstrapAvailable,identity,bootstrap,login,invite,inviteInfo,acceptInvite,newCompany};

@@ -19,10 +19,34 @@ export function openStore(filename) {
     CREATE TABLE IF NOT EXISTS status_events(wa_id TEXT PRIMARY KEY,company_id TEXT NOT NULL,status TEXT NOT NULL,error_code TEXT,updated INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS limits(key TEXT PRIMARY KEY,count INTEGER NOT NULL,expires INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY,company_id TEXT,actor_id TEXT,event TEXT NOT NULL,created INTEGER NOT NULL);
+    CREATE TABLE IF NOT EXISTS workspace_settings(company_id TEXT PRIMARY KEY REFERENCES companies(id),analytics_since INTEGER NOT NULL);
+    CREATE TABLE IF NOT EXISTS pipeline_stages(id TEXT PRIMARY KEY,company_id TEXT NOT NULL REFERENCES companies(id),name TEXT NOT NULL,position INTEGER NOT NULL,is_won INTEGER NOT NULL DEFAULT 0,UNIQUE(company_id,name));
+    CREATE TABLE IF NOT EXISTS quick_replies(id TEXT PRIMARY KEY,company_id TEXT NOT NULL REFERENCES companies(id),title TEXT NOT NULL,shortcut TEXT NOT NULL,body TEXT NOT NULL,deleted INTEGER NOT NULL DEFAULT 0,created INTEGER NOT NULL,updated INTEGER NOT NULL);
+    CREATE UNIQUE INDEX IF NOT EXISTS quick_replies_shortcut ON quick_replies(company_id,shortcut) WHERE deleted=0;
+    CREATE TABLE IF NOT EXISTS sale_events(id TEXT PRIMARY KEY,company_id TEXT NOT NULL REFERENCES companies(id),contact_id TEXT NOT NULL REFERENCES contacts(id),kind TEXT NOT NULL,created INTEGER NOT NULL);
+    CREATE INDEX IF NOT EXISTS sale_events_company ON sale_events(company_id,created);
+    CREATE TABLE IF NOT EXISTS media_assets(id TEXT PRIMARY KEY,company_id TEXT NOT NULL REFERENCES companies(id),wa_id TEXT,mime TEXT NOT NULL,filename TEXT NOT NULL,size INTEGER NOT NULL,sha256 TEXT NOT NULL DEFAULT '',content BLOB,state TEXT NOT NULL,attempts INTEGER NOT NULL DEFAULT 0,retry_at INTEGER NOT NULL DEFAULT 0,created INTEGER NOT NULL);
+    CREATE INDEX IF NOT EXISTS media_company ON media_assets(company_id,created);
   `);
   const run = (sql, ...args) => db.prepare(sql).run(...args);
   const get = (sql, ...args) => db.prepare(sql).get(...args);
   const all = (sql, ...args) => db.prepare(sql).all(...args);
+  // Additive migrations preserve existing contacts, conversations and sessions.
+  tx(()=>{
+    if(!all('PRAGMA table_info(contacts)').some(c=>c.name==='tags'))db.exec("ALTER TABLE contacts ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'");
+    if(!all('PRAGMA table_info(messages)').some(c=>c.name==='attachment_id'))db.exec('ALTER TABLE messages ADD COLUMN attachment_id TEXT');
+    for(const company of all('SELECT id FROM companies'))ensureWorkspace(company.id);
+  });
+  function ensureWorkspace(company) {
+    if(get('SELECT 1 FROM workspace_settings WHERE company_id=?',company))return;
+    run('INSERT INTO workspace_settings VALUES(?,?)',company,now());
+    stages.forEach((name,i)=>run('INSERT INTO pipeline_stages VALUES(?,?,?,?,?)',randomUUID(),company,name,i,Number(i===stages.length-1)));
+    // Preserve any pre-existing stage names instead of hiding their contacts.
+    for(const c of all('SELECT DISTINCT stage FROM contacts WHERE company_id=?',company)) {
+      if(!get('SELECT 1 FROM pipeline_stages WHERE company_id=? AND name=?',company,c.stage))
+        run('INSERT INTO pipeline_stages VALUES(?,?,?,?,0)',randomUUID(),company,c.stage,100+all('SELECT id FROM pipeline_stages WHERE company_id=?',company).length);
+    }
+  }
   function tx(fn) {
     db.exec('BEGIN IMMEDIATE');
     try { const result = fn(); db.exec('COMMIT'); return result; }
@@ -44,24 +68,39 @@ export function openStore(filename) {
     requireThat(!id || get('SELECT 1 FROM memberships WHERE company_id=? AND user_id=?', company, id), 'Responsable no disponible en esta empresa.');
   }
   function addContact(company, data, actor) {
+    ensureWorkspace(company);
     const name=text(data.name,80,true), number=phone(data.phone),mail=text(data.email||'',254),location=text(data.location||'',100);
     if (mail) requireThat(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail), 'Revisa el correo.');
     ownerValid(company,data.ownerId);
     requireThat(!get('SELECT 1 FROM contacts WHERE company_id=? AND phone=?',company,number), 'Ese teléfono ya está en tus contactos.',409);
     const id=randomUUID();
-    run('INSERT INTO contacts(id,company_id,name,phone,email,location,owner_id,created,updated) VALUES(?,?,?,?,?,?,?,?,?)',id,company,name,number,mail,location,data.ownerId||actor,now(),now());
+    const first=get('SELECT name FROM pipeline_stages WHERE company_id=? AND is_won=0 ORDER BY position,id LIMIT 1',company);
+    run('INSERT INTO contacts(id,company_id,name,phone,email,location,stage,owner_id,created,updated) VALUES(?,?,?,?,?,?,?,?,?,?)',id,company,name,number,mail,location,first.name,data.ownerId||actor,now(),now());
     audit(company,actor,'contact.created');
     return contact(company,id);
   }
   function updateContact(company,id,data,actor) {
+    ensureWorkspace(company);
     const c=contact(company,id);
-    if (data.stage!==undefined) {requireThat(stages.includes(data.stage),'Etapa no válida.');c.stage=data.stage;}
+    const beforeWon=Boolean(get('SELECT is_won FROM pipeline_stages WHERE company_id=? AND name=?',company,c.stage)?.is_won);
+    if (data.stage!==undefined) {requireThat(get('SELECT 1 FROM pipeline_stages WHERE company_id=? AND name=?',company,data.stage),'Etapa no válida.');c.stage=data.stage;}
     if (data.note!==undefined) c.note=text(data.note,4000);
     if (data.name!==undefined) c.name=text(data.name,80,true);
     if (data.ownerId!==undefined) {ownerValid(company,data.ownerId);c.owner_id=data.ownerId||null;}
     if (data.resolved!==undefined) {requireThat(typeof data.resolved==='boolean','Estado no válido.');c.resolved=Number(data.resolved);}
-    run('UPDATE contacts SET stage=?,note=?,name=?,owner_id=?,resolved=?,updated=? WHERE company_id=? AND id=?',c.stage,c.note,c.name,c.owner_id,c.resolved,now(),company,id);
-    audit(company,actor,'contact.updated');return contact(company,id);
+    if(data.tags!==undefined) {
+      requireThat(Array.isArray(data.tags)&&data.tags.length<=8,'Usa hasta ocho etiquetas por contacto.');
+      const seen=new Set(),tags=[];
+      for(const value of data.tags) {const tag=text(value,30,true),key=tag.toLocaleLowerCase('es');requireThat(!/[,\x00-\x1f]/.test(tag),'Usa etiquetas sin comas ni saltos de línea.');if(!seen.has(key)){seen.add(key);tags.push(tag);}}
+      c.tags=JSON.stringify(tags);
+    }
+    const afterWon=Boolean(get('SELECT is_won FROM pipeline_stages WHERE company_id=? AND name=?',company,c.stage)?.is_won);
+    tx(()=>{
+      run('UPDATE contacts SET stage=?,note=?,name=?,owner_id=?,resolved=?,tags=?,updated=? WHERE company_id=? AND id=?',c.stage,c.note,c.name,c.owner_id,c.resolved,c.tags,now(),company,id);
+      if(beforeWon!==afterWon)run('INSERT INTO sale_events VALUES(?,?,?,?,?)',randomUUID(),company,id,afterWon?'won':'reopened',now());
+      audit(company,actor,'contact.updated');
+    });
+    return contact(company,id);
   }
   function session(user,company) {
     const secret=token(),csrf=token();
@@ -75,10 +114,12 @@ export function openStore(filename) {
   function purge() {
     const cutoff=now()-90*86400000;
     run('DELETE FROM messages WHERE created<?',cutoff);
+    run('DELETE FROM media_assets WHERE created<? AND id NOT IN (SELECT attachment_id FROM messages WHERE attachment_id IS NOT NULL)',cutoff);
+    run('DELETE FROM sale_events WHERE created<?',cutoff);
     run('DELETE FROM status_events WHERE updated<?',cutoff);
     run('DELETE FROM audit WHERE created<?',cutoff);
     run('DELETE FROM invites WHERE expires<? OR used=1',now()-86400000);
     run('DELETE FROM sessions WHERE expires<?',now());
   }
-  return { db,run,get,all,tx,audit,limit,contact,addContact,updateContact,session,member,purge,close:()=>db.close() };
+  return { db,run,get,all,tx,audit,limit,contact,addContact,updateContact,session,member,purge,ensureWorkspace,close:()=>db.close() };
 }
