@@ -2,6 +2,8 @@
 
 Actualización del 17 de noviembre: el acceso privado con empresas y base de datos está en https://lazo.espacio-sereno.com/app/. El PR #25 contiene esa plataforma; configuración, límites, activación y recuperación en app-crm/README.md. El propietario está activado y la conexión WhatsApp se comprobó con la cuenta de prueba: mensaje entrante recibido y respuesta con estado Entregado, persistidos en el servidor y visibles en Chrome tras recargar. La cuenta sigue limitada al destinatario de prueba; esto no habilita cuentas comerciales de clientes ni sustituye la revisión pendiente de Meta. Las rutas descritas a continuación continúan ofreciendo la demo estática.
 
+Las cinco mejoras del PR #31 están publicadas en la plataforma privada: JPG/PNG y PDF, etiquetas y filtros, respuestas rápidas, etapas configurables y estadísticas por empresa. Código fecef05, release /opt/lazo-crm/releases/fecef05 y enlace /opt/lazo-crm/current; la anterior 486bc23 se conserva. Migración aditiva comprobada sobre copia antes del despliegue, respaldos consistentes anteriores y posteriores y 29 pruebas aprobadas en Windows y Node 22 de OVH. La carga y descarga de PNG/PDF se comprobó además contra Meta real con archivos generados sin datos personales y sin enviar mensajes.
+
 Entrega comprobada el 14 de noviembre de 2026:
 
 - https://lazo.espacio-sereno.com/
