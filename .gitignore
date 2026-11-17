@@ -5,3 +5,10 @@
 
 # Dependencias y salidas locales
 node_modules/
+
+# Datos y credenciales privadas del CRM
+app-crm/data/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
