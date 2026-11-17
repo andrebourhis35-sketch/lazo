@@ -1,5 +1,7 @@
 # Publicación de la demo LAZO en OVH
 
+Actualización del 17 de noviembre: el acceso privado con empresas y base de datos está en https://lazo.espacio-sereno.com/app/. El PR #25 contiene esa plataforma; configuración, límites, activación y recuperación en app-crm/README.md. Las rutas descritas a continuación continúan ofreciendo la demo estática. La conexión WhatsApp requiere completar la activación privada y verificar recepción real.
+
 Entrega comprobada el 14 de noviembre de 2026:
 
 - https://lazo.espacio-sereno.com/
