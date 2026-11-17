@@ -1,0 +1,28 @@
+[Unit]
+Description=LAZO CRM - cuentas y conversaciones
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=lazo-crm
+Group=lazo-crm
+WorkingDirectory=/opt/lazo-crm/current/app-crm
+EnvironmentFile=/etc/lazo-crm.env
+ExecStart=/opt/hq-node/current/bin/node src/index.js
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/lazo-crm
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+MemoryMax=768M
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target

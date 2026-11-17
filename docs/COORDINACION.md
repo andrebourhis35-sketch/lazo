@@ -180,3 +180,10 @@ Un abogado debe revisar el texto después, en especial la adecuación a la Ley N
 - Respaldo previo en /var/www/lazo/backups/20261114-before-demo-911ee12 y release original 118462e conservada. Cambio atómico del enlace current; sin reiniciar servicios. Caddyfile conserva el mismo SHA-256; DNS y configuración privada no se editaron.
 - Revisión de Meta: su URL sigue devolviendo 401 sin credenciales; política de privacidad 200. Caddy, lazo-meta-review, Folio y AI Business HQ continúan activos. No se consultó el estado de la solicitud en Meta.
 - Ajuste de publicación y registro en PR #24, con revisión independiente sin bloqueantes. La demo sigue usando datos ficticios y almacenamiento local; cuentas, servidor de datos y conexión del CRM con WhatsApp quedan para la siguiente fase.
+
+## Plataforma con cuentas y WhatsApp — Codex (16 de noviembre de 2026)
+
+- Autorización del usuario: «Haz todo del 1 al 5»: revisar interfaz, publicar en OVH, cuentas y empresas, base de datos y conectar WhatsApp con recepción y estados.
+- Reserva: app-crm/, docs/COORDINACION.md, docs/PUBLICACION-INTERFAZ.md y .gitignore. Rama codex/plataforma-cuentas-whatsapp. Responsable: Codex; revisión independiente antes de integrar.
+- Diseño: conservar la demo y ofrecer la plataforma con acceso privado en /app/. Backend aislado, empresas y roles, sesiones de servidor, contactos/notas/etapas en SQLite y conexión WhatsApp por empresa. Secretos fuera de Git y cifrados en el servidor. No se modifica app-meta ni el expediente de revisión de Meta.
+- Configuración real de WhatsApp: usar inicialmente la cuenta de prueba existente salvo indicación del usuario; falta el secreto de la app para validar las firmas de los webhooks. Nunca pedirlo por chat. La entrega no se declarará completa sin diferenciar pruebas simuladas de recepción real.
