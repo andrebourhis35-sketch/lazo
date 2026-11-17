@@ -26,7 +26,7 @@ Nunca pedir ni pegar tokens, contraseñas o secretos por chat. Para cambiar el a
 Node.js 22.13+ (SQLite integrado; aviso experimental en Node 22). Sin dependencias npm. HTTP escucha solo en 127.0.0.1:3031. Caddy enruta `/app`, `/app/*`, `/api/crm/*` y `/webhooks/whatsapp` a ese puerto; la demo continúa en las rutas existentes.
 
 ```powershell
-node --test app-crm/test/*.test.js
+node --test app-crm/test/platform.test.js app-crm/test/daily-workflow.test.js app-crm/test/ui-send.test.js
 node --check app-crm/public/app.js
 ```
 
