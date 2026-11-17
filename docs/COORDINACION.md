@@ -234,3 +234,12 @@ Un abogado debe revisar el texto después, en especial la adecuación a la Ley N
 - Chrome muestra en Ajustes «Secreto guardado. Meta verificó la URL. Todavía no se recibieron eventos». Se pidió al usuario enviar Hola LAZO desde su destinatario verificado al número de prueba para comprobar la recepción real. La app sigue sin publicar; Meta advierte que no entregará eventos de producción hasta publicarla. La recepción y los estados reales permanecen pendientes y no se sustituyen por esta muestra.
 - Sin cambios de código, despliegue, instancia de revisión ni servicios ajenos. Respaldo del CRM actualizado después de corregir la configuración: servicio de respaldo Result=success y ExecMainStatus=0.
 - Verificación documental: git diff --check correcto y revisión independiente del diff 0d9bfc0 sin bloqueantes.
+
+### Recepción y entrega reales confirmadas (17 de noviembre de 2026)
+
+- El usuario confirmó que envió Hola LAZO desde su WhatsApp verificado. Reserva: docs/COORDINACION.md y docs/PUBLICACION-INTERFAZ.md, rama codex/recepcion-whatsapp-confirmada. Responsable: Codex.
+- Comprobación de solo lectura en OVH: un mensaje entrante con el saludo esperado, remitente coincidente con el destinatario autorizado de prueba y estado received, registrado a las 14:20 de Perú. El callback continúa verificado y existe un evento asociado a la cuenta configurada.
+- En la misma conversación se registró una respuesta saliente hola con estado delivered y su evento de estado de Meta. El envío anterior de hello_world conserva accepted; no se le atribuye la entrega de esta respuesta. No se enviaron mensajes adicionales desde el agente durante esta comprobación.
+- Chrome, plataforma privada /app/, después de recargar: Hola lazo figura Recibido y hola figura Entregado en Mi WhatsApp de prueba. Evidencia visual guardada fuera del repositorio; no se incorpora el número privado, capturas de la conversación ni identificadores de mensajes a Git.
+- Quedan comprobados envío, recepción y actualización de estado reales entre el CRM y la cuenta de WhatsApp de prueba. La cuenta de prueba sí entregó estos eventos mientras la app seguía sin publicar; no se generaliza este resultado a números comerciales ni empresas de clientes. La revisión de Meta continúa pendiente de resolución.
+- Se actualiza el aviso de publicación para reflejar la activación del propietario y esta validación. No se modificó código, despliegue, permisos, configuración de Meta ni servicios. Revisión documental independiente pendiente antes de integrar.
