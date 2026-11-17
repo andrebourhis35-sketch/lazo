@@ -198,3 +198,10 @@ Un abogado debe revisar el texto después, en especial la adecuación a la Ley N
 - Integridad SQLite correcta. Primer respaldo consistente creado y temporizador diario habilitado (siete días de rotación local). No cubre pérdida completa del VPS; procedimiento en app-crm/README.md.
 - Lectura real de la cuenta de prueba desde OVH: Meta HTTP 200, dos plantillas aprobadas; no se enviaron mensajes. La activación privada de propietario se abrió en Chrome y se pidió al usuario completar su contraseña directamente en la página. Pendiente su entrada; no se generó ni eligió una contraseña real por él.
 - Pendiente antes de declarar terminados los cinco puntos: activación del propietario, guardar secreto de app en privado, verificar callback y suscripción messages en Meta y confirmar recepción/estados reales. La implementación está publicada, pero esas pruebas y entradas no se sustituyen por pruebas simuladas.
+
+### Cuenta activada y continuación de WhatsApp (17 de noviembre de 2026)
+
+- Usuario confirmó «Ya activé mi cuenta». Comprobación de solo lectura: un propietario, una empresa, una sesión y una conexión WhatsApp en la base de datos; formulario privado en Chrome muestra la sesión del propietario. No se leyó su contraseña ni se modificó su perfil.
+- Reserva de actualización: docs/COORDINACION.md, rama codex/activacion-cuenta-whatsapp. Servicio CRM y Caddy activos; respaldo posterior a la activación ejecutado. No se enviaron mensajes reales.
+- WhatsApp aún sin callback verificado y sin mensajes entrantes. Se abrió la configuración básica de la app LAZO en Meta para localizar su secreto. El control de Chrome perdió respuesta antes de poder leer esa página; no se modificó ninguna opción de Meta.
+- Se pidió al usuario copiar el secreto directamente de Meta al campo privado de Ajustes de LAZO y pulsar Guardar y comprobar conexión. No se pidió el valor por chat. Pendiente confirmación y comprobación de configuración, callback, suscripción y recepción real.
