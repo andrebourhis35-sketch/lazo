@@ -7,6 +7,7 @@ import { whatsapp } from './whatsapp.js';
 import { HttpError, requireThat, digest } from './core.js';
 import { workspaceTools } from './workspace.js';
 import { mediaLimits } from './media.js';
+import { mailService } from './mail.js';
 
 const root=fileURLToPath(new URL('../public/',import.meta.url));
 const demo=fileURLToPath(new URL('../../interfaz/',import.meta.url));
@@ -23,8 +24,9 @@ const assets={
 };
 const headers={ 'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','X-Frame-Options':'DENY',
   'Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'" };
-export function createServer(config,{store=openStore(config.database),fetchImpl=fetch}={}) {
-  const auth=authentication(store,config),wa=whatsapp(store,config,fetchImpl),workspace=workspaceTools(store);
+export function createServer(config,{store=openStore(config.database),fetchImpl=fetch,mailTransportFactory}={}) {
+  const mail=mailService(store,config,mailTransportFactory);
+  const auth=authentication(store,config,mail),wa=whatsapp(store,config,fetchImpl),workspace=workspaceTools(store);
   let fileUploads=0;
   const origin=new URL(config.origin);
   const cookieName=config.secureCookies?'__Host-lazo_session':'lazo_dev_session';
@@ -70,7 +72,7 @@ export function createServer(config,{store=openStore(config.database),fetchImpl=
       requireThat(pathname.startsWith('/api/crm/'),'No encontrado.',404);
       const route=pathname.slice('/api/crm'.length),method=req.method;
       const s=currentSession(req);
-      if(s&&route!=='/session'&&!['/login','/bootstrap','/invitations/info','/invitations/accept'].includes(route)) {
+      if(s&&route!=='/session'&&!['/login','/bootstrap','/invitations/info','/invitations/accept','/password/forgot','/password/reset'].includes(route)) {
         if(req.headers['x-lazo-company']!==s.company_id||req.headers['x-lazo-user']!==s.user_id) {
           return response(res,409,{error:'Tu sesión cambió en otra pestaña. Recarga para confirmar la empresa activa.',code:'CONTEXT_CHANGED'});
         }
@@ -80,6 +82,14 @@ export function createServer(config,{store=openStore(config.database),fetchImpl=
         if(s)requireThat(req.headers['x-csrf-token']===s.csrf,'Sesión no válida. Recarga la página.',403);
       }
       const ip=req.socket.remoteAddress==='127.0.0.1'||req.socket.remoteAddress==='::ffff:127.0.0.1'?String(req.headers['x-forwarded-for']||req.socket.remoteAddress).split(',')[0]:req.socket.remoteAddress;
+      if(method==='POST'&&route==='/password/forgot') {
+        const result=await auth.requestReset(await json(req),ip);
+        void mail.flush().catch(()=>{});return response(res,202,result);
+      }
+      if(method==='POST'&&route==='/password/reset') {
+        const result=await auth.resetPassword(await json(req),ip);
+        void mail.flush().catch(()=>{});return response(res,200,result,'application/json; charset=utf-8',{'Set-Cookie':cookie('',true)});
+      }
       if(method==='GET'&&route==='/setup')return response(res,200,{available:auth.bootstrapAvailable()});
       if(method==='POST'&&['/login','/bootstrap','/invitations/accept','/invitations/info'].includes(route)) {
         store.limit('authip:'+digest(ip),50,15*60*1000);
@@ -105,7 +115,7 @@ export function createServer(config,{store=openStore(config.database),fetchImpl=
         return response(res,200,{ok:true},'application/json; charset=utf-8',{'Set-Cookie':cookie(session.secret)});
       }
       requireThat(s,'Inicia sesión para continuar.',401);
-      if(method==='GET'&&route==='/session')return response(res,200,{...auth.identity(s),companies:store.all('SELECT c.id,c.name,m.role FROM companies c JOIN memberships m ON m.company_id=c.id WHERE m.user_id=?',s.user_id)});
+      if(method==='GET'&&route==='/session')return response(res,200,{...auth.identity(s),emailEnabled:mail.available,companies:store.all('SELECT c.id,c.name,m.role FROM companies c JOIN memberships m ON m.company_id=c.id WHERE m.user_id=?',s.user_id)});
       if(method==='POST'&&route==='/logout') {store.run('DELETE FROM sessions WHERE hash=?',s.hash);return response(res,200,{ok:true},'application/json; charset=utf-8',{'Set-Cookie':cookie('',true)});}
       if(method==='POST'&&route==='/companies')return response(res,201,auth.newCompany(s,await json(req)));
       if(method==='POST'&&route==='/companies/switch') {
@@ -133,7 +143,16 @@ export function createServer(config,{store=openStore(config.database),fetchImpl=
         store.limit('stats:'+s.company_id,90,60000);
         return response(res,200,workspace.statistics(s.company_id,Number(new URL(req.url,config.origin).searchParams.get('days')||30)));
       }
-      if(method==='POST'&&route==='/invitations') {store.limit('invite:'+s.company_id,30,3600000);return response(res,201,auth.invite(s,await json(req)));}
+      if(method==='POST'&&route==='/invitations') {
+        store.limit('invite:'+s.company_id,30,3600000);
+        const result=auth.invite(s,await json(req));void mail.flush().catch(()=>{});return response(res,201,result);
+      }
+      const invitationMail=route.match(/^\/invitations\/email\/([a-f\d-]+)$/);
+      if(method==='GET'&&invitationMail) {
+        admin(s);
+        const job=store.get("SELECT state,expires FROM mail_jobs WHERE id=? AND company_id=? AND kind='invite'",invitationMail[1],s.company_id);
+        requireThat(job,'Invitación no encontrada.',404);return response(res,200,job);
+      }
       const memberMatch=route.match(/^\/members\/([a-f\d-]+)$/);
       if(method==='DELETE'&&memberMatch) {
         admin(s);const member=store.get('SELECT * FROM memberships WHERE company_id=? AND user_id=?',s.company_id,memberMatch[1]);
@@ -196,5 +215,5 @@ export function createServer(config,{store=openStore(config.database),fetchImpl=
   });
   server.requestTimeout=60000;server.headersTimeout=10000;
   server.keepAliveTimeout=5000;
-  server.lazo={store,auth,wa,workspace};return server;
+  server.lazo={store,auth,wa,workspace,mail};return server;
 }
