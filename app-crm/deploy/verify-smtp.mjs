@@ -5,12 +5,12 @@ import { smtpOptions } from '../src/mail.js';
 
 // Only fixed categories leave this process. Never expose provider messages or objects.
 function failure(error) {
+  if ([421,450,451,452,454].includes(error?.responseCode)) return 'smtp-temporary';
   if (error?.code === 'EAUTH' || [534,535].includes(error?.responseCode)) return 'smtp-auth';
   if (error?.code === 'ETLS' || new Set(['CERT_HAS_EXPIRED','DEPTH_ZERO_SELF_SIGNED_CERT',
     'SELF_SIGNED_CERT_IN_CHAIN','UNABLE_TO_VERIFY_LEAF_SIGNATURE','ERR_TLS_CERT_ALTNAME_INVALID']).has(error?.code)) return 'smtp-tls';
   if (new Set(['ECONNECTION','ESOCKET','ETIMEDOUT','ECONNREFUSED','ECONNRESET',
     'ENOTFOUND','EAI_AGAIN','EHOSTUNREACH','EDNS']).has(error?.code)) return 'smtp-connection';
-  if ([421,450,451,452,454].includes(error?.responseCode)) return 'smtp-temporary';
   return 'smtp-check';
 }
 

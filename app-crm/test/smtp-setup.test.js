@@ -28,6 +28,7 @@ test('SMTP setup returns only fixed error categories and closes failed transport
     [{code:'ERR_TLS_CERT_ALTNAME_INVALID'},'smtp-tls'],
     [{code:'ETIMEDOUT'},'smtp-connection'],
     [{responseCode:454},'smtp-temporary'],
+    [{code:'EAUTH',responseCode:454},'smtp-temporary'],
     [{code:input.password,responseCode:input.password},'smtp-check']
   ]) {
     let closed = false;
