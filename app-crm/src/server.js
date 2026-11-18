@@ -16,6 +16,7 @@ const assets={
   '/app/work-ui.js':['work-ui.js','text/javascript; charset=utf-8'],
   '/app/visual-preview.js':['visual-preview.js','text/javascript; charset=utf-8'],
   '/app/visual-preview.css':['visual-preview.css','text/css; charset=utf-8'],
+  '/app/marca-volumen.svg':['marca-volumen.svg','image/svg+xml'],
   '/app/styles.css':['styles.css','text/css; charset=utf-8',demo],
   '/app/crm.css':['crm.css','text/css; charset=utf-8',demo],
   '/app/marca.svg':['marca.svg','image/svg+xml',demo]

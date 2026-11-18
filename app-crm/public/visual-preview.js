@@ -64,13 +64,32 @@ if (new URLSearchParams(location.search).get('visual') === '1') {
       const halo = document.createElement('span');
       halo.className = 'orbita-halo';
       const planet = document.createElement('img');
-      planet.src = '/app/marca.svg';
+      planet.src = '/app/marca-volumen.svg';
       planet.alt = '';
       planet.draggable = false;
       const light = document.createElement('span');
       light.className = 'orbita-light';
-      scene.append(halo, planet, light);
+      const tiles = Object.entries(paths).slice(0, 3).map(([key], index) => {
+        const tile = document.createElement('span');
+        tile.className = 'scene-tile scene-tile-' + index;
+        tile.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' + paths[key] + '</svg>';
+        return tile;
+      });
+      scene.append(halo, ...tiles, planet, light);
       header.append(scene);
+      const resetTilt = () => {
+        scene.style.removeProperty('--tilt-x');
+        scene.style.removeProperty('--tilt-y');
+      };
+      header.addEventListener('pointermove', event => {
+        if (document.body.classList.contains('quiet-preview')) { resetTilt(); return; }
+        const rect = header.getBoundingClientRect();
+        const x = Math.max(-1, Math.min(1, (event.clientX - rect.left) / rect.width * 2 - 1));
+        const y = Math.max(-1, Math.min(1, (event.clientY - rect.top) / rect.height * 2 - 1));
+        scene.style.setProperty('--tilt-x', (-y * 6).toFixed(2) + 'deg');
+        scene.style.setProperty('--tilt-y', (x * 9).toFixed(2) + 'deg');
+      });
+      header.addEventListener('pointerleave', resetTilt);
     }
   }
   decorateNavigation();
