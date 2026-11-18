@@ -109,6 +109,15 @@ class BackupTest(unittest.TestCase):
         self.assertTrue(keep.exists())
         self.assertTrue(link.is_symlink())
 
+    def test_export_group_can_traverse_directory_and_read_ciphertext(self):
+        import grp
+        group = grp.getgrgid(os.getgid()).gr_name
+        result = exporter.export_backup(self.database, self.environment, self.recipient,
+                                        self.destination, 'test-release', group=group)
+        self.assertEqual(self.destination.stat().st_mode & 0o777, 0o750)
+        self.assertEqual((self.destination / result['file']).stat().st_mode & 0o777, 0o640)
+        self.assertEqual((self.destination / result['file']).stat().st_gid, os.getgid())
+
 
 if __name__ == '__main__':
     unittest.main()

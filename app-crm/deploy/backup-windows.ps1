@@ -20,7 +20,7 @@ try {
     $finalPath = Join-Path $copyDirectory $metadata.file
     $partialPath = $finalPath + '.part'
     if ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($partialPath)) -ne $copyDirectory) { throw 'Ruta de copia no válida.' }
-    & $config.scp @sshOptions ($config.server + ':/var/backups/lazo-crm/export/' + $metadata.file) $partialPath
+    & $config.scp @sshOptions ($config.server + ':/var/backups/lazo-crm-export/' + $metadata.file) $partialPath
     if ($LASTEXITCODE -ne 0) { throw 'No se pudo descargar la copia cifrada.' }
     if ((Get-Item -LiteralPath $partialPath).Length -ne $metadata.bytes -or
         (Get-FileHash -LiteralPath $partialPath -Algorithm SHA256).Hash.ToLowerInvariant() -ne $metadata.sha256) {

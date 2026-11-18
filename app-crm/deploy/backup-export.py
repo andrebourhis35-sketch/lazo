@@ -32,6 +32,9 @@ def export_backup(database, environment, recipient_file, destination, release, a
     destination.mkdir(parents=True, exist_ok=True, mode=0o750)
     if destination.is_symlink():
         raise ValueError('Export directory cannot be a symlink')
+    if group:
+        os.chown(destination, -1, grp.getgrnam(group).gr_gid)
+        destination.chmod(0o750)  # mkdir is affected by umask 077; enforce traversal explicitly.
     lock_path = destination / '.export.lock'
     lock_fd = os.open(lock_path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
     with os.fdopen(lock_fd, 'w') as lock:
@@ -92,6 +95,6 @@ if __name__ == '__main__':
     # No command-line paths: the privileged command has a fixed LAZO-only scope.
     result = export_backup(Path('/var/lib/lazo-crm/lazo.sqlite'), Path('/etc/lazo-crm.env'),
                            Path('/etc/lazo-crm-backup-recipient.txt'),
-                           Path('/var/backups/lazo-crm/export'),
+                           Path('/var/backups/lazo-crm-export'),
                            Path('/opt/lazo-crm/current').resolve().name, group='ubuntu')
     print(json.dumps(result))

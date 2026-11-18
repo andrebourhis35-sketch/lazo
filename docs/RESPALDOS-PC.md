@@ -24,6 +24,8 @@ El código se conserva en Git; el manifiesto identifica el release del servidor.
   El VPS recibe únicamente su destinatario público.
 - El exportador root tiene rutas fijas de LAZO y un bloqueo; los archivos cifrados
   de descarga son de solo lectura para el grupo del usuario SSH existente.
+  Se guardan en `/var/backups/lazo-crm-export`, con directorio `root:ubuntu 0750`
+  y archivos `0640`, separado del directorio de SQLite privados `0700`.
 - La descarga usa el host SSH y la clave ya configurados para OVH, con comprobación
   estricta de su clave de host. Comprueba tamaño y SHA-256 antes de darla por terminada.
 
