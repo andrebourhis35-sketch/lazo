@@ -41,7 +41,8 @@ export function authentication(store, config, mail) {
     const member=store.get('SELECT company_id FROM memberships WHERE user_id=? ORDER BY company_id LIMIT 1',user.id);
     requireThat(member,'Esta cuenta no tiene acceso a ninguna empresa.',403);
     store.run('DELETE FROM limits WHERE key=?','login-email:'+digest(mail));
-    store.audit(member.company_id,user.id,'login');return store.session(user.id,member.company_id);
+    const session=store.session(user.id,member.company_id,{passwordHash:user.password});
+    store.audit(member.company_id,user.id,'login');return session;
   }
   function invite(s,data) {
     requireThat(['owner','admin'].includes(s.role),'Solo los administradores pueden invitar usuarios.',403);
@@ -117,22 +118,25 @@ export function authentication(store, config, mail) {
   async function acceptInvite(data,session) {
     const invitation=inviteInfo(data.token);
     const existing=store.get('SELECT * FROM users WHERE email=?',invitation.email);
-    let userId=existing?.id,hash,name;
+    let userId=existing?.id,hash,name,credentialProof={};
     if (existing) {
-      const verified=session?.user_id===existing.id||await hashJob(()=>passwordMatches(data.password,existing.password));
+      const bySession=session?.user_id===existing.id;
+      const verified=bySession||await hashJob(()=>passwordMatches(data.password,existing.password));
       requireThat(verified,'Inicia sesión con la cuenta invitada para aceptar.',403);
+      credentialProof=bySession?{parentHash:session.hash}:{passwordHash:existing.password};
     }
     else {
       name=text(data.name,80,true);hash=await hashJob(()=>passwordHash(data.password));userId=randomUUID();
     }
-    store.tx(()=>{
+    return store.tx(()=>{
       const fresh=inviteInfo(data.token);
+      if(existing)store.assertCredential(userId,credentialProof);
       if (!existing) store.run('INSERT INTO users(id,email,name,password,created) VALUES(?,?,?,?,?)',userId,fresh.email,name,hash,now());
       store.run('INSERT INTO memberships VALUES(?,?,?) ON CONFLICT(company_id,user_id) DO NOTHING',fresh.company_id,userId,fresh.role);
       store.run('UPDATE invites SET used=1 WHERE hash=?',fresh.hash);
       store.audit(fresh.company_id,userId,'invite.accepted');
+      return store.session(userId,fresh.company_id,credentialProof);
     });
-    return store.session(userId,invitation.company_id);
   }
   function newCompany(s,data) {
     requireThat(s.role==='owner','Solo el propietario puede crear otra empresa.',403);

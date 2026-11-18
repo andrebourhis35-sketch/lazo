@@ -227,6 +227,7 @@ async function settings(){
         else notice('No se pudo confirmar el correo. Puedes compartir el enlace privado.',true);
         return;
       }
+      if(result.emailJobId&&current())notice('El correo sigue en proceso. Puedes compartir el enlace privado.');
     });bind($('connection-form'),async data=>{await api('/whatsapp',{method:'PUT',body:data});await settings();notice('Conexión comprobada y guardada.');});
     if($('reveal-verify'))$('reveal-verify').onclick=()=>{$('verify-token').type=$('verify-token').type==='password'?'text':'password';};
     if($('subscribe'))$('subscribe').onclick=async()=>{try{await api('/whatsapp/subscribe',{method:'POST',body:{}});notice('Cuenta vinculada. Completa la verificación de la URL en Meta.');}catch(e){notice(e.message,true);}};
