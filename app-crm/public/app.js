@@ -8,6 +8,7 @@ const statusNames={queued:'En proceso',accepted:'Aceptado por Meta',sent:'Enviad
 let session=null,contacts=[],members=[],active=null,view='conversations',messages=[],templates=[],csrf='',authMode='login';
 const fragment=new URLSearchParams(location.hash.slice(1));
 let setupToken=fragment.get('setup')||'',inviteToken=fragment.get('invite')||'';
+let resetToken=fragment.get('reset')||'';
 if(location.hash)history.replaceState(null,'',location.pathname+location.search);
 const drafts=new Map(),sendKeys=new Map();let polling=false,noticeTimer,workspaceEpoch=0;
 const fileDrafts=new Map(),mediaUrls=new Map(),sendsInFlight=new Map();let chatGeneration=0;
@@ -40,13 +41,33 @@ async function loginScreen(mode='login') {
   ${mode==='setup'||mode==='invite'?'<label>Tu nombre<input name="name" maxlength="80" autocomplete="name" required></label>':''}
   ${mode!=='invite'?`<label>Correo electrónico<input name="email" type="email" autocomplete="username" required value="${esc(info?.email||'')}"></label>`:''}
   <label>Contraseña<input name="password" type="password" autocomplete="${mode==='setup'||mode==='invite'?'new-password':'current-password'}" minlength="12" maxlength="128" required></label>
-  <p class="muted">${mode==='setup'||mode==='invite'?'Usa al menos 12 caracteres. Tu contraseña se guarda protegida.':'Si necesitas recuperar tu cuenta, contacta al administrador de LAZO.'}</p><button class="send" type="submit">${mode==='setup'?'Activar mi plataforma':mode==='invite'?'Crear mi cuenta':'Entrar'}</button></form><p class="muted">Acceso privado · Tus datos pertenecen a tu empresa.</p></div></section></main>`;
+  <p class="muted">${mode==='setup'||mode==='invite'?'Usa al menos 12 caracteres. Tu contraseña se guarda protegida.':'Usa la contraseña de tu cuenta de LAZO.'}</p><button class="send" type="submit">${mode==='setup'?'Activar mi plataforma':mode==='invite'?'Crear mi cuenta':'Entrar'}</button></form><p class="muted">Acceso privado · Tus datos pertenecen a tu empresa.</p></div></section></main>`;
   bind($('auth-form'),async data=>{
     if(mode==='setup'){await api('/bootstrap',{method:'POST',body:{...data,token:setupToken}});setupToken='';}
     else if(mode==='invite'){await api('/invitations/accept',{method:'POST',body:{...data,token:inviteToken}});inviteToken='';}
     else if(mode==='invite-existing'){await api('/invitations/accept',{method:'POST',body:{token:inviteToken,password:data.password}});inviteToken='';}
     else {await api('/login',{method:'POST',body:data});}
     await startWorkspace();
+  });
+  if(mode==='login') {
+    const recover=document.createElement('button');recover.type='button';recover.className='recovery-link';
+    recover.textContent='Olvidé mi contraseña';recover.onclick=()=>passwordScreen('forgot');$('auth-form').after(recover);
+  }
+}
+function passwordScreen(mode) {
+  const reset=mode==='reset';
+  $('root').innerHTML=`<main class="auth-layout"><section class="auth-story">${brand()}<span class="eyebrow">TU ESPACIO, CONTIGO.</span><h1>Vuelve a conectar<br>con tu equipo.</h1><p>Recupera tu acceso a LAZO desde el correo de tu cuenta.</p></section><section class="auth-panel"><div class="auth-card"><span class="eyebrow">ACCESO A TU CUENTA</span><h2>${reset?'Crea una nueva contraseña':'Recupera tu acceso'}</h2><p class="muted">${reset?'El enlace es de un solo uso. Se cerrarán las sesiones anteriores.':'Introduce el correo que usas para entrar a LAZO.'}</p><form id="recovery-form">${reset?'<label>Nueva contraseña<input name="password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label><label>Repite la nueva contraseña<input name="confirmPassword" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label><p class="muted">Usa entre 12 y 128 caracteres.</p>':'<label>Correo electrónico<input name="email" type="email" autocomplete="username" required></label>'}<button class="send" type="submit">${reset?'Guardar nueva contraseña':'Solicitar enlace'}</button></form><button type="button" id="back-login" class="recovery-link">Volver a iniciar sesión</button></div></section></main>`;
+  $('back-login').onclick=()=>{resetToken='';loginScreen().catch(e=>notice(e.message,true));};
+  bind($('recovery-form'),async(data,form)=>{
+    if(reset) {
+      if(data.password!==data.confirmPassword)throw new Error('Las contraseñas no coinciden.');
+      await api('/password/reset',{method:'POST',body:{...data,token:resetToken}});
+      resetToken='';session=null;csrf='';workspaceEpoch++;clearWorkspaceView();drafts.clear();sendKeys.clear();
+      await loginScreen();notice('Contraseña actualizada. Inicia sesión con tu nueva contraseña.');
+    } else {
+      const result=await api('/password/forgot',{method:'POST',body:data});
+      form.replaceChildren();const status=document.createElement('p');status.className='recovery-status';status.setAttribute('role','status');status.textContent=result.message;form.append(status);
+    }
   });
 }
 async function loadSession(){session=await api('/session');csrf=session.csrf;}
@@ -180,7 +201,7 @@ async function settings(){
   const canAdmin=session.user.role!=='agent';
   const company=session.company.id;const connection=canAdmin?await api('/whatsapp'):null;
   if(view!=='settings'||session?.company.id!==company)return;
-  $('view').innerHTML=`<div class="crm-intro"><div><span class="eyebrow">TU EMPRESA</span><h2>Un espacio organizado para tu equipo</h2><p class="muted">${esc(session.company.name)}</p></div></div><div class="settings-grid"><section class="settings-card"><h2>Equipo</h2><div class="member-list">${members.map(m=>`<div class="team-row"><span class="avatar">${esc(initials(m.name))}</span><div><strong>${esc(m.name)}</strong><small>${esc(m.email)} · ${roles[m.role]}</small></div>${canAdmin&&m.role!=='owner'&&m.id!==session.user.id?`<button class="secondary" data-remove="${m.id}">Retirar acceso</button>`:''}</div>`).join('')}</div>${canAdmin?`<form id="invite-form"><h3>Invitar a un colaborador</h3><label>Correo<input name="email" type="email" required></label><label>Rol<select name="role"><option value="agent">Asesor</option>${session.user.role==='owner'?'<option value="admin">Administrador</option>':''}</select></label><button class="send" type="submit">Crear invitación</button><p class="muted">Recibirás un enlace privado de un solo uso, válido durante 48 horas. Compártelo con tu colaborador.</p><textarea id="invite-link" readonly hidden aria-label="Enlace privado de invitación"></textarea></form>`:''}</section>
+  $('view').innerHTML=`<div class="crm-intro"><div><span class="eyebrow">TU EMPRESA</span><h2>Un espacio organizado para tu equipo</h2><p class="muted">${esc(session.company.name)}</p></div></div><div class="settings-grid"><section class="settings-card"><h2>Equipo</h2><div class="member-list">${members.map(m=>`<div class="team-row"><span class="avatar">${esc(initials(m.name))}</span><div><strong>${esc(m.name)}</strong><small>${esc(m.email)} · ${roles[m.role]}</small></div>${canAdmin&&m.role!=='owner'&&m.id!==session.user.id?`<button class="secondary" data-remove="${m.id}">Retirar acceso</button>`:''}</div>`).join('')}</div>${canAdmin?`<form id="invite-form"><h3>Invitar a un colaborador</h3><label>Correo<input name="email" type="email" required></label><label>Rol<select name="role"><option value="agent">Asesor</option>${session.user.role==='owner'?'<option value="admin">Administrador</option>':''}</select></label><label class="invite-email"><input type="checkbox" name="sendEmail" value="true" ${session.emailEnabled?'checked':'disabled'}> Enviar también por correo</label><p class="muted">${session.emailEnabled?'La invitación se enviará al correo indicado.':'El correo todavía no está configurado. Puedes compartir el enlace privado.'}</p><button class="send" type="submit">Crear invitación</button><p class="muted">Recibirás un enlace privado de un solo uso, válido durante 48 horas. Compártelo con tu colaborador.</p><textarea id="invite-link" readonly hidden aria-label="Enlace privado de invitación"></textarea></form>`:''}</section>
   ${canAdmin?`<section class="settings-card"><h2>WhatsApp Business</h2><p class="muted">${connection.configured?`Cuenta de prueba: ${connection.testOnly?'envíos limitados al destinatario autorizado':'conectada'}. ${connection.checkedAt?'Conexión comprobada.':'Comprueba la conexión para consultar las plantillas.'}`:'Conecta tu cuenta oficial de WhatsApp.'}</p><form id="connection-form"><label>ID del número<input name="phoneId" value="${esc(connection.phoneId||'')}" required></label><label>ID de cuenta WhatsApp (WABA)<input name="wabaId" value="${esc(connection.wabaId||'')}" required></label><label>Versión de API<input name="graphVersion" value="${esc(connection.graphVersion||'')}" placeholder="vNN.N" required></label><label>Token de acceso<input name="accessToken" type="password" autocomplete="off" placeholder="${connection.configured?'Guardado; dejar vacío para conservar':''}"></label><label>Secreto de la app de Meta<input name="appSecret" type="password" autocomplete="off" placeholder="${connection.hasAppSecret?'Guardado; dejar vacío para conservar':'Necesario para recibir mensajes'}"></label><button class="send" type="submit">Guardar y comprobar conexión</button></form>
   ${connection.configured?`<div class="webhook-info"><h3>Recepción de mensajes y estados</h3><label>URL de devolución de llamada<input readonly value="${esc(connection.callbackUrl)}"></label><label>Token de verificación<input readonly type="password" id="verify-token" value="${esc(connection.verifyToken)}"><button class="secondary" id="reveal-verify" type="button">Mostrar token</button></label><p class="muted">${connection.hasAppSecret?'Secreto guardado.':'Falta guardar el secreto de la app.'} ${connection.webhookVerified?'Meta verificó la URL.':'Falta verificar esta URL en Meta.'} ${connection.webhookAt?'Último evento: '+fmt(connection.webhookAt):'Todavía no se recibieron eventos.'}</p><button class="secondary" id="subscribe">Vincular app a la cuenta de prueba</button><p class="muted">En Meta configura esta URL y suscríbete al campo messages. Los tokens permanecen en el servidor.</p></div>`:''}</section>`:''}
   ${session.user.role==='owner'?`<section class="settings-card"><h2>Otra empresa</h2><p class="muted">Cada empresa tiene su propia agenda, usuarios y conexión.</p><form id="company-form"><label>Nombre de la empresa<input name="name" maxlength="100" required></label><button class="send" type="submit">Crear empresa</button></form></section>`:''}</div>`;
@@ -191,7 +212,22 @@ async function settings(){
     mountManagement(tools,{api:scopedApi,notice,getStages:()=>pipelineStages,getReplies:()=>quickReplies,
       onStages:async list=>{if(session?.company.id!==company||toolEpoch!==workspaceEpoch)return;setPipeline(list);const data=await scopedApi('/contacts');if(session?.company.id===company&&toolEpoch===workspaceEpoch)contacts=data.contacts;},
       onReplies:list=>{if(session?.company.id===company&&toolEpoch===workspaceEpoch)quickReplies=list;}});
-    bind($('invite-form'),async data=>{const result=await api('/invitations',{method:'POST',body:data});$('invite-link').value=result.url;$('invite-link').hidden=false;notice('Invitación creada. Comparte el enlace de forma privada.');});bind($('connection-form'),async data=>{await api('/whatsapp',{method:'PUT',body:data});await settings();notice('Conexión comprobada y guardada.');});
+    bind($('invite-form'),async data=>{
+      const epoch=workspaceEpoch,company=session.company.id;
+      const current=()=>epoch===workspaceEpoch&&session?.company.id===company&&view==='settings'&&$('invite-link');
+      const result=await api('/invitations',{method:'POST',body:{...data,sendEmail:data.sendEmail==='true'}});
+      if(!current())return;
+      $('invite-link').value=result.url;$('invite-link').hidden=false;
+      notice(result.emailQueued?'Invitación en cola de correo. También puedes compartir el enlace privado.':'Invitación creada. Comparte el enlace de forma privada.');
+      if(result.emailJobId)for(let attempt=0;attempt<12;attempt++) {
+        await new Promise(resolve=>setTimeout(resolve,1500));if(!current())return;
+        const job=await api('/invitations/email/'+result.emailJobId);if(!current())return;
+        if(['queued','sending'].includes(job.state))continue;
+        if(job.state==='accepted')notice('Zoho aceptó el correo. El colaborador debe comprobar su bandeja.');
+        else notice('No se pudo confirmar el correo. Puedes compartir el enlace privado.',true);
+        return;
+      }
+    });bind($('connection-form'),async data=>{await api('/whatsapp',{method:'PUT',body:data});await settings();notice('Conexión comprobada y guardada.');});
     if($('reveal-verify'))$('reveal-verify').onclick=()=>{$('verify-token').type=$('verify-token').type==='password'?'text':'password';};
     if($('subscribe'))$('subscribe').onclick=async()=>{try{await api('/whatsapp/subscribe',{method:'POST',body:{}});notice('Cuenta vinculada. Completa la verificación de la URL en Meta.');}catch(e){notice(e.message,true);}};
     document.querySelectorAll('[data-remove]').forEach(b=>b.onclick=async()=>{try{await api('/members/'+b.dataset.remove,{method:'DELETE',body:{}});members=(await api('/members')).members;await settings();notice('Acceso retirado.');}catch(e){notice(e.message,true);}});
@@ -215,4 +251,5 @@ async function refresh(manual=false){
   }catch(e){if(e.status===401&&epoch===workspaceEpoch){session=null;csrf='';await loginScreen();}else if(manual)throw e;}finally{polling=false;}
 }
 setInterval(()=>{if(!document.hidden)refresh().catch(()=>{});},5000);
-startWorkspace().catch(e=>{if(e.status!==401)notice(e.message,true);loginScreen().catch(e=>notice(e.message,true));});
+if(resetToken)loadSession().catch(()=>{session=null;csrf='';}).then(()=>passwordScreen('reset'));
+else startWorkspace().catch(e=>{if(e.status!==401)notice(e.message,true);loginScreen().catch(e=>notice(e.message,true));});
