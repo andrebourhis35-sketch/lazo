@@ -30,7 +30,7 @@ ttk.Entry(panel, textvariable=password, show='●').pack(fill='x', pady=(5, 12))
 ttk.Label(panel, text='Usa una contraseña de aplicación creada en la seguridad de tu cuenta Zoho. '
           'No la envíes por chat. Se transmite por SSH a tu VPS y se comprueba con Zoho; '
           'se guarda solo en el entorno privado de LAZO. Los espacios de separación '
-          'de la contraseña se eliminan al pegarla.', wraplength=570).pack(anchor='w', pady=(2, 13))
+          'de la contraseña se eliminan al guardar.', wraplength=570).pack(anchor='w', pady=(2, 13))
 ttk.Label(panel, text='La comprobación usa TLS en el puerto 465. No envía ningún correo.', wraplength=570).pack(anchor='w')
 status = tk.StringVar(value='Completa los datos y pulsa el botón.')
 ttk.Label(panel, textvariable=status, wraplength=570).pack(anchor='w', pady=(14, 8))
@@ -91,7 +91,8 @@ def save():
                 messagebox.showinfo('Correo configurado', 'Zoho aceptó la conexión segura. '
                                     'Falta comprobar que el correo de recuperación llegue a tu bandeja.', parent=window)
             else:
-                status.set(ERRORS[code] + ' Código: ' + code)
+                status.set('No se pudo completar la configuración. Código: ' + code)
+                messagebox.showerror('No se pudo configurar el correo', ERRORS[code] + '\n\nCódigo: ' + code, parent=window)
         window.after(0, finish)
     threading.Thread(target=submit, daemon=True).start()
 
