@@ -49,7 +49,7 @@ export function whatsapp(store, config, fetchImpl = fetch) {
     store.run('INSERT INTO connections(company_id,phone_id,waba_id,config,checked,verified) VALUES(?,?,?,?,?,?) ON CONFLICT(company_id) DO UPDATE SET phone_id=excluded.phone_id,waba_id=excluded.waba_id,config=excluded.config,checked=excluded.checked,verified=excluded.verified',
       company,c.phoneId,c.wabaId,secrets.seal(c,company),now(),verified);
   }
-  async function connect(company,data,actor) {
+  async function connect(company,data,actor,ensureCurrent=()=>{}) {
     const old=credentials(company);
     const c={ accessToken:text(data.accessToken||old?.accessToken||'',4096,true),appSecret:text(data.appSecret||old?.appSecret||'',256),
       phoneId:text(data.phoneId||old?.phone_id||'',50,true),wabaId:text(data.wabaId||old?.waba_id||'',50,true),
@@ -59,6 +59,7 @@ export function whatsapp(store, config, fetchImpl = fetch) {
     requireThat(!c.testRecipient||/^\d{8,15}$/.test(c.testRecipient),'Destinatario de prueba no válido.');
     const phones=await graph(c,`${c.wabaId}/phone_numbers?fields=id&limit=100`);
     requireThat(phones.data?.some(p=>p.id===c.phoneId),'El número no pertenece a esta cuenta de WhatsApp.');
+    ensureCurrent();
     saveRaw(company,c,old?.phone_id===c.phoneId&&old?.appSecret===c.appSecret?old.verified:0);
     store.audit(company,actor,'whatsapp.connected');return safe(company);
   }

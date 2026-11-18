@@ -4,7 +4,8 @@ Primera plataforma con cuentas por empresa, independiente de la demo estática y
 
 ## Funciones
 
-- Propietario, administrador y asesor. Cada sesión elige una empresa de la que el usuario es miembro. Invitaciones privadas válidas 48 horas y de un solo uso. No se envían correos automáticamente.
+- Propietario, administrador y asesor. Cada sesión elige una empresa de la que el usuario es miembro. Invitaciones privadas válidas 48 horas y de un solo uso, con envío por Zoho cuando el operador configure el correo.
+- Recuperación por correo con enlaces de un solo uso de 15 minutos, contraseña nueva y cierre de sesiones anteriores. El correo requiere configuración privada; consultar [Correo y acceso](../docs/CORREO-ACCESO.md).
 - Contactos, conversaciones, notas internas, asignación y etiquetas guardadas en SQLite. Filtros por estado, asesor y etiqueta. Se muestran hasta 1.000 contactos y los 100 mensajes más recientes por contacto.
 - Conexión WhatsApp por empresa: token cifrado en el servidor, validación del número dentro del WABA y envío de plantillas aprobadas o texto dentro de la ventana de 24 horas desde el último mensaje entrante real.
 - Webhook de mensajes y estados con firma SHA-256, deduplicación e historial de estados que no retrocede al recibir eventos atrasados. Imágenes JPG/PNG de hasta 5 MB y PDF de hasta 10 MB, con envío, vista de imagen y descarga privada.
@@ -19,14 +20,15 @@ El propietario recibe en su equipo un enlace privado con fragmento `#setup=...`.
 
 En Ajustes → WhatsApp, el propietario completa el secreto de su app directamente en el formulario. Un token existente se conserva al dejar su campo vacío. Guardar y comprobar valida la cuenta con Meta. Configurar en Meta la URL de devolución de llamada que muestra la app y su token de verificación, seleccionar el campo `messages` y vincular la app a la cuenta de prueba. La recepción real se confirma solo cuando un mensaje enviado desde WhatsApp aparece en la bandeja.
 
-Nunca pedir ni pegar tokens, contraseñas o secretos por chat. Para cambiar el acceso del propietario ante una pérdida de contraseña, usar soporte administrativo del servidor y verificar la identidad; no existe recuperación por correo en esta versión.
+Nunca pedir ni pegar tokens, contraseñas o secretos por chat. Con Zoho habilitado, usar **Olvidé mi contraseña** en la página de acceso. Si el correo aún no está configurado, el operador debe completar la configuración privada o verificar la identidad mediante soporte administrativo del servidor.
 
 ## Implementación y pruebas
 
-Node.js 22.13+ (SQLite integrado; aviso experimental en Node 22). Sin dependencias npm. HTTP escucha solo en 127.0.0.1:3031. Caddy enruta `/app`, `/app/*`, `/api/crm/*` y `/webhooks/whatsapp` a ese puerto; la demo continúa en las rutas existentes.
+Node.js 22.13+ (SQLite integrado; aviso experimental en Node 22). Nodemailer está fijado en package-lock.json para el correo transaccional. HTTP escucha solo en 127.0.0.1:3031. Caddy enruta `/app`, `/app/*`, `/api/crm/*` y `/webhooks/whatsapp` a ese puerto; la demo continúa en las rutas existentes.
 
 ```powershell
-node --test app-crm/test/platform.test.js app-crm/test/daily-workflow.test.js app-crm/test/ui-send.test.js
+npm --prefix app-crm ci --ignore-scripts
+node --test app-crm/test/platform.test.js app-crm/test/daily-workflow.test.js app-crm/test/ui-send.test.js app-crm/test/recovery.test.js app-crm/test/recovery-races.test.js
 node --check app-crm/public/app.js
 ```
 
@@ -34,7 +36,7 @@ La configuración se prepara fuera de Git mediante las variables del archivo .en
 
 La unidad endurecida ejecuta código de /opt/lazo-crm/current. Las releases no contienen DB ni secretos. Antes de cambiar la release, generar un respaldo consistente de SQLite; conservar la release anterior y validar Caddy antes de recargar. Una recuperación de código cambia el enlace current y reinicia solo lazo-crm. Restaurar datos es una operación distinta y exige detener el servicio, conservar copia del estado actual y revisar la integridad de la copia.
 
-El temporizador crea un respaldo diario consistente y conserva siete días en /var/backups/lazo-crm. Son respaldos locales al VPS; no protegen frente a pérdida total del servidor. Los mensajes y eventos operativos se depuran a 90 días; una copia diaria anterior puede conservarlos hasta siete días adicionales durante la rotación.
+El temporizador crea un respaldo diario consistente y conserva siete días en /var/backups/lazo-crm. Las copias cifradas fuera del VPS se descargan a la computadora del propietario y se comprueban de forma aislada; ver [Respaldos en Windows](../docs/RESPALDOS-PC.md). Requieren conservar el perfil de Windows y que el equipo esté encendido con sesión y red. Los mensajes y eventos operativos se depuran a 90 días; una copia diaria anterior puede conservarlos hasta siete días adicionales durante la rotación.
 
 ## Archivos y métricas
 

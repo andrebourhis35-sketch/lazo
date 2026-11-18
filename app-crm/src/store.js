@@ -27,6 +27,9 @@ export function openStore(filename) {
     CREATE INDEX IF NOT EXISTS sale_events_company ON sale_events(company_id,created);
     CREATE TABLE IF NOT EXISTS media_assets(id TEXT PRIMARY KEY,company_id TEXT NOT NULL REFERENCES companies(id),wa_id TEXT,mime TEXT NOT NULL,filename TEXT NOT NULL,size INTEGER NOT NULL,sha256 TEXT NOT NULL DEFAULT '',content BLOB,state TEXT NOT NULL,attempts INTEGER NOT NULL DEFAULT 0,retry_at INTEGER NOT NULL DEFAULT 0,created INTEGER NOT NULL);
     CREATE INDEX IF NOT EXISTS media_company ON media_assets(company_id,created);
+    CREATE TABLE IF NOT EXISTS password_resets(hash TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),expires INTEGER NOT NULL,used INTEGER NOT NULL DEFAULT 0,created INTEGER NOT NULL);
+    CREATE TABLE IF NOT EXISTS mail_jobs(id TEXT PRIMARY KEY,kind TEXT NOT NULL,company_id TEXT,user_id TEXT,proof TEXT,recipient TEXT NOT NULL,payload TEXT NOT NULL,state TEXT NOT NULL,expires INTEGER NOT NULL,created INTEGER NOT NULL,updated INTEGER NOT NULL);
+    CREATE INDEX IF NOT EXISTS mail_queue ON mail_jobs(state,created);
   `);
   const run = (sql, ...args) => db.prepare(sql).run(...args);
   const get = (sql, ...args) => db.prepare(sql).get(...args);
@@ -102,7 +105,13 @@ export function openStore(filename) {
     });
     return contact(company,id);
   }
-  function session(user,company) {
+  function assertCredential(user, proof={}) {
+    if(proof.passwordHash!==undefined)requireThat(get('SELECT password FROM users WHERE id=?',user)?.password===proof.passwordHash,'El acceso cambió. Inicia sesión de nuevo.',401);
+    if(proof.parentHash!==undefined)requireThat(member(proof.parentHash)?.user_id===user,'El acceso cambió. Inicia sesión de nuevo.',401);
+  }
+  function session(user,company,proof={}) {
+    assertCredential(user,proof);
+    requireThat(get('SELECT 1 FROM memberships WHERE company_id=? AND user_id=?',company,user),'Esta cuenta ya no tiene acceso a la empresa.',401);
     const secret=token(),csrf=token();
     run('DELETE FROM sessions WHERE expires<?',now());
     run('INSERT INTO sessions(hash,user_id,company_id,csrf,expires) VALUES(?,?,?,?,?)',digest(secret),user,company,csrf,now()+12*60*60*1000);
@@ -119,7 +128,10 @@ export function openStore(filename) {
     run('DELETE FROM status_events WHERE updated<?',cutoff);
     run('DELETE FROM audit WHERE created<?',cutoff);
     run('DELETE FROM invites WHERE expires<? OR used=1',now()-86400000);
+    run('DELETE FROM password_resets WHERE expires<?',now()-86400000);
+    run("UPDATE mail_jobs SET state='expired',payload='' WHERE state='queued' AND expires<=?",now());
+    run('DELETE FROM mail_jobs WHERE created<?',now()-7*86400000);
     run('DELETE FROM sessions WHERE expires<?',now());
   }
-  return { db,run,get,all,tx,audit,limit,contact,addContact,updateContact,session,member,purge,ensureWorkspace,close:()=>db.close() };
+  return { db,run,get,all,tx,audit,limit,contact,addContact,updateContact,session,member,purge,ensureWorkspace,assertCredential,close:()=>db.close() };
 }
