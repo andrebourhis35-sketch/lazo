@@ -71,4 +71,4 @@ copiar `identity.dpapi` a otro usuario esperando que pueda abrirlo. Nunca pegar
 claves o contenido de copias en el chat, en Git o en capturas.
 
 Fuentes: [age oficial](https://age-encryption.org/),
-[DPAPI de Windows](https://learn.microsoft.com/en-us/windows/win32/secauthn/data-protection).
+[DPAPI de Windows](https://learn.microsoft.com/en-us/windows/win32/api/dpapi/nf-dpapi-cryptprotectdata).

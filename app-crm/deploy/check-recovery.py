@@ -26,7 +26,10 @@ def check_recovery(archive_path, destination):
         raise ValueError('Invalid recovery manifest')
     for name, expected in manifest['files'].items():
         with (destination / name).open('rb') as source:
-            if hashlib.file_digest(source, 'sha256').hexdigest() != expected:
+            checksum = hashlib.sha256()
+            while chunk := source.read(1024 * 1024):
+                checksum.update(chunk)
+            if checksum.hexdigest() != expected:
                 raise ValueError('Recovery checksum mismatch')
     with sqlite3.connect((destination / 'lazo.sqlite').as_uri() + '?mode=ro', uri=True) as database:
         if database.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
