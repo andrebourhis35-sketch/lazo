@@ -49,11 +49,12 @@ def save():
         try:
             result = subprocess.run([config['ssh'], *options, config['server'],
                                      'sudo -n /usr/local/sbin/lazo-crm-mail-configure'],
-                                    input=json.dumps(data).encode(), capture_output=True, timeout=120,
+                                    input=json.dumps(data).encode(), capture_output=True, timeout=330,
                                     creationflags=subprocess.CREATE_NO_WINDOW)
             ok = result.returncode == 0 and json.loads(result.stdout.decode()).get('ok') is True
         except Exception:
             ok = False
+        data['password'] = ''
         (ROOT / 'mail-setup-status.json').write_text(json.dumps({'ok': ok}), encoding='utf-8')
 
         def finish():
@@ -64,11 +65,17 @@ def save():
                 messagebox.showinfo('Correo configurado', 'Zoho aceptó la conexión segura. '
                                     'Falta comprobar que el correo de recuperación llegue a tu bandeja.', parent=window)
             else:
-                status.set('No se guardó. Revisa servidor, correo y contraseña de aplicación de Zoho.')
+                status.set('No se pudo confirmar. Revisa servidor, correo y contraseña de aplicación de Zoho.')
         window.after(0, finish)
     threading.Thread(target=submit, daemon=True).start()
 
 
 button = ttk.Button(panel, text='Guardar y comprobar conexión segura', command=save)
 button.pack(anchor='e', pady=(5, 0))
+def close_window():
+    if str(button['state']) == 'disabled':
+        messagebox.showinfo('Comprobación en proceso', 'Espera a que termine la comprobación antes de cerrar.', parent=window)
+    else:
+        window.destroy()
+window.protocol('WM_DELETE_WINDOW', close_window)
 window.mainloop()
