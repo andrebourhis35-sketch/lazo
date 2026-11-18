@@ -8,7 +8,7 @@ const statusNames={queued:'En proceso',accepted:'Aceptado por Meta',sent:'Enviad
 let session=null,contacts=[],members=[],active=null,view='conversations',messages=[],templates=[],csrf='',authMode='login';
 const fragment=new URLSearchParams(location.hash.slice(1));
 let setupToken=fragment.get('setup')||'',inviteToken=fragment.get('invite')||'';
-if(location.hash)history.replaceState(null,'',location.pathname);
+if(location.hash)history.replaceState(null,'',location.pathname+location.search);
 const drafts=new Map(),sendKeys=new Map();let polling=false,noticeTimer,workspaceEpoch=0;
 const fileDrafts=new Map(),mediaUrls=new Map(),sendsInFlight=new Map();let chatGeneration=0;
 let inboxFilters={status:'all',owner:'',tag:''};
@@ -24,7 +24,7 @@ async function api(path,{method='GET',body,binary=false}={}) {
   let data;try{data=await response.json();}catch{throw new Error('No se pudo leer la respuesta del servidor.');}
   if(!response.ok){const err=new Error(data.error||'No se pudo completar la acción.');err.status=response.status;err.code=data.code;if(data.code==='CONTEXT_CHANGED')contextChanged();throw err;}return data;
 }
-function contextChanged(){workspaceEpoch++;const overlay=document.createElement('div');overlay.className='context-changed';overlay.innerHTML='<section><h2>Tu sesión cambió en otra pestaña</h2><p>Recarga para confirmar la empresa y la cuenta con la que estás trabajando.</p><button class="send" id="reload-context">Recargar mi espacio</button></section>';$('root').inert=true;document.body.append(overlay);$('reload-context').onclick=()=>location.reload();}
+function contextChanged(){if(document.querySelector('.context-changed'))return;workspaceEpoch++;const overlay=document.createElement('div');overlay.className='context-changed';overlay.innerHTML='<section><h2>Tu sesión cambió en otra pestaña</h2><p>Recarga para confirmar la empresa y la cuenta con la que estás trabajando.</p><button class="send" id="reload-context">Recargar mi espacio</button></section>';$('root').inert=true;document.body.append(overlay);$('reload-context').onclick=()=>location.reload();}
 function bind(form,fn){form.addEventListener('submit',async e=>{e.preventDefault();const submit=e.submitter;if(submit)submit.disabled=true;try{await fn(Object.fromEntries(new FormData(form)),form);}catch(error){notice(error.message,true);}finally{if(submit)submit.disabled=false;}});}
 function initials(name){return name.trim().split(/\s+/).slice(0,2).map(p=>p[0]).join('').toUpperCase();}
 function options(values,selected){return values.map(v=>`<option value="${esc(v.id??v)}"${(v.id??v)===selected?' selected':''}>${esc(v.name??v)}</option>`).join('');}
