@@ -8,7 +8,7 @@ const statusNames={queued:'En proceso',accepted:'Aceptado por Meta',sent:'Enviad
 let session=null,contacts=[],members=[],active=null,view='conversations',messages=[],templates=[],csrf='',authMode='login';
 const fragment=new URLSearchParams(location.hash.slice(1));
 let setupToken=fragment.get('setup')||'',inviteToken=fragment.get('invite')||'';
-if(location.hash)history.replaceState(null,'',location.pathname);
+if(location.hash)history.replaceState(null,'',location.pathname+location.search);
 const drafts=new Map(),sendKeys=new Map();let polling=false,noticeTimer,workspaceEpoch=0;
 const fileDrafts=new Map(),mediaUrls=new Map(),sendsInFlight=new Map();let chatGeneration=0;
 let inboxFilters={status:'all',owner:'',tag:''};

@@ -14,6 +14,8 @@ const assets={
   '/app/':['index.html','text/html; charset=utf-8'], '/app/app.js':['app.js','text/javascript; charset=utf-8'],
   '/app/app.css':['app.css','text/css; charset=utf-8'],
   '/app/work-ui.js':['work-ui.js','text/javascript; charset=utf-8'],
+  '/app/visual-preview.js':['visual-preview.js','text/javascript; charset=utf-8'],
+  '/app/visual-preview.css':['visual-preview.css','text/css; charset=utf-8'],
   '/app/styles.css':['styles.css','text/css; charset=utf-8',demo],
   '/app/crm.css':['crm.css','text/css; charset=utf-8',demo],
   '/app/marca.svg':['marca.svg','image/svg+xml',demo]
