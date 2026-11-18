@@ -43,7 +43,7 @@ class ConfigureTest(unittest.TestCase):
             return calls
 
     def test_only_smtp_fields_change_and_file_remains_private(self):
-        calls = self.run_configuration([SimpleNamespace(returncode=0), SimpleNamespace(returncode=0)])
+        calls = self.run_configuration([SimpleNamespace(returncode=0, stdout=b'{"ok":true}'), SimpleNamespace(returncode=0)])
         changed = self.environment.read_text()
         self.assertTrue(changed.startswith(self.original.decode()))
         self.assertIn('LAZO_SMTP_HOST="smtp.zoho.com"', changed)
@@ -52,14 +52,34 @@ class ConfigureTest(unittest.TestCase):
         self.assertEqual(calls.call_args_list[1].args[0], ['systemctl','restart','lazo-crm'])
 
     def test_failed_authentication_never_changes_environment(self):
-        with self.assertRaises(ValueError):
-            self.run_configuration([SimpleNamespace(returncode=1)])
+        with self.assertRaises(module.SetupError) as raised:
+            self.run_configuration([SimpleNamespace(returncode=1, stdout=b'{"ok":false,"error":"smtp-auth"}')])
+        self.assertEqual(raised.exception.code, 'smtp-auth')
         self.assertEqual(self.environment.read_bytes(), self.original)
 
     def test_failed_restart_recovers_original_environment(self):
-        with self.assertRaises(subprocess.CalledProcessError):
-            self.run_configuration([SimpleNamespace(returncode=0),
+        with self.assertRaises(module.SetupError) as raised:
+            self.run_configuration([SimpleNamespace(returncode=0, stdout=b'{"ok":true}'),
                                     subprocess.CalledProcessError(1, ['systemctl']), SimpleNamespace(returncode=0)])
+        self.assertEqual(raised.exception.code, 'server-restart')
+        self.assertEqual(self.environment.read_bytes(), self.original)
+
+    def test_unknown_provider_output_is_never_exposed_or_saved(self):
+        for payload in (b'raw synthetic-provider-password',
+                        b'{"ok":false,"error":"synthetic-provider-password"}',
+                        b'{"ok":false,"error":["synthetic-provider-password"]}'):
+            with self.subTest(payload=payload):
+                with self.assertRaises(module.SetupError) as raised:
+                    self.run_configuration([SimpleNamespace(returncode=1, stdout=payload)])
+                self.assertEqual(raised.exception.code, 'smtp-check')
+                self.assertNotIn('synthetic-provider-password', str(raised.exception))
+                self.assertEqual(self.environment.read_bytes(), self.original)
+
+    def test_unconfirmed_recovery_has_a_distinct_safe_code(self):
+        with self.assertRaises(module.SetupError) as raised:
+            self.run_configuration([SimpleNamespace(returncode=0, stdout=b'{"ok":true}'),
+                                    subprocess.CalledProcessError(1, ['systemctl']), SimpleNamespace(returncode=1)])
+        self.assertEqual(raised.exception.code, 'server-recovery')
         self.assertEqual(self.environment.read_bytes(), self.original)
 
     def test_control_characters_are_rejected_before_verification(self):
