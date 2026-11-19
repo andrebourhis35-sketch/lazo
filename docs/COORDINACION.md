@@ -3,6 +3,7 @@
 ### Corrección de carga del SDK de Meta (19 de noviembre de 2026)
 
 - Usuario informa que Conectar con Meta falla al cargar el SDK. Diagnóstico público GET /app/: Caddy devuelve script-src y connect-src solo self y sustituye la política del CRM que sí permite Meta; SDK oficial accesible HTTP 200 desde esta computadora. Release meta-0f8ca78 y Caddyfile con huella previa sin cambios. Reserva: diagnóstico/configuración de publicación y este tablero, rama codex/csp-sdk-meta, responsable Codex. Corregir solo la política de LAZO/CRM, conservando otros sitios, datos, entorno y revisiones de Meta; validar Caddy antes de recargar y comprobar el encabezado real por HTTPS, sin atribuir login real a la prueba de carga.
+- Operador fix-caddy-sdk.py revisado independientemente y candidato validado por Caddy real antes de aplicar. La CSP estática se limita al matcher inverso de las rutas del CRM; el proxy conserva la política que entrega el backend. Copia previa privada, sustitución atómica y recarga correctas; demás bloques del archivo conservados byte a byte. Nueva huella Caddy 58d1ddaeb45f4dfb1be2df6be20641fb4e6fbf0345197a572939ca8c4451b1ec. Verificación pública desde Windows: /app/ 200 con única CSP que permite el SDK; / y /flujos/ 200 con política estática anterior; /api/crm/session 401 y /app/.env 404, ambos sin exponer datos. Sin reiniciar CRM ni cambiar datos, entorno o Meta. PR #54; queda pendiente confirmar carga en navegador y autorización real, que esta verificación HTTP no acredita.
 
 ### Vinculación de la configuración de Meta (19 de noviembre de 2026)
 
