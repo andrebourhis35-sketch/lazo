@@ -1,19 +1,5 @@
-Órbita es la presentación principal de `/app/`, también para conversaciones,
-contactos, ventas, estadísticas y ajustes. `/app/?visual=1` conserva compatibilidad
-con los enlaces de revisión anteriores. La vista clásica se abre explícitamente
-con `/app/?visual=0`; el enlace de la cabecera permite compararla.
+# Presentación Órbita de LAZO
 
-`marca-volumen.svg` exporta el primer bloque `<defs>` de
-`branding/lienzo/Definitivo.dc.html` y muestra su grupo `sym3d`, sin alterar las
-definiciones ni la geometría. El símbolo sigue pendiente de aprobación.
-`marca.svg` conserva la versión pequeña existente.
+Órbita es la única presentación de la app, también al abrir antiguos enlaces con visual=0. Se retiraron el enlace a la vista clásica y el control de pausa de animaciones, a petición del usuario. Las animaciones orbitales permanecen activas.
 
-`styles.css`, `crm.css` y `marca.svg` son copias sin cambios de los archivos de
-`interfaz/` en el commit `9399de2`. Se incluyen en `public/` para que una publicación
-de solo `app-crm/` no dependa de esa carpeta hermana. Los originales permanecen
-intactos. La prueba de paquete comprueba los recursos desde una copia aislada.
-
-La escena usa capas y perspectiva CSS, con parallax limitado a la cabecera.
-No es un modelo tridimensional WebGL. La preferencia del sistema de movimiento
-reducido se respeta al iniciar; el usuario puede activar o pausar la animación.
-No se añaden estadísticas ni contactos de muestra a las empresas reales.
+Los estilos base de la app se conservan como dependencias de Órbita; no constituyen otra vista seleccionable. El isotipo continúa provisional. El enlace de flujos abre /flujos/.
