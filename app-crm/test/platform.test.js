@@ -12,10 +12,10 @@ import { laterStatus } from '../src/whatsapp.js';
 
 test('platform: accounts, tenant isolation, persistence and signed WhatsApp lifecycle',async t=>{
   const directory=mkdtempSync(join(tmpdir(),'lazo-test-')),database=join(directory,'db.sqlite');
-  let calls=0,mode='ok',beforeResponse=null;
+  let calls=0,mode='ok',beforeResponse=null,phoneGate=null;
   const fakeFetch=async(url,options)=>{
     const path=new URL(url).pathname;
-    if(path.endsWith('/phone_numbers'))return Response.json({data:[{id:'10001'}]});
+    if(path.endsWith('/phone_numbers')){if(phoneGate){const gate=phoneGate;phoneGate=null;await gate();}return Response.json({data:[{id:'10001'}]});}
     if(path.endsWith('/message_templates'))return Response.json({data:[{name:'hello_world',language:'en_US',status:'APPROVED',components:[{type:'BODY',text:'Hello World'}]}]});
     if(path.endsWith('/messages')){
       calls++;if(mode==='timeout')throw new Error('Timeout with SECRET_SHOULD_NOT_LEAK');
@@ -79,6 +79,26 @@ test('platform: accounts, tenant isolation, persistence and signed WhatsApp life
       await api(owner,'/companies/switch','POST',{companyId:companyB});await session(owner);
       assert.equal((await api(owner,'/whatsapp','PUT',credentials)).status,409);
       await api(owner,'/companies/switch','POST',{companyId:companyA});await session(owner);
+    });
+    await t.test('another number or WABA cannot overwrite a company connection',async()=>{
+      const before=store.get('SELECT * FROM connections WHERE company_id=?',companyA);
+      for(const change of [{phoneId:'99999'},{wabaId:'99999'}]) {
+        const r=await api(owner,'/whatsapp','PUT',{...credentials,...change});
+        assert.equal(r.status,409);assert.match(r.data.error,/espacio de empresa separado/);
+        assert.deepEqual(store.get('SELECT * FROM connections WHERE company_id=?',companyA),before);
+      }
+    });
+    await t.test('token renewal preserves secrets and refuses a concurrent stale update',async()=>{
+      let release,entered;const waiting=new Promise(resolve=>{entered=resolve;});
+      phoneGate=()=>{entered();return new Promise(resolve=>{release=resolve;});};
+      const stale=api(owner,'/whatsapp','PUT',{accessToken:'stale-fake-token'});await waiting;
+      assert.equal((await api(owner,'/whatsapp','PUT',{accessToken:'renewed-fake-token'})).status,200);
+      const renewed=store.get('SELECT * FROM connections WHERE company_id=?',companyA);
+      release();assert.equal((await stale).status,409);
+      assert.deepEqual(store.get('SELECT * FROM connections WHERE company_id=?',companyA),renewed);
+      const safe=(await api(owner,'/whatsapp')).data;
+      assert.equal(safe.phoneId,'10001');assert.equal(safe.hasAppSecret,true);
+      assert.equal(JSON.stringify(safe).includes('fake-token'),false);
     });
     function event(value){return {object:'whatsapp_business_account',entry:[{id:'20001',changes:[{field:'messages',value:{metadata:{phone_number_id:'10001'},...value}}]}]};}
     function signed(value,secret='fake-app-secret'){

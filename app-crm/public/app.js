@@ -1,11 +1,12 @@
+import { mountConnections } from './connections-ui.js?v=20261119';
 import { mountManagement, replyPicker, renderStatistics } from './work-ui.js?v=20261117';
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let stages=[],pipelineStages=[],quickReplies=[],statsDays=30;
 const roles={owner:'Propietario',admin:'Administrador',agent:'Asesor'};
-const labels={conversations:'Conversaciones',contacts:'Contactos',sales:'Ventas',statistics:'Estadísticas',settings:'Ajustes'};
+const labels={conversations:'Conversaciones',contacts:'Contactos',sales:'Ventas',statistics:'Estadísticas',connections:'Conexiones',settings:'Ajustes'};
 const statusNames={queued:'En proceso',accepted:'Aceptado por Meta',sent:'Enviado',delivered:'Entregado',read:'Leído',received:'Recibido',failed:'Rechazado por Meta',unknown:'Envío no confirmado; revisa antes de repetir'};
-let session=null,contacts=[],members=[],active=null,view='conversations',messages=[],templates=[],csrf='',authMode='login';
+let session=null,contacts=[],members=[],active=null,view=new URLSearchParams(location.search).get('view')==='connections'?'connections':'conversations',messages=[],templates=[],csrf='',authMode='login';
 const fragment=new URLSearchParams(location.hash.slice(1));
 let setupToken=fragment.get('setup')||'',inviteToken=fragment.get('invite')||'';
 let resetToken=fragment.get('reset')||'';
@@ -73,14 +74,14 @@ function passwordScreen(mode) {
 async function loadSession(){session=await api('/session');csrf=session.csrf;}
 async function startWorkspace(){clearWorkspaceView();workspaceEpoch++;await loadSession();if(inviteToken){await api('/invitations/accept',{method:'POST',body:{token:inviteToken}});inviteToken='';await loadSession();}const epoch=workspaceEpoch;const loaded=await Promise.all([api('/contacts').then(d=>d.contacts),api('/members').then(d=>d.members),api('/pipeline').then(d=>d.stages),api('/quick-replies').then(d=>d.replies)]);if(epoch!==workspaceEpoch)return;[contacts,members,pipelineStages,quickReplies]=loaded;setPipeline(pipelineStages);active=contacts.find(c=>c.id===active)?.id||contacts[0]?.id||null;shell();await showView(view);}
 function shell(){
-  $('root').innerHTML=`<div class="app"><aside class="sidebar">${brand()}<label class="workspace-picker"><span class="sr-only">Empresa activa</span><select id="workspace">${options(session.companies,session.company.id)}</select></label><span class="nav-label">TU ESPACIO DE TRABAJO</span><nav>${Object.entries(labels).map(([key,label],i)=>`<button data-view="${key}" aria-label="${label}"><span aria-hidden="true">${['◫','♙','▥','▤','⚙'][i]}</span>${label}</button>`).join('')}</nav><div class="sidebar-bottom"><div class="demo-card"><span class="dot"></span>Datos guardados en tu empresa<p>Contactos, notas y conversaciones sincronizados con el servidor.<br>Isotipo provisional.</p></div><div class="user"><span class="avatar">${esc(initials(session.user.name))}</span><div>${esc(session.user.name)}<small>${roles[session.user.role]}</small></div></div><button id="logout" class="secondary">Cerrar sesión</button></div></aside><main><header class="topbar"><div><span class="breadcrumb">${esc(session.company.name)} <span>/</span> Tu espacio de trabajo</span><h1 id="view-title"></h1></div><div class="top-actions"><span id="sync-label" class="muted">Guardado en el servidor</span><button id="refresh" class="secondary">Actualizar</button><button id="logout-mobile" class="secondary mobile-logout">Salir</button></div></header><div id="view"></div></main></div>`;
+  $('root').innerHTML=`<div class="app"><aside class="sidebar">${brand()}<label class="workspace-picker"><span class="sr-only">Empresa activa</span><select id="workspace">${options(session.companies,session.company.id)}</select></label><span class="nav-label">TU ESPACIO DE TRABAJO</span><nav>${Object.entries(labels).filter(([key])=>key!=='connections'||session.user.role!=='agent').map(([key,label])=>`<button data-view="${key}" aria-label="${label}"><span aria-hidden="true">${({conversations:'◫',contacts:'♙',sales:'▥',statistics:'▤',connections:'↔',settings:'⚙'})[key]}</span>${label}</button>`).join('')}</nav><div class="sidebar-bottom"><div class="demo-card"><span class="dot"></span>Datos guardados en tu empresa<p>Contactos, notas y conversaciones sincronizados con el servidor.<br>Isotipo provisional.</p></div><div class="user"><span class="avatar">${esc(initials(session.user.name))}</span><div>${esc(session.user.name)}<small>${roles[session.user.role]}</small></div></div><button id="logout" class="secondary">Cerrar sesión</button></div></aside><main><header class="topbar"><div><span class="breadcrumb">${esc(session.company.name)} <span>/</span> Tu espacio de trabajo</span><h1 id="view-title"></h1></div><div class="top-actions"><span id="sync-label" class="muted">Guardado en el servidor</span><button id="refresh" class="secondary">Actualizar</button><button id="logout-mobile" class="secondary mobile-logout">Salir</button></div></header><div id="view"></div></main></div>`;
   document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view).catch(e=>notice(e.message,true))));
   const logout=async()=>{try{await api('/logout',{method:'POST',body:{}});}catch{}workspaceEpoch++;clearWorkspaceView();drafts.clear();sendKeys.clear();session=null;csrf='';contacts=[];messages=[];await loginScreen();};
   $('logout').onclick=logout;$('logout-mobile').onclick=logout;
   $('refresh').onclick=()=>refresh(true).catch(e=>notice(e.message,true));
   $('workspace').onchange=async e=>{$('root').inert=true;workspaceEpoch++;drafts.clear();sendKeys.clear();messages=[];try{await api('/companies/switch',{method:'POST',body:{companyId:e.target.value}});active=null;await startWorkspace();}catch(e){notice(e.message,true);}finally{$('root').inert=false;}};
 }
-async function showView(next){view=next;document.querySelectorAll('[data-view]').forEach(b=>{b.classList.toggle('active',b.dataset.view===view);b.setAttribute('aria-current',b.dataset.view===view?'page':'false');});$('view-title').textContent=labels[view];document.title=`lazo · ${labels[view]}`;if(view==='conversations')await inbox();else if(view==='settings')await settings();else if(view==='statistics')await statisticsView();else renderCRM();}
+async function showView(next){if(next==='connections'&&session.user.role==='agent')next='conversations';view=next;document.querySelectorAll('[data-view]').forEach(b=>{b.classList.toggle('active',b.dataset.view===view);b.setAttribute('aria-current',b.dataset.view===view?'page':'false');});$('view-title').textContent=labels[view];document.title=`lazo · ${labels[view]}`;if(view==='conversations')await inbox();else if(view==='settings')await settings();else if(view==='connections')await connectionsView();else if(view==='statistics')await statisticsView();else renderCRM();}
 async function statisticsView(){const epoch=workspaceEpoch,company=session.company.id;$('view').onclick=null;$('view').onchange=null;$('view').innerHTML='<p class="empty">Cargando estadísticas…</p>';const data=await api('/statistics?days='+statsDays);if(epoch!==workspaceEpoch||session?.company.id!==company||view!=='statistics')return;renderStatistics($('view'),data,days=>{statsDays=days;statisticsView().catch(e=>notice(e.message,true));});}
 function renderCRM(){
   const won=contacts.filter(c=>pipelineStages.some(p=>p.name===c.stage&&p.is_won)).length;
@@ -196,14 +197,27 @@ function renderMessages(scroll=false){
   };
   if(scroll||atBottom)box.scrollTop=box.scrollHeight;
 }
+let connectionGeneration=0;
+async function connectionsView(){
+  const generation=++connectionGeneration,epoch=workspaceEpoch,company=session.company.id;
+  const current=()=>generation===connectionGeneration&&epoch===workspaceEpoch&&session?.company.id===company&&view==='connections';
+  $('view').onclick=null;$('view').onchange=null;$('view').innerHTML='<p class="empty">Cargando conexiones…</p>';
+  const connection=await api('/whatsapp');if(!current())return;
+  const scopedApi=(path,options)=>{if(!current())throw new Error('El espacio cambió. Vuelve a abrir Conexiones.');return api(path,options);};
+  mountConnections($('view'),{connection,api:scopedApi,notice,isCurrent:current,onSaved:connectionsView,canCreate:session.user.role==='owner',
+    onCreateCompany:async name=>{
+      const created=await scopedApi('/companies',{method:'POST',body:{name}});if(!current())return;
+      await scopedApi('/companies/switch',{method:'POST',body:{companyId:created.id}});
+      if(!current())return;active=null;await startWorkspace();notice('Espacio creado. Conecta aquí la otra API; la conexión anterior se conserva en su empresa.');
+    }});
+}
 async function settings(){
   $('view').onclick=null;$('view').onchange=null;
   const canAdmin=session.user.role!=='agent';
-  const company=session.company.id;const connection=canAdmin?await api('/whatsapp'):null;
+  const company=session.company.id;
   if(view!=='settings'||session?.company.id!==company)return;
   $('view').innerHTML=`<div class="crm-intro"><div><span class="eyebrow">TU EMPRESA</span><h2>Un espacio organizado para tu equipo</h2><p class="muted">${esc(session.company.name)}</p></div></div><div class="settings-grid"><section class="settings-card"><h2>Equipo</h2><div class="member-list">${members.map(m=>`<div class="team-row"><span class="avatar">${esc(initials(m.name))}</span><div><strong>${esc(m.name)}</strong><small>${esc(m.email)} · ${roles[m.role]}</small></div>${canAdmin&&m.role!=='owner'&&m.id!==session.user.id?`<button class="secondary" data-remove="${m.id}">Retirar acceso</button>`:''}</div>`).join('')}</div>${canAdmin?`<form id="invite-form"><h3>Invitar a un colaborador</h3><label>Correo<input name="email" type="email" required></label><label>Rol<select name="role"><option value="agent">Asesor</option>${session.user.role==='owner'?'<option value="admin">Administrador</option>':''}</select></label><label class="invite-email"><input type="checkbox" name="sendEmail" value="true" ${session.emailEnabled?'checked':'disabled'}> Enviar también por correo</label><p class="muted">${session.emailEnabled?'La invitación se enviará al correo indicado.':'El correo todavía no está configurado. Puedes compartir el enlace privado.'}</p><button class="send" type="submit">Crear invitación</button><p class="muted">Recibirás un enlace privado de un solo uso, válido durante 48 horas. Compártelo con tu colaborador.</p><textarea id="invite-link" readonly hidden aria-label="Enlace privado de invitación"></textarea></form>`:''}</section>
-  ${canAdmin?`<section class="settings-card"><h2>WhatsApp Business</h2><p class="muted">${connection.configured?`Cuenta de prueba: ${connection.testOnly?'envíos limitados al destinatario autorizado':'conectada'}. ${connection.checkedAt?'Conexión comprobada.':'Comprueba la conexión para consultar las plantillas.'}`:'Conecta tu cuenta oficial de WhatsApp.'}</p><form id="connection-form"><label>ID del número<input name="phoneId" value="${esc(connection.phoneId||'')}" required></label><label>ID de cuenta WhatsApp (WABA)<input name="wabaId" value="${esc(connection.wabaId||'')}" required></label><label>Versión de API<input name="graphVersion" value="${esc(connection.graphVersion||'')}" placeholder="vNN.N" required></label><label>Token de acceso<input name="accessToken" type="password" autocomplete="off" placeholder="${connection.configured?'Guardado; dejar vacío para conservar':''}"></label><label>Secreto de la app de Meta<input name="appSecret" type="password" autocomplete="off" placeholder="${connection.hasAppSecret?'Guardado; dejar vacío para conservar':'Necesario para recibir mensajes'}"></label><button class="send" type="submit">Guardar y comprobar conexión</button></form>
-  ${connection.configured?`<div class="webhook-info"><h3>Recepción de mensajes y estados</h3><label>URL de devolución de llamada<input readonly value="${esc(connection.callbackUrl)}"></label><label>Token de verificación<input readonly type="password" id="verify-token" value="${esc(connection.verifyToken)}"><button class="secondary" id="reveal-verify" type="button">Mostrar token</button></label><p class="muted">${connection.hasAppSecret?'Secreto guardado.':'Falta guardar el secreto de la app.'} ${connection.webhookVerified?'Meta verificó la URL.':'Falta verificar esta URL en Meta.'} ${connection.webhookAt?'Último evento: '+fmt(connection.webhookAt):'Todavía no se recibieron eventos.'}</p><button class="secondary" id="subscribe">Vincular app a la cuenta de prueba</button><p class="muted">En Meta configura esta URL y suscríbete al campo messages. Los tokens permanecen en el servidor.</p></div>`:''}</section>`:''}
+  ${canAdmin?`<section class="settings-card"><h2>WhatsApp Business</h2><p class="muted">Configura tu API y consulta el estado de recepción en Conexiones.</p><button class="secondary" id="open-connections">Abrir Conexiones de WhatsApp</button></section>`:''}
   ${session.user.role==='owner'?`<section class="settings-card"><h2>Otra empresa</h2><p class="muted">Cada empresa tiene su propia agenda, usuarios y conexión.</p><form id="company-form"><label>Nombre de la empresa<input name="name" maxlength="100" required></label><button class="send" type="submit">Crear empresa</button></form></section>`:''}</div>`;
   if(canAdmin){
     const tools=document.createElement('div');tools.className='settings-tools';$('view').append(tools);
@@ -228,9 +242,8 @@ async function settings(){
         return;
       }
       if(result.emailJobId&&current())notice('El correo sigue en proceso. Puedes compartir el enlace privado.');
-    });bind($('connection-form'),async data=>{await api('/whatsapp',{method:'PUT',body:data});await settings();notice('Conexión comprobada y guardada.');});
-    if($('reveal-verify'))$('reveal-verify').onclick=()=>{$('verify-token').type=$('verify-token').type==='password'?'text':'password';};
-    if($('subscribe'))$('subscribe').onclick=async()=>{try{await api('/whatsapp/subscribe',{method:'POST',body:{}});notice('Cuenta vinculada. Completa la verificación de la URL en Meta.');}catch(e){notice(e.message,true);}};
+    });
+    $('open-connections').onclick=()=>showView('connections').catch(e=>notice(e.message,true));
     document.querySelectorAll('[data-remove]').forEach(b=>b.onclick=async()=>{try{await api('/members/'+b.dataset.remove,{method:'DELETE',body:{}});members=(await api('/members')).members;await settings();notice('Acceso retirado.');}catch(e){notice(e.message,true);}});
   }
   if($('company-form'))bind($('company-form'),async data=>{const c=await api('/companies',{method:'POST',body:data});await api('/companies/switch',{method:'POST',body:{companyId:c.id}});active=null;await startWorkspace();notice('Empresa creada.');});
