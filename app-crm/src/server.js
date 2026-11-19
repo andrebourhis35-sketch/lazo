@@ -8,6 +8,7 @@ import { HttpError, requireThat, digest } from './core.js';
 import { workspaceTools } from './workspace.js';
 import { mediaLimits } from './media.js';
 import { mailService } from './mail.js';
+import { automationFlows } from './flows.js';
 
 const root=fileURLToPath(new URL('../public/',import.meta.url));
 const assets={
@@ -25,7 +26,9 @@ const headers={ 'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','R
   'Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'" };
 export function createServer(config,{store=openStore(config.database),fetchImpl=fetch,mailTransportFactory}={}) {
   const mail=mailService(store,config,mailTransportFactory);
-  const auth=authentication(store,config,mail),wa=whatsapp(store,config,fetchImpl),workspace=workspaceTools(store);
+  let flows;
+  const auth=authentication(store,config,mail),wa=whatsapp(store,config,fetchImpl,message=>flows.enqueue(message)),workspace=workspaceTools(store);
+  flows=automationFlows(store,wa);
   let fileUploads=0;
   const origin=new URL(config.origin);
   const cookieName=config.secureCookies?'__Host-lazo_session':'lazo_dev_session';
@@ -38,9 +41,9 @@ export function createServer(config,{store=openStore(config.database),fetchImpl=
     for await(const part of req){size+=part.length;if(size>max)throw new HttpError(413,'Solicitud demasiado grande.');chunks.push(part);}
     return Buffer.concat(chunks);
   }
-  async function json(req) {
+  async function json(req,max=64*1024) {
     requireThat((req.headers['content-type']||'').split(';')[0]==='application/json','Se esperaba JSON.',415);
-    try {const result=JSON.parse((await raw(req)).toString());requireThat(result&&typeof result==='object'&&!Array.isArray(result),'Formulario no válido.');return result;}
+    try {const result=JSON.parse((await raw(req,max)).toString());requireThat(result&&typeof result==='object'&&!Array.isArray(result),'Formulario no válido.');return result;}
     catch(e){if(e instanceof HttpError)throw e;throw new HttpError(400,'Formulario no válido.');}
   }
   function currentSession(req) {
@@ -53,8 +56,8 @@ export function createServer(config,{store=openStore(config.database),fetchImpl=
       'Tu sesión cambió o caducó. Inicia sesión de nuevo.',401);
     return fresh;
   }
-  async function authorizedJson(req,s,action) {
-    const data=await json(req);
+  async function authorizedJson(req,s,action,max) {
+    const data=await json(req,max);
     assertSession(s);
     return action(data); // Apply immediately after validation, without another await boundary.
   }
@@ -71,6 +74,7 @@ export function createServer(config,{store=openStore(config.database),fetchImpl=
         if(req.method==='POST') {
           const result=wa.receive(await raw(req,1024*1024),req.headers['x-hub-signature-256']);
           void wa.media.warm().catch(()=>{});
+          void flows.flush().catch(()=>{});
           return response(res,200,result);
         }
         throw new HttpError(405,'Método no admitido.');
@@ -134,6 +138,19 @@ export function createServer(config,{store=openStore(config.database),fetchImpl=
         return response(res,200,{ok:true},'application/json; charset=utf-8',{'Set-Cookie':cookie(fresh.secret)});
       }
       if(method==='GET'&&route==='/members')return response(res,200,{members:members(s.company_id)});
+      if(route==='/flows') {
+        admin(s);
+        if(method==='GET')return response(res,200,{flows:flows.list(s.company_id)});
+        if(method==='POST')return response(res,201,await authorizedJson(req,s,data=>flows.save(s.company_id,null,data,s.user_id),2*1024*1024));
+      }
+      const flowMatch=route.match(/^\/flows\/([a-f\d-]+)(?:\/(activate|pause|runs))?$/);
+      if(flowMatch) {
+        admin(s);const [,id,action]=flowMatch;
+        if(method==='GET'&&action==='runs')return response(res,200,{runs:flows.runs(s.company_id,id)});
+        if(method==='PUT'&&!action)return response(res,200,await authorizedJson(req,s,data=>flows.save(s.company_id,id,data,s.user_id),2*1024*1024));
+        if(method==='POST'&&action==='activate')return response(res,200,await authorizedJson(req,s,data=>flows.publish(s.company_id,id,data,s.user_id)));
+        if(method==='POST'&&action==='pause')return response(res,200,await authorizedJson(req,s,()=>flows.pause(s.company_id,id,s.user_id)));
+      }
       if(method==='GET'&&route==='/pipeline')return response(res,200,{stages:workspace.pipeline(s.company_id)});
       if(method==='POST'&&route==='/pipeline/stages') {admin(s);return response(res,201,{stages:await authorizedJson(req,s,data=>workspace.addStage(s.company_id,data,s.user_id))});}
       if(method==='PUT'&&route==='/pipeline/order') {admin(s);return response(res,200,{stages:await authorizedJson(req,s,data=>workspace.orderStages(s.company_id,data.ids,s.user_id))});}
@@ -227,5 +244,5 @@ export function createServer(config,{store=openStore(config.database),fetchImpl=
   });
   server.requestTimeout=60000;server.headersTimeout=10000;
   server.keepAliveTimeout=5000;
-  server.lazo={store,auth,wa,workspace,mail};return server;
+  server.lazo={store,auth,wa,workspace,mail,flows};return server;
 }

@@ -17,6 +17,7 @@ if(env.WHATSAPP_ACCESS_TOKEN&&env.WHATSAPP_PHONE_NUMBER_ID&&env.WHATSAPP_BUSINES
 const server=createServer(config);
 // An interrupted send must not be silently retried after a process restart.
 server.lazo.store.run("UPDATE messages SET status='unknown',updated=? WHERE status='queued'",Date.now());
+server.lazo.flows.recover();
 server.listen(Number(env.PORT||3031),'127.0.0.1',()=>console.log('LAZO CRM: servicio iniciado en la interfaz local.'));
 server.lazo.store.purge();
 const timer=setInterval(()=>server.lazo.store.purge(),3600000);timer.unref();
@@ -24,5 +25,7 @@ const mediaTimer=setInterval(()=>{void server.lazo.wa.media.warm().catch(()=>{})
 void server.lazo.wa.media.warm().catch(()=>{});
 const mailTimer=setInterval(()=>{void server.lazo.mail.flush().catch(()=>{});},5000);mailTimer.unref();
 void server.lazo.mail.flush().catch(()=>{});
-function stop(){clearInterval(timer);clearInterval(mediaTimer);clearInterval(mailTimer);server.close(async()=>{await Promise.all([server.lazo.wa.media.stop(),server.lazo.mail.stop()]);server.lazo.store.close();process.exit(0);});setTimeout(()=>process.exit(1),25000).unref();}
+const flowTimer=setInterval(()=>{void server.lazo.flows.flush().catch(()=>{});},1500);flowTimer.unref();
+void server.lazo.flows.flush().catch(()=>{});
+function stop(){clearInterval(timer);clearInterval(mediaTimer);clearInterval(mailTimer);clearInterval(flowTimer);server.close(async()=>{await Promise.all([server.lazo.wa.media.stop(),server.lazo.mail.stop(),server.lazo.flows.stop()]);server.lazo.store.close();process.exit(0);});setTimeout(()=>process.exit(1),25000).unref();}
 process.on('SIGTERM',stop);process.on('SIGINT',stop);
