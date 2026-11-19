@@ -34,9 +34,10 @@ export function metaAssets(event){
   if(data?.type!=='WA_EMBEDDED_SIGNUP')return null;
   return data;
 }
-export function mountMetaSignup(root,{api,isCurrent,onSaved,notice}){
+export function mountMetaSignup(root,{api,isCurrent,onSaved,notice,connection}){
   root.innerHTML='<h2>Conecta tu WhatsApp con Meta</h2><p class="muted">Inicia sesión en Meta, elige tu negocio y autoriza la cuenta y el número que quieras usar en LAZO. Tus credenciales se gestionan automáticamente.</p><button class="send" id="meta-connect" type="button" disabled>Conectar con Meta</button><p class="muted" id="meta-state" role="status" aria-live="polite">Comprobando disponibilidad…</p><form id="meta-pin-form" hidden><label>PIN de verificación de dos pasos<input name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="new-password" required></label><p class="muted">Tu número necesita registrarse en Cloud API. Elige un PIN de seis dígitos y guárdalo en tu gestor de contraseñas. No lo envíes por chat.</p><button class="send" type="submit">Registrar este número y conectar</button></form><p class="muted">La disponibilidad de cuentas depende de los permisos y requisitos de Meta. El proceso no cambia el número que ya tiene este espacio ni habilita envíos comerciales por sí solo.</p>';
   const button=root.querySelector('#meta-connect'),status=root.querySelector('#meta-state'),pinForm=root.querySelector('#meta-pin-form');
+  if(connection?.configured){const hint=document.createElement('p');hint.className='muted';hint.textContent='Este espacio ya tiene una conexión. Para añadir otro número, usa «Crear espacio para otra API» al final de esta página y conecta desde ese espacio nuevo.';button.before(hint);}
   let ticket,FB,assets,generation=0,authorized=false,completing=false,active=false,cleanup=()=>{};
   function fail(message){generation++;cleanup();active=false;completing=false;pinForm.inert=false;button.disabled=false;button.textContent='Volver a conectar con Meta';status.textContent=message;pinForm.hidden=true;}
   async function prepare(){
@@ -48,7 +49,7 @@ export function mountMetaSignup(root,{api,isCurrent,onSaved,notice}){
     if(!settings.available){status.textContent=settings.message;return;}
     const prepared=await api('/whatsapp/signup/start',{method:'POST',body:{}});if(!isCurrent()||current!==generation)return;
     const loaded=await loadSdk(prepared);if(!isCurrent()||current!==generation)return;ticket=prepared;FB=loaded;
-    button.disabled=false;button.textContent='Conectar con Meta';status.textContent='Se abrirá una ventana oficial de Meta. No necesitas copiar tokens ni secretos.';
+    button.disabled=false;button.textContent='Conectar con Meta';status.textContent='Todo listo: pulsa «Conectar con Meta». Dispones de hasta 30 minutos para completar el alta.';
     }catch(error){if(isCurrent()&&current===generation)fail(error.message);}
   }
   async function complete(pin,expected=generation){
@@ -68,7 +69,7 @@ export function mountMetaSignup(root,{api,isCurrent,onSaved,notice}){
   button.onclick=()=>{
     if(!isCurrent())return;
     // Refresh a consumed/failed ticket, then require a fresh user click to avoid popup blocking.
-    if(!ticket||active===false&&button.textContent.startsWith('Volver')){
+    if(!ticket||ticket.expiresAt<=Date.now()||active===false&&button.textContent.startsWith('Volver')){
       ticket=null;void prepare();return;
     }
     const launched=++generation,launchTicket=ticket;
@@ -84,7 +85,8 @@ export function mountMetaSignup(root,{api,isCurrent,onSaved,notice}){
       assets=result.data;void complete(undefined,launched);
     };
     const interval=setInterval(()=>{if(launched===generation&&!isCurrent()){cleanup();active=false;}},1000);
-    const timeout=setTimeout(()=>{if(launched!==generation)return;if(isCurrent())fail('La autorización ha caducado. Vuelve a conectar con Meta.');else cleanup();},9*60*1000);
+    const remaining=Math.max(0,(launchTicket.expiresAt||Date.now()+30*60*1000)-Date.now());
+    const timeout=setTimeout(()=>{if(launched!==generation)return;if(isCurrent())fail('El intento de conexión venció. Vuelve a conectar con Meta para completar el alta.');else cleanup();},remaining);
     cleanup=()=>{window.removeEventListener('message',listener);clearInterval(interval);clearTimeout(timeout);};
     window.addEventListener('message',listener);
     // FB.login is called synchronously in the click, after loading SDK and ticket.
