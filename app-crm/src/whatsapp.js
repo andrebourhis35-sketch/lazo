@@ -56,10 +56,14 @@ export function whatsapp(store, config, fetchImpl = fetch, onIncoming = () => {}
       graphVersion:text(data.graphVersion||old?.graphVersion||'',12,true),verifyToken:old?.verifyToken||token(),
       testRecipient:old?.testRecipient||config.testRecipient||'' };
     requireThat(/^\d+$/.test(c.phoneId)&&/^\d+$/.test(c.wabaId)&&/^v\d+\.\d+$/.test(c.graphVersion),'Revisa los identificadores y la versión de la API.');
+    requireThat(!old||(old.phone_id===c.phoneId&&old.waba_id===c.wabaId),
+      'Para conectar otro número o cuenta, crea un espacio de empresa separado en Conexiones. La conexión actual conserva su historial y sus flujos.',409);
     requireThat(!c.testRecipient||/^\d{8,15}$/.test(c.testRecipient),'Destinatario de prueba no válido.');
     const phones=await graph(c,`${c.wabaId}/phone_numbers?fields=id&limit=100`);
     requireThat(phones.data?.some(p=>p.id===c.phoneId),'El número no pertenece a esta cuenta de WhatsApp.');
     ensureCurrent();
+    const current=store.get('SELECT config FROM connections WHERE company_id=?',company);
+    requireThat((current?.config||null)===(old?.config||null),'La conexión cambió mientras se comprobaba. Recarga Conexiones antes de guardar.',409);
     saveRaw(company,c,old?.phone_id===c.phoneId&&old?.appSecret===c.appSecret?old.verified:0);
     store.audit(company,actor,'whatsapp.connected');return safe(company);
   }

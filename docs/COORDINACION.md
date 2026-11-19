@@ -1,5 +1,10 @@
 # Coordinación Codex y Claude
 
+### Conexión manual de una API de WhatsApp (19 de noviembre de 2026)
+
+- Usuario solicita poder conectar su API desde LAZO. Reserva: navegación y formulario de conexiones en app-crm/public/, validación en src/whatsapp.js, pruebas y este tablero; rama codex/conexion-api-whatsapp. Responsable: Codex. Una conexión activa por empresa; un espacio separado permite conservar la prueba actual. No se promete multiplenúmero dentro de una misma bandeja ni vinculación QR. Se bloqueará reemplazar el número de una empresa para conservar historial y flujos, sin migrar conexiones de otros proveedores. Pendientes implementación, revisión independiente y publicación.
+- Implementada sección Conexiones y acceso directo /app/?view=connections: formulario privado, renovación de credenciales, estado del webhook, instrucciones de recepción y creación de otro espacio para otra API. Se conserva el destinatario de prueba de esta instalación. Backend bloquea reemplazar número/WABA y rechaza guardados concurrentes obsoletos; sin migraciones de base, modificaciones de Meta ni envíos. Revisión independiente apta tras corregir generación del formulario y patrón de versión; pruebas nuevas de concurrencia, conservación y respuestas tardías aprobadas. No se atribuye QA visual ni conexión real de una API nueva; pendientes validación en Node 22 y publicación.
+
 Fecha: 29 de octubre de 2026.
 
 Repositorio: https://github.com/andrebourhis35-sketch/lazo
