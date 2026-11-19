@@ -3,7 +3,12 @@ La vista optativa se abre con `/app/?visual=1`; `/app/` conserva la presentació
 `marca-volumen.svg` exporta el primer bloque `<defs>` de
 `branding/lienzo/Definitivo.dc.html` y muestra su grupo `sym3d`, sin alterar las
 definiciones ni la geometría. El símbolo sigue pendiente de aprobación.
-`interfaz/marca.svg` se conserva para el tamaño pequeño.
+`marca.svg` conserva la versión pequeña existente.
+
+`styles.css`, `crm.css` y `marca.svg` son copias sin cambios de los archivos de
+`interfaz/` en el commit `9399de2`. Se incluyen en `public/` para que una publicación
+de solo `app-crm/` no dependa de esa carpeta hermana. Los originales permanecen
+intactos. La prueba de paquete comprueba los recursos desde una copia aislada.
 
 La escena usa capas y perspectiva CSS, con parallax limitado a la cabecera.
 No es un modelo tridimensional WebGL. La preferencia del sistema de movimiento

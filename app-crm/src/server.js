@@ -10,7 +10,6 @@ import { mediaLimits } from './media.js';
 import { mailService } from './mail.js';
 
 const root=fileURLToPath(new URL('../public/',import.meta.url));
-const demo=fileURLToPath(new URL('../../interfaz/',import.meta.url));
 const assets={
   '/app/':['index.html','text/html; charset=utf-8'], '/app/app.js':['app.js','text/javascript; charset=utf-8'],
   '/app/app.css':['app.css','text/css; charset=utf-8'],
@@ -18,9 +17,9 @@ const assets={
   '/app/visual-preview.js':['visual-preview.js','text/javascript; charset=utf-8'],
   '/app/visual-preview.css':['visual-preview.css','text/css; charset=utf-8'],
   '/app/marca-volumen.svg':['marca-volumen.svg','image/svg+xml'],
-  '/app/styles.css':['styles.css','text/css; charset=utf-8',demo],
-  '/app/crm.css':['crm.css','text/css; charset=utf-8',demo],
-  '/app/marca.svg':['marca.svg','image/svg+xml',demo]
+  '/app/styles.css':['styles.css','text/css; charset=utf-8'],
+  '/app/crm.css':['crm.css','text/css; charset=utf-8'],
+  '/app/marca.svg':['marca.svg','image/svg+xml']
 };
 const headers={ 'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','X-Frame-Options':'DENY',
   'Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'" };
