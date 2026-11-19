@@ -4,6 +4,27 @@ import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 const source=readFileSync(new URL('../public/meta-signup.js',import.meta.url),'utf8').replaceAll('export function','function');
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
+test('SDK bootstrap load waits for fbAsyncInit and initializes only once',async()=>{
+  let script,initialized=0,done=false;const timers=new Map();
+  const ctx=vm.createContext({window:{},settings:{appId:'123456',graphVersion:'v27.0'},
+    document:{createElement:()=>({remove(){}}),head:{append:node=>{script=node;}}},
+    setTimeout:fn=>{timers.set(1,fn);return 1;},clearTimeout:id=>timers.delete(id)});
+  vm.runInContext(source,ctx);const loading=vm.runInContext('loadSdk(settings)',ctx).then(value=>{done=true;return value;});
+  script.onload();await tick();assert.equal(done,false,'Bootstrap load alone is not SDK readiness');
+  ctx.window.FB={init(){initialized++;},login(){}};const ready=ctx.window.fbAsyncInit;
+  ready();assert.equal(await loading,ctx.window.FB);ready();script.onload();
+  assert.equal(initialized,1);assert.equal(timers.size,0);
+});
+test('SDK load timeout is bounded and a new attempt can recover',async()=>{
+  const scripts=[],timers=new Map();let timer=0;
+  const ctx=vm.createContext({window:{},settings:{appId:'123456',graphVersion:'v27.0'},
+    document:{createElement:()=>({removed:false,remove(){this.removed=true;}}),head:{append:node=>scripts.push(node)}},
+    setTimeout:fn=>{timers.set(++timer,fn);return timer;},clearTimeout:id=>timers.delete(id)});
+  vm.runInContext(source,ctx);const first=vm.runInContext('loadSdk(settings)',ctx);const failed=assert.rejects(first,/demasiado/);
+  const stale=ctx.window.fbAsyncInit;timers.get(1)();await failed;assert.equal(scripts[0].removed,true);
+  const second=vm.runInContext('loadSdk(settings)',ctx);ctx.window.FB={init(){},login(){}};
+  stale();ctx.window.fbAsyncInit();assert.equal(await second,ctx.window.FB);assert.equal(scripts.length,2);
+});
 function fixture(){
   const button={textContent:'Conectar con Meta'},status={},pin={reset(){},hidden:true},nodes={'#meta-connect':button,'#meta-state':status,'#meta-pin-form':pin};
   const listeners=new Map(),calls=[];let callback,exchangeDone,current=true,saved=0;

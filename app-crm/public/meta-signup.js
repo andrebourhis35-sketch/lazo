@@ -1,15 +1,30 @@
 let sdk;
 function loadSdk(settings){
-  if(!sdk)sdk=new Promise((resolve,reject)=>{
+  if(sdk)return sdk;
+  const pending=new Promise((resolve,reject)=>{
+    let settled=false,timer;
+    const previous=window.fbAsyncInit;
     const script=document.createElement('script');script.src='https://connect.facebook.net/es_LA/sdk.js';script.async=true;
-    script.crossOrigin='anonymous';script.onload=()=>{
-      if(!window.FB){sdk=null;reject(new Error('No se pudo cargar Meta. Revisa el bloqueo de ventanas o rastreadores.'));return;}
-      window.FB.init({appId:settings.appId,version:settings.graphVersion,autoLogAppEvents:false,xfbml:false});resolve(window.FB);
-    };
-    script.onerror=()=>{script.remove();sdk=null;reject(new Error('No se pudo cargar Meta. Revisa la conexión y el bloqueo de rastreadores.'));};
-    document.head.append(script);
+    script.crossOrigin='anonymous';
+    function cleanup(){clearTimeout(timer);if(window.fbAsyncInit===ready)window.fbAsyncInit=previous;}
+    function failed(message){if(settled)return;settled=true;cleanup();script.remove();sdk=null;reject(new Error(message));}
+    function ready(){
+      if(settled||!window.FB)return;
+      try{window.FB.init({appId:settings.appId,version:settings.graphVersion,autoLogAppEvents:false,xfbml:false});}
+      catch{failed('Meta no pudo iniciar la conexión. Recarga la página e inténtalo de nuevo.');return;}
+      settled=true;cleanup();resolve(window.FB);
+    }
+    // sdk.js is a bootstrap: its load event can precede the actual FB API.
+    // Meta calls fbAsyncInit after its dependent SDK modules are ready.
+    window.fbAsyncInit=ready;
+    script.onload=ready;
+    script.onerror=()=>failed('No se pudo cargar Meta. Revisa la conexión y el bloqueo de rastreadores.');
+    timer=setTimeout(()=>failed('Meta tardó demasiado en cargar. Recarga la página e inténtalo de nuevo.'),25000);
+    if(window.FB)ready();else document.head.append(script);
   });
-  return sdk;
+  sdk=pending;
+  pending.catch(()=>{if(sdk===pending)sdk=null;});
+  return pending;
 }
 export function metaAssets(event){
   if(!['https://www.facebook.com','https://web.facebook.com'].includes(event.origin))return null;
