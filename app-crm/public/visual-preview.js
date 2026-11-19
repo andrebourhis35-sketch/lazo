@@ -1,5 +1,5 @@
-// Opt-in visual comparison. This module never changes workspace data or actions.
-if (new URLSearchParams(location.search).get('visual') === '1') {
+// Default Órbita presentation. This module never changes workspace data or actions.
+if (new URLSearchParams(location.search).get('visual') !== '0') {
   const style = document.createElement('link');
   style.rel = 'stylesheet';
   style.href = '/app/visual-preview.css?v=20261117';
@@ -7,14 +7,14 @@ if (new URLSearchParams(location.search).get('visual') === '1') {
   document.body.classList.add('visual-preview');
   const banner = document.createElement('aside');
   banner.className = 'visual-preview-banner';
-  banner.setAttribute('aria-label', 'Vista previa de diseño');
+  banner.setAttribute('aria-label', 'Apariencia de LAZO');
   const label = document.createElement('span');
-  label.textContent = 'Propuesta inmersiva · Órbita';
+  label.textContent = 'LAZO · Órbita';
   const detail = document.createElement('small');
   detail.textContent = 'Isotipo provisional';
   const back = document.createElement('a');
-  back.href = '/app/';
-  back.textContent = 'Ver versión actual ↗';
+  back.href = '/app/?visual=0';
+  back.textContent = 'Ver vista clásica ↗';
   const motion = document.createElement('button');
   motion.type = 'button';
   motion.className = 'visual-motion-toggle';
