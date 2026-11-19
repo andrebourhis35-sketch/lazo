@@ -16,9 +16,10 @@ export function embeddedSignup(store,config,wa,fetchImpl=fetch){
     requireThat(ready(),'La configuración empresarial de Meta de LAZO está pendiente.',409);
     for(const [key,item] of attempts)if(item.expires<now()||(item.company===s.company_id&&item.user===s.user_id))attempts.delete(key);
     requireThat(attempts.size<100,'Hay demasiadas conexiones en curso. Inténtalo más tarde.',429);
-    const attempt=token();attempts.set(digest(attempt),{company:s.company_id,user:s.user_id,session:s.hash,
-      expires:now()+10*60*1000,phase:'new',busy:false,snapshot:snapshot(s.company_id)});
-    return {...settings(),attempt};
+    const attempt=token(),expiresAt=now()+30*60*1000;
+    attempts.set(digest(attempt),{company:s.company_id,user:s.user_id,session:s.hash,
+      expires:expiresAt,phase:'new',busy:false,snapshot:snapshot(s.company_id)});
+    return {...settings(),attempt,expiresAt};
   }
   function context(s,value,ensureSession){
     const key=digest(text(value,100,true)),item=attempts.get(key);

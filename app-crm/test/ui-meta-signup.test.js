@@ -29,23 +29,23 @@ test('SDK load timeout is bounded and a new attempt can recover',async()=>{
   const second=vm.runInContext('loadSdk(settings)',ctx);ctx.window.FB={init(){},login(){}};
   stale();ctx.window.fbAsyncInit();assert.equal(await second,ctx.window.FB);assert.equal(scripts.length,2);
 });
-function fixture(){
+function fixture({expiresAt}={}){
   const button={textContent:'Conectar con Meta'},status={},pin={reset(){},hidden:true},nodes={'#meta-connect':button,'#meta-state':status,'#meta-pin-form':pin};
-  const listeners=new Map(),calls=[];let callback,exchangeDone,current=true,saved=0;
+  const listeners=new Map(),calls=[],timers=[];let callback,exchangeDone,current=true,saved=0;
   const FB={init(){},login(fn){callback=fn;}};
   const ctx=vm.createContext({root:{querySelector:key=>nodes[key]},
     window:{FB,addEventListener:(event,fn)=>listeners.set(event,fn),removeEventListener:(event,fn)=>{if(listeners.get(event)===fn)listeners.delete(event);}},
     document:{createElement:()=>({remove(){}}),head:{append:script=>script.onload()}},
-    setTimeout:()=>1,clearTimeout(){},setInterval:()=>1,clearInterval(){},
+    setTimeout:(_fn,delay)=>{timers.push(delay);return timers.length;},clearTimeout(){},setInterval:()=>1,clearInterval(){},
     options:{isCurrent:()=>current,notice(){},onSaved:()=>{saved++;},api:async(path,options)=>{
       calls.push({path,body:options?.body});
       if(path.endsWith('/exchange'))return new Promise(resolve=>{exchangeDone=resolve;});
       if(path.endsWith('/complete'))return {connected:true};
-      return {available:true,appId:'123456',configId:'654321',graphVersion:'v27.0',attempt:'test-attempt'};
+      return {available:true,appId:'123456',configId:'654321',graphVersion:'v27.0',attempt:'test-attempt',expiresAt};
     }}});
   vm.runInContext(source+'\nmountMetaSignup(root,options);',ctx);
   const emit=(event='FINISH')=>listeners.get('message')?.({origin:'https://www.facebook.com',data:JSON.stringify({type:'WA_EMBEDDED_SIGNUP',event,data:{phone_number_id:'22222',waba_id:'44444'}})});
-  return {button,calls,emit,callback:()=>callback,resolve:()=>exchangeDone({authorized:true}),saved:()=>saved,leave:()=>{current=false;}};
+  return {button,calls,timers,emit,callback:()=>callback,resolve:()=>exchangeDone({authorized:true}),saved:()=>saved,leave:()=>{current=false;}};
 }
 for(const codeFirst of [true,false])test('Meta code is exchanged immediately and completes only after asset event: '+(codeFirst?'code first':'assets first'),async()=>{
   const f=fixture();await tick();assert.equal(f.button.disabled,false);
@@ -74,4 +74,16 @@ test('a callback from a cancelled popup cannot authorize a later login attempt',
   assert.equal(f.calls.filter(c=>c.path.endsWith('/exchange')).length,0);
   f.callback()({authResponse:{code:'new-private-code'}});f.resolve();await tick();f.emit();await tick();
   assert.equal(f.calls.filter(c=>c.path.endsWith('/exchange')).length,1);assert.equal(f.saved(),1);
+});
+
+test('popup deadline uses remaining server attempt lifetime rather than nine minutes',async()=>{
+  const f=fixture({expiresAt:Date.now()+20*60*1000});await tick();f.button.onclick();
+  assert.ok(f.timers.some(delay=>delay>19*60*1000&&delay<=20*60*1000));
+  assert.equal(f.timers.includes(9*60*1000),false);
+});
+
+test('an expired prepared ticket is renewed before opening Meta',async()=>{
+  const f=fixture({expiresAt:Date.now()-1000});await tick();f.button.onclick();await tick();
+  assert.equal(f.callback(),undefined);
+  assert.equal(f.calls.filter(call=>call.path.endsWith('/start')).length,2);
 });

@@ -1,5 +1,9 @@
 # Coordinación Codex y Claude
 
+### Plazo del alta y protección de la conexión de prueba (19 de noviembre de 2026)
+
+- Apertura de Meta confirmada por el usuario. Tras la selección de negocio/cuenta y espera en Meta, vuelve al CRM con el aviso literal del temporizador local de nueve minutos; la consulta de solo lectura confirma que aún existe únicamente la conexión de prueba, sin alta nueva. La captura muestra seleccionado el espacio original La Boutique du Monde. Reserva: duración del intento en servidor/cliente, explicación de espacio ocupado, pruebas y este tablero; rama codex/plazo-alta-meta, responsable Codex. Ampliar a 30 minutos y sincronizar cliente con vencimiento devuelto por servidor, renovar intentos vencidos antes de abrir el popup y conservar el intercambio inmediato del código de Meta. No reemplazar el número de prueba ni eliminar las comprobaciones de sesión/empresa.
+
 ### Referencia al SDK completo de Meta (19 de noviembre de 2026)
 
 - Usuario informa que el botón queda esperando sin ventana. Inspección de Chrome: pantalla en espera, sin ventana de Meta; consola muestra bloqueo de estilos internos del SDK pero no un bloqueo de la ventana. Inspección del SDK oficial descargado de connect.facebook.net confirma objeto provisional FB.__buffer cuya función login solo encola llamadas; el SDK real sustituye ese objeto. El cargador conservaba el provisional al dispararse load del bootstrap. Reserva: public/meta-signup.js, versiones de recursos, regresión del cargador y este tablero; rama codex/meta-sdk-completo, responsable Codex. Esperar objeto real y no inicializar/guardar el provisional; probar sustitución y publicar tras revisión. No cambiar navegador, credenciales, Meta, datos ni Caddy.

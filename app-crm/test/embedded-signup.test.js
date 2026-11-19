@@ -112,3 +112,16 @@ test('two companies cannot register the same phone concurrently',async()=>{
     assert.equal(f.calls.filter(c=>c.path.endsWith('/register')).length,1);assert.equal(f.wa.safe('b').configured,false);
   }finally{f.store.close();}
 });
+
+test('human onboarding remains valid after twenty minutes but expires after thirty',async t=>{
+  let clock=Date.now();t.mock.method(Date,'now',()=>clock);
+  const f=fixture();try{
+    const ticket=f.signup.start(f.s);assert.equal(ticket.expiresAt,clock+30*60*1000);
+    clock+=20*60*1000;
+    assert.equal((await f.signup.exchange(f.s,{attempt:ticket.attempt,code:'fresh-code-from-meta'},f.ensure)).authorized,true);
+    const result=await f.signup.complete(f.s,{attempt:ticket.attempt,phoneId:'22222',wabaId:'44444'},f.ensure);
+    assert.equal(result.connected,true);
+    const expired=f.signup.start(f.s);clock+=30*60*1000+1;
+    await assert.rejects(f.signup.exchange(f.s,{attempt:expired.attempt,code:'expired-attempt'},f.ensure),{status:409});
+  }finally{f.store.close();}
+});

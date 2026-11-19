@@ -1,4 +1,4 @@
-import { mountConnections } from './connections-ui.js?v=20261119-sdk-full';
+import { mountConnections } from './connections-ui.js?v=20261119-signup-time';
 import { mountManagement, replyPicker, renderStatistics } from './work-ui.js?v=20261117';
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

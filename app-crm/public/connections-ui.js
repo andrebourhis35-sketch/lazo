@@ -1,4 +1,4 @@
-import { mountMetaSignup } from './meta-signup.js?v=20261119-sdk-full';
+import { mountMetaSignup } from './meta-signup.js?v=20261119-signup-time';
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const when=value=>value?new Intl.DateTimeFormat('es-PE',{dateStyle:'short',timeStyle:'short'}).format(new Date(value)):'Sin eventos todavía';
 
@@ -37,7 +37,7 @@ export function mountConnections(root,{connection:c,api,notice,isCurrent,onSaved
     </section>
   </div>`;
   const meta=root.querySelector('#meta-signup');
-  if(meta)mountMetaSignup(meta,{api,notice,isCurrent,onSaved});
+  if(meta)mountMetaSignup(meta,{api,notice,isCurrent,onSaved,connection:c});
   const form=root.querySelector('#wa-connect');
   form.onsubmit=async event=>{
     event.preventDefault();if(!isCurrent())return;
