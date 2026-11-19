@@ -7,6 +7,8 @@ if(production&&!origin.startsWith('https://'))throw new Error('LAZO_ORIGIN debe 
 const database=resolve(env.LAZO_DATABASE||'data/lazo.sqlite');
 mkdirSync(dirname(database),{recursive:true,mode:0o700});
 const config={origin,database,masterKey:env.LAZO_MASTER_KEY||'',bootstrapHash:env.LAZO_BOOTSTRAP_HASH||'',secureCookies:production,testRecipient:env.LAZO_TEST_RECIPIENT||''};
+config.metaSignup={appId:env.LAZO_META_APP_ID||'',configId:env.LAZO_META_CONFIG_ID||'',
+  appSecret:env.LAZO_META_APP_SECRET||'',graphVersion:env.LAZO_META_GRAPH_VERSION||'v27.0'};
 if(env.LAZO_SMTP_HOST||env.LAZO_SMTP_USER||env.LAZO_SMTP_PASSWORD) {
   config.smtp={host:env.LAZO_SMTP_HOST,port:Number(env.LAZO_SMTP_PORT||465),user:env.LAZO_SMTP_USER,password:env.LAZO_SMTP_PASSWORD};
 }

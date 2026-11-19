@@ -9,12 +9,14 @@ import { workspaceTools } from './workspace.js';
 import { mediaLimits } from './media.js';
 import { mailService } from './mail.js';
 import { automationFlows } from './flows.js';
+import { embeddedSignup } from './embedded-signup.js';
 
 const root=fileURLToPath(new URL('../public/',import.meta.url));
 const assets={
   '/app/':['index.html','text/html; charset=utf-8'], '/app/app.js':['app.js','text/javascript; charset=utf-8'],
   '/app/app.css':['app.css','text/css; charset=utf-8'],
   '/app/connections-ui.js':['connections-ui.js','text/javascript; charset=utf-8'],
+  '/app/meta-signup.js':['meta-signup.js','text/javascript; charset=utf-8'],
   '/app/work-ui.js':['work-ui.js','text/javascript; charset=utf-8'],
   '/app/visual-preview.js':['visual-preview.js','text/javascript; charset=utf-8'],
   '/app/visual-preview.css':['visual-preview.css','text/css; charset=utf-8'],
@@ -24,12 +26,13 @@ const assets={
   '/app/marca.svg':['marca.svg','image/svg+xml']
 };
 const headers={ 'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','X-Frame-Options':'DENY',
-  'Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'" };
+  'Content-Security-Policy':"default-src 'self'; script-src 'self' https://connect.facebook.net; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' blob:; connect-src 'self' https://graph.facebook.com https://www.facebook.com https://connect.facebook.net; frame-src https://www.facebook.com https://web.facebook.com https://staticxx.facebook.com; frame-ancestors 'none'; base-uri 'none'; form-action 'self'" };
 export function createServer(config,{store=openStore(config.database),fetchImpl=fetch,mailTransportFactory}={}) {
   const mail=mailService(store,config,mailTransportFactory);
   let flows;
   const auth=authentication(store,config,mail),wa=whatsapp(store,config,fetchImpl,message=>flows.enqueue(message)),workspace=workspaceTools(store);
   flows=automationFlows(store,wa);
+  const signup=embeddedSignup(store,config,wa,fetchImpl);
   let fileUploads=0;
   const origin=new URL(config.origin);
   const cookieName=config.secureCookies?'__Host-lazo_session':'lazo_dev_session';
@@ -231,6 +234,10 @@ export function createServer(config,{store=openStore(config.database),fetchImpl=
           return response(res,200,await wa.send(s.company_id,id,data,s.user_id));
         }
       }
+      if(route==='/whatsapp/signup'&&method==='GET') {admin(s);return response(res,200,signup.settings());}
+      if(route==='/whatsapp/signup/start'&&method==='POST') {admin(s);store.limit('signup:'+s.company_id,10,60000);return response(res,200,await authorizedJson(req,s,()=>signup.start(s)));}
+      if(route==='/whatsapp/signup/exchange'&&method==='POST') {admin(s);return response(res,200,await authorizedJson(req,s,data=>signup.exchange(s,data,()=>assertSession(s))));}
+      if(route==='/whatsapp/signup/complete'&&method==='POST') {admin(s);return response(res,200,await authorizedJson(req,s,data=>signup.complete(s,data,()=>assertSession(s))));}
       if(route==='/whatsapp'&&method==='GET') {admin(s);return response(res,200,wa.safe(s.company_id));}
       if(route==='/whatsapp'&&method==='PUT') {admin(s);store.limit('connect:'+s.company_id,10,60000);return response(res,200,await authorizedJson(req,s,data=>wa.connect(s.company_id,data,s.user_id,()=>assertSession(s))));}
       if(route==='/whatsapp/subscribe'&&method==='POST') {admin(s);return response(res,200,await wa.subscribe(s.company_id,s.user_id));}
