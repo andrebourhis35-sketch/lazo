@@ -31,6 +31,12 @@ export function openStore(filename) {
     CREATE TABLE IF NOT EXISTS mail_jobs(id TEXT PRIMARY KEY,kind TEXT NOT NULL,company_id TEXT,user_id TEXT,proof TEXT,recipient TEXT NOT NULL,payload TEXT NOT NULL,state TEXT NOT NULL,expires INTEGER NOT NULL,created INTEGER NOT NULL,updated INTEGER NOT NULL);
     CREATE INDEX IF NOT EXISTS mail_queue ON mail_jobs(state,created);
   `);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS flows(id TEXT PRIMARY KEY,company_id TEXT NOT NULL REFERENCES companies(id),draft TEXT NOT NULL,revision INTEGER NOT NULL DEFAULT 1,published TEXT,published_revision INTEGER,activation INTEGER NOT NULL DEFAULT 0,active INTEGER NOT NULL DEFAULT 0,actor_id TEXT,created INTEGER NOT NULL,updated INTEGER NOT NULL);
+    CREATE UNIQUE INDEX IF NOT EXISTS flows_one_active ON flows(company_id) WHERE active=1;
+    CREATE TABLE IF NOT EXISTS flow_runs(id TEXT PRIMARY KEY,company_id TEXT NOT NULL,flow_id TEXT NOT NULL,contact_id TEXT NOT NULL,message_id TEXT NOT NULL,revision INTEGER NOT NULL,activation INTEGER NOT NULL,snapshot TEXT NOT NULL,state TEXT NOT NULL,step TEXT,reason TEXT NOT NULL DEFAULT '',created INTEGER NOT NULL,updated INTEGER NOT NULL,UNIQUE(flow_id,message_id));
+    CREATE INDEX IF NOT EXISTS flow_runs_queue ON flow_runs(state,created);
+  `);
   const run = (sql, ...args) => db.prepare(sql).run(...args);
   const get = (sql, ...args) => db.prepare(sql).get(...args);
   const all = (sql, ...args) => db.prepare(sql).all(...args);
@@ -122,6 +128,7 @@ export function openStore(filename) {
   }
   function purge() {
     const cutoff=now()-90*86400000;
+    run('DELETE FROM flow_runs WHERE created<?',cutoff);
     run('DELETE FROM messages WHERE created<?',cutoff);
     run('DELETE FROM media_assets WHERE created<? AND id NOT IN (SELECT attachment_id FROM messages WHERE attachment_id IS NOT NULL)',cutoff);
     run('DELETE FROM sale_events WHERE created<?',cutoff);
