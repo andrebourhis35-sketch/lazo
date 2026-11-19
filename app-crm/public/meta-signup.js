@@ -9,7 +9,9 @@ function loadSdk(settings){
     function cleanup(){clearTimeout(timer);if(window.fbAsyncInit===ready)window.fbAsyncInit=previous;}
     function failed(message){if(settled)return;settled=true;cleanup();script.remove();sdk=null;reject(new Error(message));}
     function ready(){
-      if(settled||!window.FB)return;
+      // Meta's bootstrap publishes a temporary FB whose login only queues calls.
+      // The real SDK replaces that object before calling fbAsyncInit.
+      if(settled||!window.FB||window.FB.__buffer)return;
       try{window.FB.init({appId:settings.appId,version:settings.graphVersion,autoLogAppEvents:false,xfbml:false});}
       catch{failed('Meta no pudo iniciar la conexión. Recarga la página e inténtalo de nuevo.');return;}
       settled=true;cleanup();resolve(window.FB);
@@ -20,7 +22,7 @@ function loadSdk(settings){
     script.onload=ready;
     script.onerror=()=>failed('No se pudo cargar Meta. Revisa la conexión y el bloqueo de rastreadores.');
     timer=setTimeout(()=>failed('Meta tardó demasiado en cargar. Recarga la página e inténtalo de nuevo.'),25000);
-    if(window.FB)ready();else document.head.append(script);
+    if(window.FB&&!window.FB.__buffer)ready();else document.head.append(script);
   });
   sdk=pending;
   pending.catch(()=>{if(sdk===pending)sdk=null;});

@@ -1,4 +1,4 @@
-import { mountMetaSignup } from './meta-signup.js?v=20261119-sdk-ready';
+import { mountMetaSignup } from './meta-signup.js?v=20261119-sdk-full';
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const when=value=>value?new Intl.DateTimeFormat('es-PE',{dateStyle:'short',timeStyle:'short'}).format(new Date(value)):'Sin eventos todavía';
 
