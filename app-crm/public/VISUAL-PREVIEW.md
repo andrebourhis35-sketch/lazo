@@ -1,4 +1,7 @@
-La vista optativa se abre con `/app/?visual=1`; `/app/` conserva la presentación actual.
+Órbita es la presentación principal de `/app/`, también para conversaciones,
+contactos, ventas, estadísticas y ajustes. `/app/?visual=1` conserva compatibilidad
+con los enlaces de revisión anteriores. La vista clásica se abre explícitamente
+con `/app/?visual=0`; el enlace de la cabecera permite compararla.
 
 `marca-volumen.svg` exporta el primer bloque `<defs>` de
 `branding/lienzo/Definitivo.dc.html` y muestra su grupo `sym3d`, sin alterar las
