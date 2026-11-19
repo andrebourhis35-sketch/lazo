@@ -1,5 +1,9 @@
 # Coordinación Codex y Claude
 
+### Corrección de carga del SDK de Meta (19 de noviembre de 2026)
+
+- Usuario informa que Conectar con Meta falla al cargar el SDK. Diagnóstico público GET /app/: Caddy devuelve script-src y connect-src solo self y sustituye la política del CRM que sí permite Meta; SDK oficial accesible HTTP 200 desde esta computadora. Release meta-0f8ca78 y Caddyfile con huella previa sin cambios. Reserva: diagnóstico/configuración de publicación y este tablero, rama codex/csp-sdk-meta, responsable Codex. Corregir solo la política de LAZO/CRM, conservando otros sitios, datos, entorno y revisiones de Meta; validar Caddy antes de recargar y comprobar el encabezado real por HTTPS, sin atribuir login real a la prueba de carga.
+
 ### Vinculación de la configuración de Meta (19 de noviembre de 2026)
 
 - Usuario crea la configuración que Codex dejó preparada en el asistente de Meta: LAZO · WhatsApp Cloud API, registro insertado v4, solo Cloud API, token de usuario del sistema de 60 días y permisos whatsapp_business_management/whatsapp_business_messaging. El diálogo confirma creación y devuelve ID público 1624576328867502. Reserva de este tablero en rama codex/configuracion-meta-alta, responsable Codex. Pendientes vinculación privada en servidor, ajustes OAuth/SDK y prueba real. No declarar aprobado el acceso de clientes por haber creado la configuración.
