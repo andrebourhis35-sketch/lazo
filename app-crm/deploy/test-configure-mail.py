@@ -83,9 +83,25 @@ class ConfigureTest(unittest.TestCase):
         self.assertEqual(self.environment.read_bytes(), self.original)
 
     def test_control_characters_are_rejected_before_verification(self):
-        self.data['password'] = 'invalid\nvalue'
+        self.data['password'] = 'invalid\x00value'
         with self.assertRaises(ValueError):
             self.run_configuration([])
+        self.assertEqual(self.environment.read_bytes(), self.original)
+
+    def test_grouped_app_password_paste_is_normalized_before_authentication(self):
+        self.data['password'] = '  synthetic\tabcd\r\nefgh\u00a0ijkl  '
+        calls = self.run_configuration([SimpleNamespace(returncode=0, stdout=b'{"ok":true}'), SimpleNamespace(returncode=0)])
+        sent = json.loads(calls.call_args_list[0].kwargs['input'])
+        self.assertEqual(sent['password'], 'syntheticabcdefghijkl')
+        self.assertEqual(sent['user'], self.data['user'])
+        self.assertEqual(sent['host'], self.data['host'])
+        self.assertIn('LAZO_SMTP_PASSWORD="syntheticabcdefghijkl"', self.environment.read_text())
+
+    def test_empty_paste_never_reaches_provider_or_changes_environment(self):
+        self.data['password'] = ' \t\r\n '
+        with self.assertRaises(module.SetupError) as raised:
+            self.run_configuration([])
+        self.assertEqual(raised.exception.code, 'smtp-settings')
         self.assertEqual(self.environment.read_bytes(), self.original)
 
 
