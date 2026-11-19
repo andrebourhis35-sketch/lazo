@@ -2,6 +2,8 @@
 
 Prueba independiente con React 19.3.1, Astryx 0.7.16 y React Flow 13.0.2. Sirve para evaluar el editor antes de decidir una integración con el CRM. No requiere una cuenta, credenciales, servicios de pago ni conexión con Meta.
 
+Destino de publicación autorizado: https://lazo.espacio-sereno.com/flujos/. El enlace «Flujos · laboratorio» de la presentación Órbita del CRM permite abrirlo. Los borradores siguen siendo locales a cada navegador; esta publicación no conecta el motor a WhatsApp.
+
 ## Abrir en Windows
 
 Con Node 22.13 o superior, desde PowerShell:
