@@ -1,10 +1,11 @@
-// Default Órbita presentation. This module never changes workspace data or actions.
-if (new URLSearchParams(location.search).get('visual') !== '0') {
+// Única presentación de LAZO. No cambia los datos ni las acciones del CRM.
+{
   const style = document.createElement('link');
   style.rel = 'stylesheet';
   style.href = '/app/visual-preview.css?v=20261117';
   document.head.append(style);
-  document.body.classList.add('visual-preview');
+  document.body.classList.add('visual-preview', 'motion-on');
+  document.body.classList.remove('quiet-preview');
   const banner = document.createElement('aside');
   banner.className = 'visual-preview-banner';
   banner.setAttribute('aria-label', 'Apariencia de LAZO');
@@ -12,26 +13,10 @@ if (new URLSearchParams(location.search).get('visual') !== '0') {
   label.textContent = 'LAZO · Órbita';
   const detail = document.createElement('small');
   detail.textContent = 'Isotipo provisional';
-  const back = document.createElement('a');
-  back.href = '/app/?visual=0';
-  back.textContent = 'Ver vista clásica ↗';
-  const motion = document.createElement('button');
-  motion.type = 'button';
-  motion.className = 'visual-motion-toggle';
-  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  document.body.classList.toggle('quiet-preview', reducedMotion);
-  motion.textContent = reducedMotion ? 'Activar animaciones' : 'Pausar animaciones';
-  motion.setAttribute('aria-pressed', String(reducedMotion));
-  motion.addEventListener('click', () => {
-    const paused = document.body.classList.toggle('quiet-preview');
-    document.body.classList.toggle('motion-on', !paused);
-    motion.textContent = paused ? 'Activar animaciones' : 'Pausar animaciones';
-    motion.setAttribute('aria-pressed', String(paused));
-  });
   const flows = document.createElement('a');
   flows.href = '/flujos/';
   flows.textContent = 'Flujos · laboratorio';
-  banner.append(label, detail, motion, flows, back);
+  banner.append(label, detail, flows);
   document.body.prepend(banner);
 
   const paths = {
@@ -85,7 +70,6 @@ if (new URLSearchParams(location.search).get('visual') !== '0') {
         scene.style.removeProperty('--tilt-y');
       };
       header.addEventListener('pointermove', event => {
-        if (document.body.classList.contains('quiet-preview')) { resetTilt(); return; }
         const rect = header.getBoundingClientRect();
         const x = Math.max(-1, Math.min(1, (event.clientX - rect.left) / rect.width * 2 - 1));
         const y = Math.max(-1, Math.min(1, (event.clientY - rect.top) / rect.height * 2 - 1));
