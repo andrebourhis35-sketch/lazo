@@ -10,10 +10,14 @@ test('SDK bootstrap load waits for fbAsyncInit and initializes only once',async(
     document:{createElement:()=>({remove(){}}),head:{append:node=>{script=node;}}},
     setTimeout:fn=>{timers.set(1,fn);return 1;},clearTimeout:id=>timers.delete(id)});
   vm.runInContext(source,ctx);const loading=vm.runInContext('loadSdk(settings)',ctx).then(value=>{done=true;return value;});
+  const provisional={__buffer:{calls:[]},init(){initialized++;},login(...args){this.__buffer.calls.push(args);}};
+  ctx.window.FB=provisional;
   script.onload();await tick();assert.equal(done,false,'Bootstrap load alone is not SDK readiness');
+  assert.equal(initialized,0,'The provisional SDK must not be initialized or retained');
   ctx.window.FB={init(){initialized++;},login(){}};const ready=ctx.window.fbAsyncInit;
   ready();assert.equal(await loading,ctx.window.FB);ready();script.onload();
   assert.equal(initialized,1);assert.equal(timers.size,0);
+  assert.notEqual(await loading,provisional);
 });
 test('SDK load timeout is bounded and a new attempt can recover',async()=>{
   const scripts=[],timers=new Map();let timer=0;
