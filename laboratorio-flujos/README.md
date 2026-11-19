@@ -46,10 +46,10 @@ npm audit --omit=dev
 ```
 
 - Once pruebas del modelo: dos ramas, variables, reloj virtual, sustitución de conexiones, rechazo de ciclos, incompletos, borradores manipulados, capacidad máxima y resaltado exacto del recorrido.
-- QA de Chrome sobre la compilación: ambas ramas; selección/movimiento con teclado; conexión y reconexión por arrastre; eliminación de arista conservando los nueve nodos; guardado y recuperación tras recarga; edición/eliminación de un bloque ficticio desde panel móvil; modos claro/oscuro. Sin desbordamiento horizontal del documento en escritorio y 390×844. El viewport se restableció al terminar.
+- QA de Chrome de la primera versión local, anterior a la conexión con el servidor: ambas ramas; selección/movimiento con teclado; conexión y reconexión por arrastre; eliminación de arista conservando los nueve nodos; guardado y recuperación tras recarga; edición/eliminación de un bloque ficticio desde panel móvil; modos claro/oscuro. Sin desbordamiento horizontal del documento en escritorio y 390×844. El viewport se restableció al terminar.
 - Astryx doctor: cero fallos. Conserva advertencias de estilos inline (usados con tokens en el prototipo) y de identificación del shim `.cmd` en Windows. La invocación fijada `npm run astryx -- ...` utiliza el paquete correcto.
 - Auditoría de dependencias de ejecución: cero vulnerabilidades detectadas al preparar esta prueba; no es una garantía sobre futuras versiones.
-- Compilación aproximada: JS principal 897 kB / 289 kB gzip; CSS 334 kB / 54 kB gzip; fuente latina Manrope 25 kB. Vite avisa del tamaño del chunk y de una directiva de `react-compiler-runtime`. La vista previa comprobada usa los artefactos compilados. Conviene evaluar partición/carga diferida y coste de Astryx antes de extender su uso.
+- Compilación aproximada: JS principal 904 kB / 291 kB gzip; CSS 334 kB / 54 kB gzip; fuente latina Manrope 25 kB. Vite avisa del tamaño del chunk y de una directiva de `react-compiler-runtime`. La vista previa comprobada usa los artefactos compilados. Conviene evaluar partición/carga diferida y coste de Astryx antes de extender su uso.
 
 La revisión independiente identificó y permitió corregir el contrato `NodeChangeset`/`EdgeChangeset` de React Flow 13, selección y deselección, protección de la serialización, límite del borrador y resaltado de aristas. No sustituye la revisión del usuario de su apariencia.
 
@@ -62,3 +62,7 @@ La inspección de SendyPRO fue de solo lectura y se usó únicamente como refere
 El recurso `public/marca.svg` procede del isotipo provisional existente `app-crm/public/marca-volumen.svg`; no se rediseñó ni se considera aprobado definitivamente. Manrope se sirve desde el propio paquete. Se incluyen avisos de Astryx (MIT) y Manrope (SIL OFL) en `public/licenses/`. Las demás dependencias conservan sus licencias en los paquetes originales.
 
 Referencias: [Astryx](https://github.com/meta/astryx), [React Flow 13](https://reactflow.dev/learn/troubleshooting/migrate-to-v13).
+
+## Verificación de la primera ejecución real
+
+Actualización del 19 de noviembre de 2026: las nueve pruebas de integración de flujos cubren persistencia tras reinicio, controles de API, deduplicación, pausa/reactivación, baja, envío incierto y capacidad de etiquetas. La suite completa del CRM pasó 57/57 en Node 22 de OVH. La migración sobre copia de la base real conservó todas las filas previas. Tras publicar, el usuario envió un nuevo Hola desde su cuenta de prueba: el servidor registró recorrido completado, etiqueta Interesado, asignación al propietario y estado delivered del mensaje automático. La nueva interacción visual del editor no se automatizó porque el control de navegador dejó de estar disponible; la compilación y los contratos API sí se verificaron.
