@@ -28,7 +28,10 @@ if (new URLSearchParams(location.search).get('visual') !== '0') {
     motion.textContent = paused ? 'Activar animaciones' : 'Pausar animaciones';
     motion.setAttribute('aria-pressed', String(paused));
   });
-  banner.append(label, detail, motion, back);
+  const flows = document.createElement('a');
+  flows.href = '/flujos/';
+  flows.textContent = 'Flujos · laboratorio';
+  banner.append(label, detail, motion, flows, back);
   document.body.prepend(banner);
 
   const paths = {
