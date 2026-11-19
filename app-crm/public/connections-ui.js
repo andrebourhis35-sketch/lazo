@@ -1,10 +1,12 @@
+import { mountMetaSignup } from './meta-signup.js?v=20261119';
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const when=value=>value?new Intl.DateTimeFormat('es-PE',{dateStyle:'short',timeStyle:'short'}).format(new Date(value)):'Sin eventos todavía';
 
 export function mountConnections(root,{connection:c,api,notice,isCurrent,onSaved,onCreateCompany,canCreate}) {
   root.innerHTML=`<div class="crm-intro"><div><span class="eyebrow">WHATSAPP CLOUD API</span><h2>Conecta tu número con LAZO</h2><p class="muted">Una conexión activa por empresa. Elige la empresa en el menú lateral antes de guardar.</p></div></div>
   <div class="settings-grid">
-    <section class="settings-card"><h2>1. Credenciales de Meta</h2>
+    <section class="settings-card" id="meta-signup"></section>
+    <details class="settings-card"><summary>Conexión manual avanzada</summary><h2>Credenciales de Meta</h2>
       <p class="muted">${c.configured?'API guardada. Puedes renovar sus credenciales; los identificadores pertenecen a esta conexión.':'Introduce las credenciales de una API que ya tengas configurada en Meta.'}</p>
       <form id="wa-connect" autocomplete="off">
         <label>Identificador del número (Phone Number ID)<input name="phoneId" inputmode="numeric" pattern="[0-9]+" maxlength="50" value="${esc(c.phoneId)}" ${c.configured?'readonly':''} required></label>
@@ -17,8 +19,8 @@ export function mountConnections(root,{connection:c,api,notice,isCurrent,onSaved
         <p id="wa-result" role="status" aria-live="polite" class="muted"></p>
       </form>
       <p class="muted">Esto comprueba el acceso a la cuenta y al número. No envía mensajes, no registra ni migra el número desde otro proveedor.</p>
-    </section>
-    <section class="settings-card"><h2>2. Recepción y estado</h2>
+    </details>
+    <section class="settings-card"><h2>Recepción y estado</h2>
       ${c.configured?`<dl><dt>Acceso a la cuenta comprobado</dt><dd>${when(c.checkedAt)}</dd><dt>URL verificada por Meta</dt><dd>${c.webhookVerified?'Sí':'Pendiente'}</dd><dt>Secreto de la app</dt><dd>${c.hasAppSecret?'Guardado':'Pendiente'}</dd><dt>Último evento recibido</dt><dd>${when(c.webhookAt)}</dd></dl>
       <p class="muted">${c.testOnly?'Modo de prueba: los envíos siguen limitados al destinatario autorizado.':'El envío depende de los permisos de Meta y de la ventana de atención.'}</p>
       <label>URL de devolución de llamada<input readonly value="${esc(c.callbackUrl)}"></label>
@@ -34,6 +36,8 @@ export function mountConnections(root,{connection:c,api,notice,isCurrent,onSaved
       <p class="muted">La conexión mediante WhatsApp Business en el celular se implementará con el proceso oficial de Meta. El enlace por QR todavía no está disponible.</p>
     </section>
   </div>`;
+  const meta=root.querySelector('#meta-signup');
+  if(meta)mountMetaSignup(meta,{api,notice,isCurrent,onSaved});
   const form=root.querySelector('#wa-connect');
   form.onsubmit=async event=>{
     event.preventDefault();if(!isCurrent())return;

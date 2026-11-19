@@ -49,7 +49,10 @@ export function whatsapp(store, config, fetchImpl = fetch, onIncoming = () => {}
     store.run('INSERT INTO connections(company_id,phone_id,waba_id,config,checked,verified) VALUES(?,?,?,?,?,?) ON CONFLICT(company_id) DO UPDATE SET phone_id=excluded.phone_id,waba_id=excluded.waba_id,config=excluded.config,checked=excluded.checked,verified=excluded.verified',
       company,c.phoneId,c.wabaId,secrets.seal(c,company),now(),verified);
   }
-  async function connect(company,data,actor,ensureCurrent=()=>{}) {
+  function providerWebhookReady(secret){
+    return Boolean(secret)&&store.all('SELECT company_id FROM connections WHERE verified=1').some(row=>credentials(row.company_id)?.appSecret===secret);
+  }
+  async function connect(company,data,actor,ensureCurrent=()=>{},verifiedProvider=false) {
     const old=credentials(company);
     const c={ accessToken:text(data.accessToken||old?.accessToken||'',4096,true),appSecret:text(data.appSecret||old?.appSecret||'',256),
       phoneId:text(data.phoneId||old?.phone_id||'',50,true),wabaId:text(data.wabaId||old?.waba_id||'',50,true),
@@ -62,9 +65,10 @@ export function whatsapp(store, config, fetchImpl = fetch, onIncoming = () => {}
     const phones=await graph(c,`${c.wabaId}/phone_numbers?fields=id&limit=100`);
     requireThat(phones.data?.some(p=>p.id===c.phoneId),'El número no pertenece a esta cuenta de WhatsApp.');
     ensureCurrent();
+    requireThat(!verifiedProvider||providerWebhookReady(c.appSecret),'El webhook del proveedor todavía no está verificado.',409);
     const current=store.get('SELECT config FROM connections WHERE company_id=?',company);
     requireThat((current?.config||null)===(old?.config||null),'La conexión cambió mientras se comprobaba. Recarga Conexiones antes de guardar.',409);
-    saveRaw(company,c,old?.phone_id===c.phoneId&&old?.appSecret===c.appSecret?old.verified:0);
+    saveRaw(company,c,verifiedProvider?1:old?.phone_id===c.phoneId&&old?.appSecret===c.appSecret?old.verified:0);
     store.audit(company,actor,'whatsapp.connected');return safe(company);
   }
   async function templates(company) {
@@ -180,8 +184,9 @@ export function whatsapp(store, config, fetchImpl = fetch, onIncoming = () => {}
   }
   async function subscribe(company,actor) {
     const c=credentials(company);requireThat(c?.appSecret&&c.verified,'Guarda el secreto y verifica primero la URL de devolución en Meta.');
-    await graph(c,`${c.waba_id}/subscribed_apps`,'POST',{});
+    const result=await graph(c,`${c.waba_id}/subscribed_apps`,'POST',{});
+    requireThat(result.success===true,'Meta no confirmó la suscripción de la app a esta cuenta.',502);
     store.audit(company,actor,'whatsapp.subscribed');return {ok:true};
   }
-  return {credentials,safe,connect,send,templates,verify,receive,subscribe,saveRaw,media};
+  return {credentials,safe,connect,send,templates,verify,receive,subscribe,saveRaw,media,providerWebhookReady};
 }

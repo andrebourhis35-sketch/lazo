@@ -70,6 +70,10 @@ test('platform: accounts, tenant isolation, persistence and signed WhatsApp life
       assert.equal((await api(outsider,'/invitations/accept','POST',{token:invitation,name:'Intruder',password})).status,404);
       for(const route of ['/invitations','/companies'])assert.equal((await api(agent,route,'POST',{email:'bad@example.com',role:'admin',name:'Other'})).status,403);
       assert.equal((await api(agent,'/whatsapp')).status,403);
+      assert.equal((await api(agent,'/whatsapp/signup')).status,403);
+      for(const action of ['start','exchange','complete'])assert.equal((await api(agent,'/whatsapp/signup/'+action,'POST',{})).status,403);
+      assert.equal((await api(owner,'/whatsapp/signup')).data.available,false);
+      assert.equal((await api(owner,'/whatsapp/signup/start','POST',{})).status,409);
     });
     const credentials={accessToken:'fake-access-token',appSecret:'fake-app-secret',wabaId:'20001',phoneId:'10001',graphVersion:'v25.0'};
     await t.test('connection checks ownership, encrypts secrets and prevents cross-company reuse',async()=>{

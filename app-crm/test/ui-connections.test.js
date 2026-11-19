@@ -28,7 +28,7 @@ test('a stale connections load cannot overwrite a later visit or refresh',async(
   assert.equal(mounted[0].isCurrent(),false);assert.equal(mounted[1].isCurrent(),true);
 });
 
-const moduleSource=readFileSync(new URL('../public/connections-ui.js',import.meta.url),'utf8').replace('export function','function');
+const moduleSource=readFileSync(new URL('../public/connections-ui.js',import.meta.url),'utf8').replace(/^import .*;$/gm,'').replace('export function','function');
 test('a saved form from an old visit clears its secrets without remounting the new screen',async()=>{
   const pending=deferred();let current=true,remounts=0;
   const submit={},result={},form={elements:{accessToken:{value:'private-token'},appSecret:{value:'private-secret'}},querySelector:()=>submit};
