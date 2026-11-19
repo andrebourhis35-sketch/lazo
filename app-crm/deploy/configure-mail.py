@@ -44,6 +44,12 @@ def configure():
         raise SetupError('smtp-settings') from None
     if not isinstance(data, dict) or set(data) != {'host','port','user','password'}:
         raise SetupError('smtp-settings')
+    # Zoho displays generated app passwords in groups. Pasting may add separators;
+    # remove whitespace only from this app password, never from other fields.
+    if isinstance(data['password'], str):
+        data['password'] = ''.join(data['password'].split())
+        if not data['password']:
+            raise SetupError('smtp-settings')
     for key in ('host','user','password'):
         if not isinstance(data[key], str) or re.search(r'[\x00-\x1f\x7f]', data[key]):
             raise SetupError('smtp-settings')
