@@ -9,6 +9,14 @@ import tempfile
 import time
 import urllib.request
 
+SMTP_ERRORS = {'smtp-settings','smtp-auth','smtp-tls','smtp-connection','smtp-temporary','smtp-check'}
+
+
+class SetupError(ValueError):
+    def __init__(self, code):
+        super().__init__('Mail setup could not be confirmed')
+        self.code = code
+
 
 def atomic_environment(path, content):
     descriptor, temporary = tempfile.mkstemp(prefix='.lazo-crm-mail-', dir=path.parent)
@@ -26,25 +34,36 @@ def atomic_environment(path, content):
 
 def configure():
     if os.geteuid() != 0 or len(sys.argv) != 1:
-        raise ValueError('Fixed root-only command')
+        raise SetupError('server-permissions')
     raw = sys.stdin.buffer.read(8193)
     if len(raw) > 8192:
-        raise ValueError('Input too large')
-    data = json.loads(raw)
-    if set(data) != {'host','port','user','password'}:
-        raise ValueError('Unexpected fields')
+        raise SetupError('smtp-settings')
+    try:
+        data = json.loads(raw)
+    except (ValueError, TypeError):
+        raise SetupError('smtp-settings') from None
+    if not isinstance(data, dict) or set(data) != {'host','port','user','password'}:
+        raise SetupError('smtp-settings')
     for key in ('host','user','password'):
         if not isinstance(data[key], str) or re.search(r'[\x00-\x1f\x7f]', data[key]):
-            raise ValueError('Invalid value')
+            raise SetupError('smtp-settings')
     # The application enforces the same Zoho allowlist, TLS, port and mailbox rules.
-    checked = subprocess.run(['/opt/hq-node/current/bin/node',
-                              '/opt/lazo-crm/current/app-crm/deploy/verify-smtp.mjs'],
-                             input=json.dumps(data).encode(), capture_output=True, timeout=40)
-    if checked.returncode != 0:
-        raise ValueError('Could not authenticate with Zoho')
+    try:
+        checked = subprocess.run(['/opt/hq-node/current/bin/node',
+                                  '/opt/lazo-crm/current/app-crm/deploy/verify-smtp.mjs'],
+                                 input=json.dumps(data).encode(), capture_output=True, timeout=40)
+    except subprocess.TimeoutExpired:
+        raise SetupError('smtp-connection') from None
+    try:
+        result = json.loads(checked.stdout)
+    except (ValueError, TypeError):
+        raise SetupError('smtp-check') from None
+    if not isinstance(result, dict) or checked.returncode != 0 or result.get('ok') is not True:
+        code = result.get('error') if isinstance(result, dict) else None
+        raise SetupError(code if isinstance(code, str) and code in SMTP_ERRORS else 'smtp-check')
     path = Path('/etc/lazo-crm.env')
     if path.is_symlink() or not path.is_file() or path.stat().st_uid != 0 or path.stat().st_mode & 0o077:
-        raise ValueError('Environment permissions are not private')
+        raise SetupError('server-permissions')
     original = path.read_bytes()
     keys = {'LAZO_SMTP_HOST': data['host'], 'LAZO_SMTP_PORT': str(int(data['port'])),
             'LAZO_SMTP_USER': data['user'], 'LAZO_SMTP_PASSWORD': data['password']}
@@ -65,15 +84,23 @@ def configure():
                 time.sleep(0.5)
         raise RuntimeError('Service did not become healthy')
     except Exception:
-        atomic_environment(path, original)
-        subprocess.run(['systemctl','restart','lazo-crm'], capture_output=True, timeout=35)
-        raise
+        try:
+            atomic_environment(path, original)
+            restored = subprocess.run(['systemctl','restart','lazo-crm'], capture_output=True, timeout=35)
+            if restored.returncode != 0:
+                raise RuntimeError('Recovery restart failed')
+        except Exception:
+            raise SetupError('server-recovery') from None
+        raise SetupError('server-restart') from None
 
 
 if __name__ == '__main__':
     try:
         configure()
         print(json.dumps({'ok': True, 'smtpVerified': True}))
+    except SetupError as error:
+        print(json.dumps({'ok': False, 'error': error.code}))
+        raise SystemExit(1)
     except Exception:
-        print('LAZO: no se guardó la configuración de correo. Comprueba los datos de Zoho y la conexión.', file=sys.stderr)
+        print(json.dumps({'ok': False, 'error': 'server-setup'}))
         raise SystemExit(1)
