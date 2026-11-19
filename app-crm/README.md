@@ -24,6 +24,16 @@ Nunca pedir ni pegar tokens, contraseñas o secretos por chat. Con Zoho habilita
 
 ## Implementación y pruebas
 
+### Flujos de bienvenida por empresa
+
+En `/flujos/`, la sesión de LAZO permite al propietario o administrador guardar borradores en SQLite, abrirlos desde otra computadora y activar una versión independiente del borrador. La activación exige la cuenta de WhatsApp de prueba, palabra clave y exactamente un mensaje. Admite Inicio, Mensaje, Etiqueta, Asignar asesor y Finalizar; condiciones y esperas continúan disponibles solo para simular.
+
+Solo puede haber un flujo activo por empresa. Los mensajes entrantes nuevos con firma válida se registran junto a su trabajo en una transacción. El motor deduplica por mensaje/flujo y limita las bienvenidas a una por minuto y contacto. Los eventos con más de cinco minutos no inician automatizaciones. Pausar cancela pendientes; reactivar crea una generación distinta. Un envío que ya está en curso puede terminar, pero se comprueba el estado antes de las acciones siguientes. «Baja», «stop» y «cancelar» detienen pendientes y acciones posteriores del contacto; un nuevo mensaje posterior puede iniciar otro recorrido conforme al límite.
+
+El envío reutiliza la protección del destinatario de prueba, ventana real de 24 horas e identificador idempotente. Un resultado incierto o un trabajo interrumpido no se reintentan automáticamente. Antes del envío se comprueba capacidad de etiquetas y pertenencia del asesor. El historial distingue cola, ejecución, completado, cancelado, error e interrupción; completado no equivale a entrega de WhatsApp, que se consulta en Conversaciones. Los trabajos se depuran a 90 días. No hay campañas ni seguimientos programados en esta fase.
+
+Prueba específica: `node --test app-crm/test/flows.test.js`. Guardar/activar/pausar requieren los mismos controles de sesión, empresa, rol, origen y CSRF del CRM. El guardado exige la revisión actual para impedir que otra pestaña sobrescriba el borrador.
+
 Node.js 22.13+ (SQLite integrado; aviso experimental en Node 22). Nodemailer está fijado en package-lock.json para el correo transaccional. HTTP escucha solo en 127.0.0.1:3031. Caddy enruta `/app`, `/app/*`, `/api/crm/*` y `/webhooks/whatsapp` a ese puerto; la demo continúa en las rutas existentes.
 
 ```powershell

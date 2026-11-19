@@ -3,6 +3,7 @@ import { now, requireThat, digest } from './core.js';
 import { parseDraft, validateFlow } from './flow-model.js';
 
 const normalize = value => value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+const tagKey = value => value.trim().toLocaleLowerCase('es');
 export function automationFlows(store, wa) {
   let task=null, stopping=false;
   const get = (company,id) => { const row=store.get('SELECT * FROM flows WHERE company_id=? AND id=?',company,id);requireThat(row,'Flujo no encontrado.',404);return row; };
@@ -29,7 +30,7 @@ export function automationFlows(store, wa) {
     requireThat(draft.nodes.length<=20&&draft.nodes.every(n=>['trigger','message','tag','assign','end'].includes(n.data.kind)),'La ejecución real admite Inicio, Mensaje, Etiqueta, Asignar asesor y Finalizar. Condiciones y esperas siguen en simulación.');
     requireThat(draft.nodes.filter(n=>n.data.kind==='message').length===1,'La primera automatización debe enviar exactamente un mensaje.');
     const start=draft.nodes.find(n=>n.data.kind==='trigger');requireThat(start.data.value.trim(),'La ejecución real requiere una palabra clave.');
-    requireThat(new Set(draft.nodes.filter(n=>n.data.kind==='tag').map(n=>normalize(n.data.value))).size<=8,'El flujo admite hasta ocho etiquetas distintas.');
+    requireThat(new Set(draft.nodes.filter(n=>n.data.kind==='tag').map(n=>tagKey(n.data.value))).size<=8,'El flujo admite hasta ocho etiquetas distintas.');
     for(const node of draft.nodes) {
       if(node.data.kind==='tag')requireThat(node.data.value.trim().length<=30&&!/[,\x00-\x1f]/.test(node.data.value),'La etiqueta admite hasta treinta caracteres, sin comas ni saltos.');
       if(node.data.kind==='assign')requireThat(store.get('SELECT 1 FROM memberships WHERE company_id=? AND user_id=?',company,node.data.value),'Selecciona un asesor de esta empresa.');
@@ -70,7 +71,7 @@ export function automationFlows(store, wa) {
     try {
       const draft=JSON.parse(run.snapshot);let node=draft.nodes.find(n=>n.data.kind==='trigger');
       const initialContact=store.contact(run.company_id,run.contact_id);
-      const plannedTags=new Set([...JSON.parse(initialContact.tags||'[]'),...draft.nodes.filter(n=>n.data.kind==='tag').map(n=>n.data.value)].map(normalize));
+      const plannedTags=new Set([...JSON.parse(initialContact.tags||'[]'),...draft.nodes.filter(n=>n.data.kind==='tag').map(n=>n.data.value)].map(tagKey));
       requireThat(plannedTags.size<=8,'El contacto no tiene espacio para las etiquetas del flujo.');
       for(const assignment of draft.nodes.filter(n=>n.data.kind==='assign'))requireThat(store.get('SELECT 1 FROM memberships WHERE company_id=? AND user_id=?',run.company_id,assignment.data.value),'El asesor ya no pertenece a la empresa.');
       for(let i=0;node&&i<21;i++) {
@@ -82,7 +83,7 @@ export function automationFlows(store, wa) {
           const result=await wa.send(run.company_id,run.contact_id,{type:'text',text:node.data.value.replaceAll('{{nombre}}',contact.name),clientId:'flow-'+digest(run.id+':'+node.id)},owner.actor_id);
           requireThat(['accepted','sent','delivered','read'].includes(result.status),'El envío no quedó confirmado. Revisa la conversación antes de repetir.',409);
         }
-        if(node.data.kind==='tag') {const tags=JSON.parse(contact.tags||'[]');if(!tags.some(t=>normalize(t)===normalize(node.data.value)))tags.push(node.data.value);store.updateContact(run.company_id,contact.id,{tags},owner.actor_id);}
+        if(node.data.kind==='tag') {const tags=JSON.parse(contact.tags||'[]');if(!tags.some(t=>tagKey(t)===tagKey(node.data.value)))tags.push(node.data.value);store.updateContact(run.company_id,contact.id,{tags},owner.actor_id);}
         if(node.data.kind==='assign')store.updateContact(run.company_id,contact.id,{ownerId:node.data.value},owner.actor_id);
         if(node.data.kind==='end'){store.run("UPDATE flow_runs SET state='done',updated=? WHERE id=?",now(),run.id);return;}
         const edge=draft.edges.find(e=>e.source===node.id);node=draft.nodes.find(n=>n.id===edge?.target);

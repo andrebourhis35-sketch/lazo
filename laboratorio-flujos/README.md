@@ -1,8 +1,10 @@
 # LAZO · Laboratorio de flujos
 
-Prueba independiente con React 19.3.1, Astryx 0.7.16 y React Flow 13.0.2. Sirve para evaluar el editor antes de decidir una integración con el CRM. No requiere una cuenta, credenciales, servicios de pago ni conexión con Meta.
+Editor React 19.3.1, Astryx 0.7.16 y React Flow 13.0.2, publicado en https://lazo.espacio-sereno.com/flujos/.
 
-Destino de publicación autorizado: https://lazo.espacio-sereno.com/flujos/. El enlace «Flujos · laboratorio» de la presentación Órbita del CRM permite abrirlo. Los borradores siguen siendo locales a cada navegador; esta publicación no conecta el motor a WhatsApp.
+Con una sesión de propietario o administrador de LAZO, permite guardar borradores por empresa en el servidor, activar una versión y pausarla, elegir asesores y consultar las últimas ejecuciones. La primera automatización real admite Inicio → Mensaje → Etiqueta → Asesor → Finalizar con la cuenta de WhatsApp de prueba. Condiciones y esperas siguen limitadas a simulación y no se pueden activar como ejecución real.
+
+Sin sesión se conserva la simulación local. El guardado local no publica ni activa un flujo. Los borradores locales pertenecen a este navegador; los guardados en el servidor se recuperan desde la cuenta de la empresa. Las credenciales de WhatsApp nunca llegan al editor.
 
 ## Abrir en Windows
 
@@ -26,15 +28,13 @@ Abrir la dirección indicada: http://127.0.0.1:8771/. El servidor escucha única
 - Simular «Quiero el catálogo» y «Prefiero un asesor». El recorrido muestra textos personalizados, decisiones, tiempo virtual, etiquetas y responsable. Solo se resaltan las conexiones realmente recorridas.
 - Usar los paneles desplegables en pantallas pequeñas. El lienzo se desplaza y amplía; los botones de vista general permiten localizar todo el recorrido.
 
-Guardar no publica ni activa el flujo. Los datos de ejemplo son ficticios; mantenerlos así al compartir la prueba. El borrador pertenece al navegador y origen usados, no se sincroniza con la empresa ni ofrece una copia de seguridad. Su limpieza o el modo privado pueden impedir conservarlo.
+## Alcance de ejecución
 
-## Alcance y decisión pendiente
+Guardar un borrador no altera la versión que está activa. «Activar versión guardada» comienza a procesar mensajes nuevos; «Pausar flujo» evita nuevas ejecuciones. Un envío ya iniciado puede completarse. La comparación de revisiones evita sobrescrituras entre pestañas. Al cambiar la sesión o empresa se bloquean peticiones del contexto anterior y se debe recargar.
 
-El laboratorio está completamente separado de `app-crm/`, `app-meta/`, `interfaz/` y las fuentes de branding. No consulta las APIs del CRM ni de Meta, no envía mensajes y no procesa contactos reales. Los tiempos se adelantan al instante. La condición utiliza la misma respuesta de prueba indicada por el usuario, no una conversación interactiva ni un agente IA.
+La condición del simulador usa la respuesta ficticia escrita por el usuario. Sus tiempos son virtuales: «Probar flujo» no manda mensajes reales. La ejecución real se realiza exclusivamente en el servidor y respeta la ventana real de WhatsApp y el destinatario de prueba. No hay marketing ni campañas.
 
-Admite hasta 80 bloques y 160 conexiones, con textos de 2000 caracteres y borrador serializado de hasta dos millones de caracteres. Para simular, todas las salidas deben estar conectadas y todos los bloques deben ser alcanzables desde un único Inicio. Los borradores incompletos se pueden guardar.
-
-Antes de producción se necesita decidir la adopción visual y técnica, medir dispositivos y redes objetivo, y diseñar un motor persistente con ejecución por empresa, eventos reales, permisos, idempotencia, cancelación por respuesta/baja, ventanas y plantillas de WhatsApp, publicación de versiones e historial. Ninguna de esas capacidades se atribuye a esta prueba. Marketing y campañas quedan fuera del alcance.
+Admite hasta 80 bloques y 160 conexiones en borradores; para la primera ejecución real se limita a veinte bloques y exactamente un mensaje, sin condiciones ni esperas. Un flujo activo por empresa y una bienvenida por minuto/contacto. Consultar [backend](../app-crm/README.md#flujos-de-bienvenida-por-empresa) para estados, cancelación, recuperación incierta y límites.
 
 ## Validación realizada
 
