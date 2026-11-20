@@ -1,0 +1,110 @@
+/* Conversation-only density: preserve the rest of Órbita and its motion. */
+.visual-preview .app[data-view="conversations"]{
+  height:calc(100dvh - 42px);min-height:0;
+}
+.visual-preview .app[data-view="conversations"] main{
+  display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden;padding:12px 18px;
+}
+.visual-preview .app[data-view="conversations"] .topbar{
+  flex:0 0 72px;min-height:72px;margin-bottom:10px;padding:10px 18px;border-radius:15px;
+}
+.visual-preview .app[data-view="conversations"] .topbar h1{font-size:25px;margin:4px 0 0}
+.visual-preview .app[data-view="conversations"] .breadcrumb{font-size:10px}
+.visual-preview .app[data-view="conversations"] .topbar .top-actions{align-self:center;margin:0}
+.visual-preview .app[data-view="conversations"] .orbita-scene{
+  top:-61px;right:150px;transform:scale(.55);transform-origin:75% 50%;opacity:.8;
+}
+.visual-preview .app[data-view="conversations"] #view{flex:1;min-height:0}
+.visual-preview .app[data-view="conversations"] #view .inbox{
+  position:relative;height:100%;min-height:0;grid-template-columns:250px minmax(0,1fr) 230px;border-radius:15px;
+}
+.visual-preview .app[data-view="conversations"] .sidebar{
+  width:188px;flex-shrink:0;margin:12px 0 12px 12px;padding:18px 12px;overflow-y:auto;
+}
+.visual-preview .app[data-view="conversations"] .sidebar nav{gap:7px}
+.visual-preview .app[data-view="conversations"] .sidebar nav button{min-height:43px;padding:9px;font-size:12px}
+.visual-preview .app[data-view="conversations"] .sidebar nav button>span{width:27px;height:27px;border-radius:8px}
+.visual-preview .app[data-view="conversations"] .sidebar .demo-card{padding:10px;font-size:10px}
+.visual-preview .app[data-view="conversations"] .sidebar .demo-card p{margin:7px 0 0;font-size:10px;line-height:1.5}
+.visual-preview .app[data-view="conversations"] .list-title{padding:14px}
+.visual-preview .app[data-view="conversations"] .list-title h2{font-size:15px}
+.visual-preview .app[data-view="conversations"] .list-panel>.search{margin:0 12px 12px;padding:10px}
+.visual-preview .app[data-view="conversations"] .inbox-filters{padding:0 12px 12px;gap:8px}
+.visual-preview .app[data-view="conversations"] .inbox-filters label{font-size:10px}
+.visual-preview .app[data-view="conversations"] .inbox-filters select{padding:7px;font-size:11px}
+.visual-preview .app[data-view="conversations"] .conversation{padding:14px 12px;gap:10px}
+.visual-preview .app[data-view="conversations"] .conversation strong{font-size:12px}
+.visual-preview .app[data-view="conversations"] .conversation .avatar{width:34px;height:34px;font-size:12px}
+.visual-preview .app[data-view="conversations"] .chat-header{flex-shrink:0;min-height:56px;padding:10px 16px;gap:10px}
+.visual-preview .app[data-view="conversations"] .chat-header>.avatar{width:34px;height:34px;font-size:12px}
+.visual-preview .app[data-view="conversations"] .chat-person h2{font-size:14px}
+.visual-preview .app[data-view="conversations"] .chat-person>span{font-size:10px}
+.visual-preview .app[data-view="conversations"] .chat-toolbar{flex-shrink:0;padding:6px 16px;min-height:36px}
+.visual-preview .app[data-view="conversations"] .chat-toolbar .secondary{padding:6px 10px;font-size:11px}
+.visual-preview .app[data-view="conversations"] .messages{min-height:0;padding:16px;gap:14px;overscroll-behavior:contain}
+.visual-preview .app[data-view="conversations"] .message .bubble{padding:10px 13px;font-size:13px;line-height:1.6}
+.visual-preview .app[data-view="conversations"] .composer-area{flex-shrink:0;padding:8px 12px 6px;max-height:48%;overflow:auto}
+.visual-preview .app[data-view="conversations"] #send-form{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;padding:10px;border-radius:12px;
+}
+.visual-preview .app[data-view="conversations"] .send-options{grid-column:1/-1;gap:8px;margin:0}
+.visual-preview .app[data-view="conversations"] .send-options label{font-size:10px;margin:0}
+.visual-preview .app[data-view="conversations"] .send-options select{margin-top:3px;padding:6px 8px;height:32px;font-size:11px}
+.visual-preview .app[data-view="conversations"] .send-options>.secondary{height:32px;font-size:11px;padding:6px 10px}
+.visual-preview .app[data-view="conversations"] #parameters{grid-column:1/-1}
+.visual-preview .app[data-view="conversations"] #parameters:empty{display:none}
+.visual-preview .app[data-view="conversations"] .reply-label{grid-column:1/-1;margin:2px 0 0;font-size:11px;color:#c9daff;font-weight:700}
+.visual-preview .app[data-view="conversations"] #message{
+  grid-column:1/-1;display:block;width:100%;min-height:62px;height:62px;max-height:140px;resize:vertical;
+  padding:10px 12px;border:1px solid #6a8dff;border-radius:9px;background:#192c49;color:#f5f7fb;font-size:13px;line-height:1.6;
+}
+.visual-preview .app[data-view="conversations"] #message::placeholder{color:#b6c7e6;opacity:1}
+.visual-preview .app[data-view="conversations"] #message:focus{outline:2px solid #35d6c1;outline-offset:1px}
+.visual-preview .app[data-view="conversations"] #message[hidden],
+.visual-preview .app[data-view="conversations"] .reply-label[hidden]{display:none}
+.visual-preview .app[data-view="conversations"] #file-composer{grid-column:1;min-width:0;align-self:center}
+.visual-preview .app[data-view="conversations"] .attachment-controls{padding:0;gap:8px}
+.visual-preview .app[data-view="conversations"] .attachment-controls .secondary{padding:7px 9px;font-size:10px}
+.visual-preview .app[data-view="conversations"] .attachment-controls .muted{font-size:9px}
+.visual-preview .app[data-view="conversations"] .composer-bottom{grid-column:2;margin:0;align-self:end}
+.visual-preview .app[data-view="conversations"] .composer-bottom>span{display:none}
+.visual-preview .app[data-view="conversations"] .composer-bottom .send{padding:9px 18px;font-size:12px;min-height:36px}
+.visual-preview .app[data-view="conversations"] .composer-area .status{min-height:0;height:auto;font-size:9px;line-height:1.4;margin:4px 0 0;padding:0}
+.visual-preview .app[data-view="conversations"] .details{padding:16px;overflow:auto;overscroll-behavior:contain}
+.visual-preview .app[data-view="conversations"] .details .profile{padding:16px 0}
+.visual-preview .app[data-view="conversations"] .details .profile .avatar{width:52px;height:52px;font-size:20px}
+.visual-preview .app[data-view="conversations"] .details .profile h3{font-size:14px;margin:12px 0 6px}
+@media(max-width:1300px){
+  .visual-preview .app[data-view="conversations"] #view .inbox{grid-template-columns:235px minmax(0,1fr)}
+  .visual-preview .app[data-view="conversations"] .inbox>.details{display:none}
+  .visual-preview .app[data-view="conversations"] .inbox.show-details>.details{
+    display:block;position:absolute;inset:0 0 0 auto;width:270px;max-width:calc(100% - 20px);height:100%;
+    z-index:30;border-left:1px solid #3b5274;background:#122139;box-shadow:-12px 0 30px #0004;
+  }
+  .visual-preview .app[data-view="conversations"] .orbita-scene{display:none}
+}
+@media(min-width:621px) and (max-width:1000px){
+  .visual-preview .app[data-view="conversations"] .sidebar{width:67px;padding:18px 8px;margin-left:10px}
+  .visual-preview .app[data-view="conversations"] main{padding:12px}
+  .visual-preview .app[data-view="conversations"] #view .inbox{grid-template-columns:220px minmax(0,1fr)}
+}
+@media(max-width:620px){
+  .visual-preview .app[data-view="conversations"]{height:calc(100dvh - 48px);display:flex;flex-direction:column}
+  .visual-preview .app[data-view="conversations"] .sidebar{width:calc(100% - 20px);flex-shrink:0;margin:6px 10px 0;padding:6px;overflow:visible}
+  .visual-preview .app[data-view="conversations"] .sidebar nav{gap:2px}
+  .visual-preview .app[data-view="conversations"] .sidebar nav button{min-height:42px;font-size:8px;padding:5px 2px;gap:4px}
+  .visual-preview .app[data-view="conversations"] .sidebar nav button>span{width:17px;height:17px}
+  .visual-preview .app[data-view="conversations"] main{flex:1;padding:8px 10px}
+  .visual-preview .app[data-view="conversations"] .topbar{flex-basis:50px;min-height:50px;padding:6px 10px;margin-bottom:8px}
+  .visual-preview .app[data-view="conversations"] .topbar h1{font-size:20px;margin:2px 0 0}
+  .visual-preview .app[data-view="conversations"] .topbar .breadcrumb{font-size:8px;max-width:170px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .visual-preview .app[data-view="conversations"] .topbar .top-actions{flex-direction:row;gap:4px}
+  .visual-preview .app[data-view="conversations"] .chat-header{padding:8px 10px;min-height:50px}
+  .visual-preview .app[data-view="conversations"] .chat-toolbar{padding:5px 10px}
+  .visual-preview .app[data-view="conversations"] .composer-area{padding:7px 8px 5px;max-height:52%}
+  .visual-preview .app[data-view="conversations"] #send-form{padding:8px;gap:5px 7px}
+  .visual-preview .app[data-view="conversations"] .send-options>.secondary{font-size:10px;padding:6px 8px}
+  .visual-preview .app[data-view="conversations"] .attachment-controls .muted{display:none}
+  .visual-preview .app[data-view="conversations"] #message{font-size:16px;min-height:62px;height:62px}
+  .visual-preview .app[data-view="conversations"] .composer-bottom .send{min-height:40px;padding:8px 12px}
+}

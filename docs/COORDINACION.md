@@ -1,5 +1,11 @@
 # Coordinación Codex y Claude
 
+### Conversaciones compactas y respuesta visible (20 de noviembre de 2026)
+
+- Usuario confirma envío y recepción desde el nuevo número y solicita reducir el tamaño de la interfaz: el historial queda pequeño y no se distingue dónde responder. Reserva: app-crm/public/app.js, presentación visual y versiones de recursos, documentación y este tablero; rama codex/chat-compacto, responsable Codex. Medición real en Chrome a 1482×734: encabezado 194 px, compositor 306,5 px e historial solo 96 px, bandeja fuera del alto visible. Compactar exclusivamente Conversaciones, conservar Órbita/animaciones y funciones de envío, y verificar escritorio/móvil antes de publicar. No modificar credenciales ni envíos reales durante QA.
+
+- Implementado CSS exclusivo de Conversaciones, encabezado reducido a 72 px y compositor con etiqueta visible Tu respuesta, borde y fondo propios. QA en Chrome: a 1482x734 el historial aumenta de 96 a 247 px y la bandeja cabe completa; 1280x800 y 1100x768 con ficha flotante; 390x844 sin desborde horizontal, historial de 330 px y campo/Enviar visibles. Cinco pruebas dirigidas aprobadas, sintaxis y diff limpios; revisión independiente apta tras corregir ficha en breakpoint 1300 y alcance de selectores de navegación. Pendiente publicación y verificación HTTPS.
+
 ### Alta real mediante Meta confirmada (19 de noviembre de 2026)
 
 - Tras repetir el alta, usuario vuelve a Conexiones y pregunta por el resultado. Reserva: registro en este tablero, rama codex/verificacion-alta-real, responsable Codex. Consulta de solo lectura del servidor confirma dos conexiones en total, una nueva durante los últimos 30 minutos; auditoría whatsapp.connected a las 23:00:52 UTC y whatsapp.subscribed a las 23:00:53 UTC del 19 de noviembre. La conexión de prueba anterior sigue presente. Esto acredita guardado y suscripción tras autorización real, sin imprimir credenciales ni modificar datos o configuración. Pendiente recepción real en el número nuevo: se solicita enviar Hola LAZO desde el destinatario personal usado en las pruebas. No se presume recepción, entrega de respuesta ni aprobación de revisión de Meta.
