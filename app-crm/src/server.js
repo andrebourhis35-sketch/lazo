@@ -15,6 +15,7 @@ const root=fileURLToPath(new URL('../public/',import.meta.url));
 const assets={
   '/app/':['index.html','text/html; charset=utf-8'], '/app/app.js':['app.js','text/javascript; charset=utf-8'],
   '/app/app.css':['app.css','text/css; charset=utf-8'],
+  '/app/chat-compact.css':['chat-compact.css','text/css; charset=utf-8'],
   '/app/connections-ui.js':['connections-ui.js','text/javascript; charset=utf-8'],
   '/app/meta-signup.js':['meta-signup.js','text/javascript; charset=utf-8'],
   '/app/work-ui.js':['work-ui.js','text/javascript; charset=utf-8'],
