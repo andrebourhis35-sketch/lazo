@@ -1,6 +1,6 @@
 // Frame adapted from Astryx 0.7.16's canvas-editor template (Meta, MIT).
 // LAZO content, workflow behavior and styling are original to this prototype.
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Theme } from '@astryxdesign/core/theme';
 import { Button } from '@astryxdesign/core/Button';
 import { IconButton } from '@astryxdesign/core/IconButton';
@@ -14,11 +14,11 @@ import { Drawer, DrawerHeader } from '@astryxdesign/core/Drawer';
 import { ReactFlow, ReactFlowProvider, Background, BackgroundVariant, Controls, MiniMap, Panel, Handle, Position, MarkerType, useNodesState, useEdgesState, useReactFlow } from '@xyflow/react';
 import { ArrowLeft, Check, CheckCheck, ChevronRight, CircleCheck, Clock3, Copy, GitBranch, Layers2, Lightbulb, Maximize2, MessageCircle, Moon, MousePointer2, MoveRight, Pause, Play, Plus, RotateCcw, Save, Search, Settings2, ShieldCheck, Sun, Tag, Trash2, UserRound, Workflow, Zap } from 'lucide-react';
 import { lazoTheme } from './theme.js';
-import { connectFlowsServer, welcomeFlow } from './server-client.mjs';
-import { BLOCKS, DRAFT_KEY, connectNodes, connectionProblem, createNode, exampleFlow, parseDraft, simulateFlow, summarizeNode, traversedEdgeIds, validateFlow } from './flow-model.mjs';
+import { connectFlowsServer } from './server-client.mjs';
+import { BLOCKS, DRAFT_KEY, buttonWelcomeFlow, connectNodes, connectionProblem, createNode, exampleFlow, parseDraft, simulateFlow, summarizeNode, traversedEdgeIds, validateFlow } from './flow-model.mjs';
 
-const ICONS = { trigger: Zap, message: MessageCircle, condition: GitBranch, wait: Clock3, tag: Tag, assign: UserRound, end: CircleCheck };
-const COLORS = { trigger: 'var(--lazo-mint)', message: 'var(--lazo-sky)', condition: 'var(--color-accent)', wait: 'var(--lazo-mint)', tag: 'var(--lazo-sky)', assign: 'var(--lazo-mint)', end: 'var(--color-text-secondary)' };
+const ICONS = { trigger: Zap, message: MessageCircle, buttons: GitBranch, condition: GitBranch, wait: Clock3, tag: Tag, assign: UserRound, end: CircleCheck };
+const COLORS = { trigger: 'var(--lazo-mint)', message: 'var(--lazo-sky)', buttons: 'var(--lazo-sky)', condition: 'var(--color-accent)', wait: 'var(--lazo-mint)', tag: 'var(--lazo-sky)', assign: 'var(--lazo-mint)', end: 'var(--color-text-secondary)' };
 const stroke = 'var(--lazo-stroke) solid var(--color-border)';
 const styles = {
   app: { height: '100dvh', minHeight: '30rem', overflow: 'hidden', background: 'var(--color-background-surface)', color: 'var(--color-text-primary)' },
@@ -73,7 +73,10 @@ const FlowNode = memo(function FlowNode({ data, selected }) {
     {data.kind === 'condition' ? <>
       <Text style={{ ...styles.outputLabel, top: '40%' }}>SÍ</Text><Handle type="source" id="yes" position={Position.Right} style={{ ...styles.handle, top: '42%', background: 'var(--lazo-mint)' }} />
       <Text style={{ ...styles.outputLabel, top: '78%', color: 'var(--color-text-secondary)' }}>NO</Text><Handle type="source" id="no" position={Position.Right} style={{ ...styles.handle, top: '80%', background: 'var(--color-text-secondary)' }} />
-    </> : data.kind !== 'end' && <Handle type="source" id="next" position={Position.Right} style={styles.handle} />}
+    </> : data.kind === 'buttons' ? data.choices.map((choice,index) => {
+      const top = index === 0 ? '40%' : '78%';
+      return <Fragment key={index}><Text style={{ ...styles.outputLabel, top }}>{index + 1}</Text><Handle type="source" id={'option-' + (index + 1)} position={Position.Right} style={{ ...styles.handle, top }} aria-label={choice || 'Botón ' + (index + 1)} /></Fragment>;
+    }) : data.kind !== 'end' && <Handle type="source" id="next" position={Position.Right} style={styles.handle} />}
   </VStack>;
 });
 const nodeTypes = { lazo: FlowNode };
@@ -104,6 +107,11 @@ function Inspector({ node, onUpdate, onDuplicate, onDelete, members }) {
     <TextInput label="Nombre del bloque" value={label} onChange={next => onUpdate({ label: next.slice(0, 90) })} />
     {kind === 'message' ? <VStack gap={3}><TextArea label="Contenido del mensaje" value={value} onChange={next => onUpdate({ value: next.slice(0, 2000) })} rows={6} maxLength={2000} description="Personaliza el texto con el nombre del contacto." /><Button label="Insertar nombre del contacto" variant="secondary" size="sm" onClick={() => onUpdate({ value: (value + ' {{nombre}}').slice(0, 2000) })}>{'{{nombre}}'}</Button></VStack> : kind === 'assign' && members ? <VStack gap={2}><Text weight="semibold">Responsable de la empresa</Text>{members.map(member => <Button key={member.id} label={member.name} variant={value === member.id ? 'primary' : 'secondary'} onClick={() => onUpdate({ value: member.id })} />)}</VStack> : field && <TextInput label={field} value={value} inputMode={kind === 'wait' ? 'numeric' : 'text'} onChange={next => onUpdate({ value: next.slice(0, kind === 'wait' ? 5 : 100) })} description={kind === 'trigger' ? 'La activación real requiere una palabra clave.' : kind === 'condition' ? 'La comparación ignora mayúsculas y tildes.' : kind === 'wait' ? 'De 1 a 10080 minutos. En la prueba, el reloj avanza al instante.' : undefined} />}
     {kind === 'message' && <VStack gap={3}><Text style={styles.eyebrow}>Así lo verá el contacto</Text><VStack gap={2} style={styles.bubble}><Text as="p" size="sm" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>{value.replaceAll('{{nombre}}', 'Lucía') || 'Tu mensaje aparecerá aquí.'}</Text><HStack hAlign="end" gap={1} vAlign="center"><Text size="sm" color="secondary">Vista previa</Text><Icon icon={CheckCheck} size="xsm" color="accent" /></HStack></VStack></VStack>}
+    {kind === 'buttons' && <VStack gap={3}>
+      <TextArea label="Mensaje de bienvenida" rows={4} value={value} maxLength={1024} onChange={next => onUpdate({ value: next.slice(0, 1024) })} />
+      {node.data.choices.map((choice,index) => <TextInput key={index} label={'Botón ' + (index + 1)} value={choice} onChange={next => onUpdate({ choices: node.data.choices.map((item,i) => i === index ? next.slice(0,20) : item) })} />)}
+      <Text size="sm" color="secondary">Conecta las dos salidas numeradas. El flujo esperará hasta 24 horas a que el contacto toque un botón.</Text>
+    </VStack>}
     {kind === 'condition' && <VStack padding={3} gap={3} style={styles.note}><Pill icon={GitBranch}>Dos caminos posibles</Pill><Text size="sm" color="secondary">Sí: el texto contiene la expresión indicada. No: continúa por la otra salida.</Text></VStack>}
     {kind === 'end' && <Text color="secondary" size="sm">El recorrido termina aquí. Este bloque no necesita una salida.</Text>}
     <VStack gap={2} style={{ borderBlockStart: stroke, paddingBlockStart: 'var(--spacing-4)' }}><Button label="Duplicar bloque" icon={<Icon icon={Copy} size="sm" />} onClick={onDuplicate} /><Button label="Eliminar bloque" variant="ghost" icon={<Icon icon={Trash2} size="sm" />} onClick={onDelete} /></VStack>
@@ -114,14 +122,15 @@ function Inspector({ node, onUpdate, onDuplicate, onDelete, members }) {
 function Simulation({ flow, onPath }) {
   const [name, setName] = useState('Lucía');
   const [incoming, setIncoming] = useState('Hola, quiero información');
-  const [answer, setAnswer] = useState('Quiero ver el catálogo');
+  const choices = flow.nodes.find(node => node.data.kind === 'buttons')?.data.choices;
+  const [answer, setAnswer] = useState(choices?.[0] ?? 'Quiero ver el catálogo');
   const [result, setResult] = useState(null);
   const run = () => { const next = simulateFlow(flow, { name, incoming, answer }); setResult(next); onPath(next.steps); };
   return <VStack padding={4} gap={5}>
     <VStack padding={3} gap={2} style={styles.note}><Pill>Prueba local con datos ficticios</Pill><Text size="sm" color="secondary">No usa tu WhatsApp ni envía mensajes. Las esperas se adelantan y las acciones se muestran en este recorrido.</Text></VStack>
     <TextInput label="Nombre del contacto de prueba" value={name} onChange={v => setName(v.slice(0, 80))} />
     <TextInput label="Mensaje que inicia el flujo" value={incoming} onChange={v => setIncoming(v.slice(0, 500))} />
-    <TextInput label="Respuesta del contacto" value={answer} onChange={v => setAnswer(v.slice(0, 500))} description="Prueba «Quiero el catálogo» o «Prefiero un asesor»." />
+    {choices ? <VStack gap={2}><Text weight="semibold">Opción del contacto</Text><HStack gap={2} wrap="wrap">{choices.map((choice,index) => <Button key={index} label={choice || 'Botón ' + (index + 1)} variant={answer === choice ? 'primary' : 'secondary'} onClick={() => setAnswer(choice)} />)}</HStack></VStack> : <TextInput label="Respuesta del contacto" value={answer} onChange={v => setAnswer(v.slice(0,500))} />}
     <Button label={result ? 'Volver a simular' : 'Iniciar simulación'} variant="primary" icon={<Icon icon={result ? RotateCcw : Play} size="sm" />} onClick={run} />
     {result?.errors.length > 0 && <VStack gap={2} role="alert"><Heading level={4}>Revisa el flujo</Heading>{result.errors.map(error => <Text as="p" size="sm" key={error}>{error}</Text>)}</VStack>}
     {result && !result.errors.length && <VStack gap={4} aria-live="polite"><HStack vAlign="center" hAlign="between"><Heading level={4}>Recorrido completado</Heading><Pill icon={Check}>{result.steps.length} pasos</Pill></HStack><VStack gap={5} style={styles.timeline}>{result.steps.map((step, index) => <VStack gap={2} key={step.id}><HStack gap={2} vAlign="center"><Icon icon={ICONS[step.kind]} size="sm" color="accent" /><Text weight="semibold" size="sm">{step.label}</Text><Text size="sm" color="secondary">+{step.minutes} min</Text></HStack><Text as="p" size="sm" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }} color={step.kind === 'message' ? 'primary' : 'secondary'}>{step.detail}</Text></VStack>)}</VStack>{result.tags.length > 0 && <Text size="sm">Etiquetas: {result.tags.join(', ')}</Text>}{result.assigned && <Text size="sm">Responsable: {result.assigned}</Text>}</VStack>}
@@ -165,7 +174,7 @@ function Editor() {
     let cancelled=false;
     connectFlowsServer().then(info=>{
       if(cancelled)return;setServerInfo(info);setSavedFlows(info.flows);
-      if(editEpoch.current===0) { if(info.flows.length)showDocument(info.flows.find(item=>item.active)||info.flows[0]);else {const next=welcomeFlow(info.identity.user.id);setNodes(next.nodes);setEdges(next.edges);setName(next.name);setSelectedId(next.nodes[1].id);} }
+      if(editEpoch.current===0) { if(info.flows.length)showDocument(info.flows.find(item=>item.active)||info.flows[0]);else {const next=buttonWelcomeFlow();setNodes(next.nodes);setEdges(next.edges);setName(next.name);setSelectedId(next.nodes[1].id);} }
       setStatus(`Conectado a ${info.identity.company.name}. Guarda el borrador antes de activar.`);
     }).catch(error=>{if(!cancelled)setStatus(error.message);}).finally(()=>{if(!cancelled)setServerLoading(false);});
     return ()=>{cancelled=true;};
@@ -185,7 +194,7 @@ function Editor() {
   }
   async function openSaved() {if(!serverInfo||serverBusy)return;setServerBusy(true);try{const result=await serverInfo.request('/flows');setSavedFlows(result.flows);setPanel('saved');}catch(error){serverFailure(error);}finally{setServerBusy(false);}}
   async function openHistory() {if(!serverInfo||!serverDoc||serverBusy)return;setServerBusy(true);try{const result=await serverInfo.request('/flows/'+serverDoc.id+'/runs');setRunHistory(result.runs);setPanel('history');}catch(error){serverFailure(error);}finally{setServerBusy(false);}}
-  function newServerFlow() {if(dirty||serverBusy)return setStatus('Guarda el borrador actual antes de crear otro.');const graph=welcomeFlow(serverInfo.identity.user.id);showDocument({graph});setServerDoc(null);setDirty(true);setPanel('');setStatus('Nueva bienvenida preparada. Guarda y revisa el texto antes de activarla.');}
+  function newServerFlow() {if(dirty||serverBusy)return setStatus('Guarda el borrador actual antes de crear otro.');const graph=buttonWelcomeFlow();showDocument({graph});setServerDoc(null);setDirty(true);setPanel('');setStatus('Nueva bienvenida preparada. Guarda y revisa el texto antes de activarla.');}
   useEffect(() => { const warn = event => { if (dirty) { event.preventDefault(); event.returnValue = ''; } }; window.addEventListener('beforeunload', warn); return () => window.removeEventListener('beforeunload', warn); }, [dirty]);
   useEffect(() => { if (!compact && ['palette', 'inspector'].includes(panel)) setPanel(''); }, [compact, panel]);
   const update = patch => { setNodes(current => current.map(node => node.id === selectedId ? { ...node, data: { ...node.data, ...patch } } : node)); mutate(); };
@@ -244,7 +253,7 @@ function Editor() {
     <Drawer isOpen={panel === 'inspector'} onOpenChange={open => !open && setPanel('')} label="Propiedades del bloque" width="22rem" padding={0}><Layout height="fill" header={<LayoutHeader padding={3}><DrawerHeader title="Configurar bloque" onOpenChange={() => setPanel('')} /></LayoutHeader>}><LayoutContent padding={0}>{inspector}</LayoutContent></Layout></Drawer>
     <Drawer isOpen={panel === 'simulation'} onOpenChange={open => !open && setPanel('')} label="Simular el flujo" width="30rem" padding={0}><Layout height="fill" header={<LayoutHeader padding={4} hasDivider><DrawerHeader title="Prueba tu conversación" subtitle="Una vista previa de cómo avanza el flujo" onOpenChange={() => setPanel('')} /></LayoutHeader>}><LayoutContent padding={0}>{snapshot && <Simulation key={snapshot.name + JSON.stringify(snapshot.nodes)} flow={snapshot} onPath={setPath} />}</LayoutContent></Layout></Drawer>
     <Drawer isOpen={panel === 'saved'} onOpenChange={open=>!open&&setPanel('')} label="Flujos guardados" width="26rem"><VStack gap={4}><DrawerHeader title="Flujos de tu empresa" onOpenChange={()=>setPanel('')} />{savedFlows.length ? savedFlows.map(doc=><Button key={doc.id} label={doc.graph.name+(doc.active?' · Activo':' · Pausado')} isDisabled={dirty || serverBusy} onClick={()=>{showDocument(doc);setPanel('');setStatus('Borrador recuperado del servidor.');}} />):<Text>Todavía no guardaste ningún flujo.</Text>}{dirty&&<Text>Guarda los cambios actuales antes de abrir otro flujo.</Text>}</VStack></Drawer>
-    <Drawer isOpen={panel === 'history'} onOpenChange={open=>!open&&setPanel('')} label="Historial de ejecuciones" width="28rem"><VStack gap={4}><DrawerHeader title="Últimas ejecuciones" subtitle="El mensaje aceptado se comprueba como entregado en Conversaciones." onOpenChange={()=>setPanel('')} />{runHistory.length ? runHistory.map(run=><VStack key={run.id} gap={2} padding={3} style={styles.note}><Text weight="semibold">{({pending:'En cola',running:'En ejecución',done:'Recorrido completado',failed:'Detenido por un error',cancelled:'Cancelado',interrupted:'Interrumpido; revisar antes de repetir'})[run.state]||run.state}</Text><Text size="sm" color="secondary">{new Date(run.created).toLocaleString('es-PE')}</Text>{run.reason&&<Text size="sm">{run.reason}</Text>}</VStack>):<Text>Aquí aparecerán las ejecuciones de mensajes nuevos que coincidan con la palabra clave.</Text>}</VStack></Drawer>
+    <Drawer isOpen={panel === 'history'} onOpenChange={open=>!open&&setPanel('')} label="Historial de ejecuciones" width="28rem"><VStack gap={4}><DrawerHeader title="Últimas ejecuciones" subtitle="El mensaje aceptado se comprueba como entregado en Conversaciones." onOpenChange={()=>setPanel('')} />{runHistory.length ? runHistory.map(run=><VStack key={run.id} gap={2} padding={3} style={styles.note}><Text weight="semibold">{({pending:'En cola',running:'En ejecución',waiting:'Esperando una opción',done:'Recorrido completado',failed:'Detenido por un error',cancelled:'Cancelado',interrupted:'Interrumpido; revisar antes de repetir'})[run.state]||run.state}</Text><Text size="sm" color="secondary">{new Date(run.created).toLocaleString('es-PE')}</Text>{run.reason&&<Text size="sm">{run.reason}</Text>}</VStack>):<Text>Aquí aparecerán las ejecuciones de mensajes nuevos que coincidan con la palabra clave.</Text>}</VStack></Drawer>
     <Drawer isOpen={isRestoreConfirm} onOpenChange={setRestoreConfirm} label="Restaurar ejemplo" width="24rem"><VStack gap={5}><DrawerHeader title="¿Volver al ejemplo inicial?" onOpenChange={setRestoreConfirm} /><Text>Reemplazará lo que ves en el lienzo. Tu borrador guardado se conserva hasta que vuelvas a guardar.</Text><Button label="Restaurar ejemplo inicial" onClick={restore} /><Button label="Seguir editando" variant="ghost" onClick={() => setRestoreConfirm(false)} /></VStack></Drawer>
   </VStack></Theme>;
 }

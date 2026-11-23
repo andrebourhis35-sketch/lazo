@@ -6,7 +6,7 @@ import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createServer} from '../src/server.js';
-import {createNode} from '../src/flow-model.js';
+import {buttonWelcomeFlow,createNode,simulateFlow} from '../src/flow-model.js';
 
 function welcome(owner){
   const nodes=['trigger','message','tag','assign','end'].map((kind,i)=>createNode(kind,'n'+i,{x:i*300,y:100}));
@@ -15,8 +15,9 @@ function welcome(owner){
 }
 async function fixture(database=':memory:'){
   let calls=0,mode='ok',hold=null;
+  const sent=[];
   const config={database,origin:'http://127.0.0.1:3031',masterKey:randomBytes(32).toString('base64'),secureCookies:false};
-  const server=createServer(config,{fetchImpl:async()=>{calls++;if(hold)await hold;if(mode==='unknown')throw new Error('private upstream error');return Response.json({messages:[{id:'wamid.out.'+calls}]});}});
+  const server=createServer(config,{fetchImpl:async(_,request)=>{sent.push(JSON.parse(request.body));calls++;if(hold)await hold;if(mode==='unknown')throw new Error('private upstream error');return Response.json({messages:[{id:'wamid.out.'+calls}]});}});
   const store=server.lazo.store,wa=server.lazo.wa,flows=server.lazo.flows;
   const company=randomUUID(),user=randomUUID(),other=randomUUID();
   store.run('INSERT INTO companies VALUES(?,?,?)',company,'Empresa A',Date.now());store.run('INSERT INTO companies VALUES(?,?,?)',other,'Empresa B',Date.now());
@@ -24,10 +25,10 @@ async function fixture(database=':memory:'){
   store.run('INSERT INTO memberships VALUES(?,?,?)',company,user,'owner');
   wa.saveRaw(company,{phoneId:'10001',wabaId:'20001',accessToken:'synthetic',appSecret:'synthetic-secret',testRecipient:'51900000001',graphVersion:'v25.0'},1);
   const session=store.session(user,company),graph=welcome(user);let seq=0;
-  function receive(body='Hola',age=0){const event={object:'whatsapp_business_account',entry:[{id:'20001',changes:[{field:'messages',value:{metadata:{phone_number_id:'10001'},contacts:[{wa_id:'51900000001',profile:{name:'Lucía'}}],messages:[{id:'wamid.in.'+(++seq),from:'51900000001',timestamp:String(Math.floor((Date.now()-age)/1000)),type:'text',text:{body}}]}}]}]};const raw=Buffer.from(JSON.stringify(event));const signature='sha256='+createHmac('sha256','synthetic-secret').update(raw).digest('hex');wa.receive(raw,signature);return {raw,signature};}
+  function receive(body='Hola',age=0,fields={}){const event={object:'whatsapp_business_account',entry:[{id:'20001',changes:[{field:'messages',value:{metadata:{phone_number_id:'10001'},contacts:[{wa_id:'51900000001',profile:{name:'Lucía'}}],messages:[{id:'wamid.in.'+(++seq),from:'51900000001',timestamp:String(Math.floor((Date.now()-age)/1000)),type:'text',text:{body},...fields}]}}]}]};const raw=Buffer.from(JSON.stringify(event));const signature='sha256='+createHmac('sha256','synthetic-secret').update(raw).digest('hex');wa.receive(raw,signature);return {raw,signature};}
   server.listen(0,'127.0.0.1');await once(server,'listening');
   async function api(path,method='GET',data,extra={}){const res=await fetch(`http://127.0.0.1:${server.address().port}/api/crm${path}`,{method,headers:{Origin:config.origin,'Content-Type':'application/json','X-Lazo-Client':'1',Cookie:'lazo_dev_session='+session.secret,'X-CSRF-Token':session.csrf,'X-Lazo-Company':company,'X-Lazo-User':user,...extra},body:data?JSON.stringify(data):undefined});return {status:res.status,body:await res.json()};}
-  return {config,store,wa,flows,company,user,other,graph,receive,api,get calls(){return calls;},setMode:v=>mode=v,hold:p=>hold=p,async close(){await flows.stop();await wa.media.stop();await server.lazo.mail.stop();await new Promise(r=>server.close(r));store.close();}};
+  return {config,store,wa,flows,company,user,other,graph,receive,api,sent,get calls(){return calls;},setMode:v=>mode=v,hold:p=>hold=p,async close(){await flows.stop();await wa.media.stop();await server.lazo.mail.stop();await new Promise(r=>server.close(r));store.close();}};
 }
 
 test('flows API: tenant, roles, CSRF, draft CAS, published snapshot and pause',async()=>{
@@ -84,4 +85,37 @@ test('draft, active version and pending input survive reopening the database',as
   const f=await fixture(join(dir,'test.sqlite'));
   try{const flow=f.flows.save(f.company,null,{graph:f.graph},f.user);f.flows.publish(f.company,flow.id,{revision:1},f.user);f.receive();await f.close();let sends=0;second=createServer(f.config,{fetchImpl:async()=>{sends++;return Response.json({messages:[{id:'wamid.reopened'}]});}});second.lazo.flows.recover();assert.equal(second.lazo.flows.list(f.company)[0].active,true);await second.lazo.flows.flush();assert.equal(sends,1);assert.equal(second.lazo.flows.runs(f.company,flow.id)[0].state,'done');}
   finally{if(second){await second.lazo.flows.stop();await second.lazo.wa.media.stop();await second.lazo.mail.stop();second.lazo.store.close();}rmSync(dir,{recursive:true,force:true});}
+});
+
+
+test('welcome buttons resume only the selected branch for the original menu', async () => {
+  for (const index of [0,1]) {
+    const f=await fixture();
+    try {
+      const graph=buttonWelcomeFlow();
+      const flow=f.flows.save(f.company,null,{graph},f.user);
+      f.flows.publish(f.company,flow.id,{revision:1},f.user);
+      f.receive();
+      await f.flows.flush();
+      assert.equal(f.flows.runs(f.company,flow.id)[0].state,'waiting');
+      const menu=f.sent[0].interactive;
+      assert.equal(menu.type,'button');
+      assert.match(menu.body.text,/Hola Lucía/);
+      const reply=menu.action.buttons[index].reply;
+      const fields={type:'interactive',interactive:{type:'button_reply',button_reply:reply}};
+      f.receive('',0,{...fields,context:{id:'different-menu'}});
+      await f.flows.flush();
+      assert.equal(f.calls,1);
+      const event=f.receive('',0,{...fields,context:{id:'wamid.out.1'}});
+      f.wa.receive(event.raw,event.signature);
+      f.receive('',0,{...fields,context:{id:'wamid.out.1'}});
+      await f.flows.flush();
+      assert.equal(f.calls,2);
+      assert.equal(f.sent[1].text.body,graph.nodes[2+index].data.value);
+      assert.equal(f.flows.runs(f.company,flow.id)[0].state,'done');
+      const simulation=simulateFlow(graph,{answer:reply.title});
+      assert.deepEqual(simulation.errors,[]);
+      assert.equal(simulation.steps[2].detail,f.sent[1].text.body);
+    } finally { await f.close(); }
+  }
 });

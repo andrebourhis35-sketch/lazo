@@ -1,5 +1,11 @@
 # Coordinación Codex y Claude
 
+### Bienvenida con botones (22 de noviembre de 2026)
+
+- Codex, rama codex/flujos-botones. Cambios en modelo, motor y transporte de flujos, pruebas de integración y editor visual. El borrador inicial de un flujo nuevo ofrece dos botones editables. Cada botón lleva a su propia rama y se valida contra el menú original y el contacto. Pausar o cambiar la versión cancela menús pendientes. Se conserva la activación en cuenta de prueba. Pruebas con webhook firmado y Meta simulado para ambas ramas, contexto incorrecto y respuestas repetidas.
+
+- Publicado buttons-ed3e332 en el CRM y el editor de OVH. 78 pruebas del CRM y 11 del editor aprobadas. Respaldo cifrado previo y salud verificada. HTML y recursos del editor verificados por HTTPS y SHA-256. PR #59. El ejemplo queda disponible en Nuevo flujo. Falta la prueba con un toque desde WhatsApp real.
+
 ### Conversaciones compactas y respuesta visible (20 de noviembre de 2026)
 
 - Usuario confirma envío y recepción desde el nuevo número y solicita reducir el tamaño de la interfaz: el historial queda pequeño y no se distingue dónde responder. Reserva: app-crm/public/app.js, presentación visual y versiones de recursos, documentación y este tablero; rama codex/chat-compacto, responsable Codex. Medición real en Chrome a 1482×734: encabezado 194 px, compositor 306,5 px e historial solo 96 px, bandeja fuera del alto visible. Compactar exclusivamente Conversaciones, conservar Órbita/animaciones y funciones de envío, y verificar escritorio/móvil antes de publicar. No modificar credenciales ni envíos reales durante QA.

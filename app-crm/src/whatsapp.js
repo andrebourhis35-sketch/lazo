@@ -77,7 +77,7 @@ export function whatsapp(store, config, fetchImpl = fetch, onIncoming = () => {}
     return (result.data||[]).filter(t=>t.status==='APPROVED'&&(t.components||[]).every(part=>part.type==='BODY'||part.type==='FOOTER'||(part.type==='HEADER'&&part.format==='TEXT'&&!/{{/.test(part.text||''))))
       .map(t=>({name:t.name,language:t.language,body:t.components?.find(p=>p.type==='BODY')?.text||'',parameters:[...new Set((t.components?.find(p=>p.type==='BODY')?.text||'').match(/{{\d+}}/g)||[])].length}));
   }
-  async function send(company,contactId,data,actor) {
+  async function send(company,contactId,data,actor,{flow=false}={}) {
     const c=credentials(company);requireThat(c,'Conecta WhatsApp en Ajustes.',409);
     const contact=store.contact(company,contactId);
     requireThat(!c.testRecipient||contact.phone===c.testRecipient,'Solo se puede enviar al destinatario de prueba autorizado.',403);
@@ -88,6 +88,11 @@ export function whatsapp(store, config, fetchImpl = fetch, onIncoming = () => {}
     if(type==='text') {
       requireThat(contact.last_inbound>now()-24*60*60*1000,'Para iniciar o reabrir una conversación, utiliza una plantilla aprobada.');
       body=text(data.text,4000,true);payload={type:'text',text:{preview_url:false,body}};
+    } else if(type==='interactive') {
+      requireThat(flow,'Tipo de mensaje no válido.');
+      requireThat(contact.last_inbound>now()-24*60*60*1000,'Espera un mensaje del contacto para enviar botones.');
+      body=text(data.text,1024,true);
+      payload={type,interactive:{type:'button',body:{text:body},action:{buttons:data.buttons.map(reply=>({type:'reply',reply}))}}};
     } else if(type==='image'||type==='document') {
       requireThat(contact.last_inbound>now()-24*60*60*1000,'Para enviar un archivo, espera un mensaje del contacto o usa una plantilla aprobada.');
       requireThat(data.file&&((type==='image'&&data.file.mime?.startsWith('image/'))||(type==='document'&&data.file.mime==='application/pdf')),'Archivo no válido.');
@@ -163,11 +168,12 @@ export function whatsapp(store, config, fetchImpl = fetch, onIncoming = () => {}
             contact=store.addContact(c.company_id,{name:String(name).slice(0,80),phone:msg.from},user.user_id);
           }
           const part=msg[msg.type],attachment=media.incoming(c.company_id,msg.type,part,created);
-          const body=msg.type==='text'?String(msg.text?.body||'').slice(0,4000):attachment?String(part.caption||part.filename||(msg.type==='image'?'Imagen':'Documento PDF')).slice(0,1024):`[Mensaje recibido: ${String(msg.type||'desconocido').slice(0,30)}]`;
+          const reply=msg.type==='interactive'&&msg.interactive?.type==='button_reply'?msg.interactive.button_reply:null;
+          const body=reply?String(reply.title||'Botón').slice(0,20):msg.type==='text'?String(msg.text?.body||'').slice(0,4000):attachment?String(part.caption||part.filename||(msg.type==='image'?'Imagen':'Documento PDF')).slice(0,1024):`[Mensaje recibido: ${String(msg.type||'desconocido').slice(0,30)}]`;
           const messageId=randomUUID();
           store.run("INSERT INTO messages(id,company_id,contact_id,direction,body,type,status,wa_id,created,updated,attachment_id) VALUES(?,?,?,'in',?,?,'received',?,?,?,?)",messageId,c.company_id,contact.id,body,msg.type||'other',msg.id,created,now(),attachment);
           store.run('UPDATE contacts SET unread=unread+1,resolved=0,last_inbound=MAX(last_inbound,?),updated=MAX(updated,?) WHERE id=? AND company_id=?',created,created,contact.id,c.company_id);
-          onIncoming({id:messageId,company_id:c.company_id,contact_id:contact.id,body,type:msg.type||'other',created});
+          onIncoming({id:messageId,company_id:c.company_id,contact_id:contact.id,body,type:msg.type||'other',created,buttonId:reply?.id,contextId:msg.context?.id});
         }
         for(const status of value.statuses||[]) {
           if(!['sent','delivered','read','failed'].includes(status.status)||typeof status.id!=='string')continue;
