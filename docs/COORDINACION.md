@@ -1,5 +1,10 @@
 # Coordinación Codex y Claude
 
+### Biblioteca de flujos y tema compartido (23 de noviembre de 2026)
+
+- Reserva: tema del CRM, editor y API de espacios de Flujos; rama codex/biblioteca-flujos. Tema claro u oscuro compartido en el navegador. Biblioteca con búsqueda, estado y selector del número o espacio. Cada flujo se guarda en su espacio; se mantiene la activación para cuentas de prueba verificadas.
+- QA con empresas ficticias: CRM claro abre biblioteca clara; desde Flujos se cambia a oscuro y el CRM retoma el tema. Cambio Perú → Panamá carga solo el flujo de Panamá, muestra el número simulado, abre su editor y guarda el nuevo borrador en ese espacio. Biblioteca móvil sin desbordamiento en 390 × 844.
+
 ### Alineación del acceso a Flujos (23 de noviembre de 2026)
 
 - Reserva: estilos base de navegación del CRM, rama codex/alinear-flujos. El enlace Flujos comparte la disposición, peso, centrado y foco con los botones adyacentes.

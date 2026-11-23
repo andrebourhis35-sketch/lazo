@@ -28,6 +28,7 @@ const assets={
   '/app/work-ui.js':['work-ui.js','text/javascript; charset=utf-8'],
   '/app/visual-preview.js':['visual-preview.js','text/javascript; charset=utf-8'],
   '/app/visual-preview.css':['visual-preview.css','text/css; charset=utf-8'],
+  '/app/workspace-theme.js':['workspace-theme.js','text/javascript; charset=utf-8'],
   '/app/marca-volumen.svg':['marca-volumen.svg','image/svg+xml'],
   '/app/styles.css':['styles.css','text/css; charset=utf-8'],
   '/app/crm.css':['crm.css','text/css; charset=utf-8'],
@@ -169,6 +170,21 @@ export function createServer(config,{store=openStore(config.database),fetchImpl=
         admin(s);
         if(method==='GET')return response(res,200,{flows:flows.list(s.company_id)});
         if(method==='POST')return response(res,201,await authorizedJson(req,s,data=>flows.save(s.company_id,null,data,s.user_id),2*1024*1024));
+      }
+      if(method==='GET'&&route==='/flow-workspaces'){
+        admin(s);
+        const workspaces=store.all(`SELECT c.id,c.name,w.phone_id AS phoneId,
+          (SELECT COUNT(*) FROM flows f WHERE f.company_id=c.id) AS flowCount
+          FROM memberships m JOIN companies c ON c.id=m.company_id LEFT JOIN connections w ON w.company_id=c.id
+          WHERE m.user_id=? AND m.role IN ('owner','admin') ORDER BY c.name,c.id`,s.user_id);
+        return response(res,200,{workspaces});
+      }
+      if(method==='GET'&&route==='/flow-number'){
+        admin(s);
+        store.limit('flow-number:'+s.user_id,30,60000);
+        const connection=await wa.flowNumber(s.company_id);
+        assertSession(s);
+        return response(res,200,connection);
       }
       const flowMatch=route.match(/^\/flows\/([a-f\d-]+)(?:\/(activate|pause|runs))?$/);
       if(flowMatch) {

@@ -1,8 +1,10 @@
-// Única presentación de LAZO. No cambia los datos ni las acciones del CRM.
+import {readWorkspaceTheme,saveWorkspaceTheme,themeKey} from './workspace-theme.js?v=20261123';
+
+// Apariencia de LAZO. No cambia los datos ni las acciones del CRM.
 {
   const style = document.createElement('link');
   style.rel = 'stylesheet';
-  style.href = '/app/visual-preview.css?v=20261123-menu-flujos';
+  style.href = '/app/visual-preview.css?v=20261123-tema-flujos';
   document.head.append(style);
   document.body.classList.add('visual-preview', 'motion-on');
   document.body.classList.remove('quiet-preview');
@@ -11,7 +13,22 @@
   banner.setAttribute('aria-label', 'Apariencia de LAZO');
   const label = document.createElement('span');
   label.textContent = 'LAZO · Órbita';
-  banner.append(label);
+  const toggle=document.createElement('button');
+  toggle.type='button';
+  toggle.className='workspace-theme-toggle';
+  function applyTheme(mode){
+    document.body.dataset.lazoTheme=mode;
+    toggle.textContent=mode==='dark'?'Modo claro':'Modo oscuro';
+  }
+  toggle.onclick=()=>{
+    const mode=document.body.dataset.lazoTheme==='dark'?'light':'dark';
+    saveWorkspaceTheme(mode);
+    applyTheme(mode);
+  };
+  applyTheme(readWorkspaceTheme());
+  window.addEventListener('storage',event=>{if(event.key===themeKey)applyTheme(readWorkspaceTheme());});
+  window.addEventListener('pageshow',()=>applyTheme(readWorkspaceTheme()));
+  banner.append(label,toggle);
   document.body.prepend(banner);
 
   const paths = {
