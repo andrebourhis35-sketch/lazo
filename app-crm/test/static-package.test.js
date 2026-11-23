@@ -27,6 +27,7 @@ test('an app-only release serves every visual dependency without the demo checko
     const assets={
       '/app/':'text/html','/app/styles.css?v=20261118':'text/css','/app/crm.css?v=20261118':'text/css',
       '/app/chat-compact.css':'text/css','/app/marca.svg':'image/svg+xml','/app/app.css':'text/css','/app/app.js':'text/javascript',
+      '/app/workspace-theme.js':'text/javascript',
       '/app/sales.css':'text/css','/app/sales-ui.js':'text/javascript','/app/sales-map.js':'text/javascript','/app/sales-globe.js':'text/javascript',
       '/app/work-ui.js':'text/javascript','/app/connections-ui.js':'text/javascript','/app/meta-signup.js':'text/javascript','/app/visual-preview.css':'text/css',
       '/app/visual-preview.js':'text/javascript','/app/marca-volumen.svg':'image/svg+xml'

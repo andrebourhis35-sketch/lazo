@@ -10,11 +10,13 @@ import { Section } from '@astryxdesign/core/Section';
 import { Heading, Text } from '@astryxdesign/core/Text';
 import { TextInput } from '@astryxdesign/core/TextInput';
 import { TextArea } from '@astryxdesign/core/TextArea';
+import { Selector } from '@astryxdesign/core/Selector';
 import { Drawer, DrawerHeader } from '@astryxdesign/core/Drawer';
 import { ReactFlow, ReactFlowProvider, Background, BackgroundVariant, Controls, MiniMap, Panel, BaseEdge, EdgeLabelRenderer, getSmoothStepPath, Handle, Position, MarkerType, useNodesState, useEdgesState, useReactFlow, useUpdateNodeInternals } from '@xyflow/react';
 import { ArrowLeft, CircleDollarSign, PackageCheck, ShoppingBag, Check, CheckCheck, CircleCheck, Clock3, Copy, GitBranch, Lightbulb, Maximize2, MessageCircle, Moon, MousePointer2, Pause, Play, Plus, RotateCcw, Save, Search, Settings2, ShieldCheck, Sun, Tag, Trash2, UserRound, Zap } from 'lucide-react';
 import { lazoTheme } from './theme.js';
 import { connectFlowsServer } from './server-client.mjs';
+import {readWorkspaceTheme,saveWorkspaceTheme,themeKey} from '../../app-crm/public/workspace-theme.js';
 import { BLOCKS, DRAFT_KEY, chainedWelcomeFlow, connectNodes, connectionProblem, createNode, digitalSaleFlow, exampleFlow, outputsFor, parseDraft, simulateFlow, summarizeNode, traversedEdgeIds, validateFlow } from './flow-model.mjs';
 
 const ICONS = { trigger: Zap, message: MessageCircle, plan: ShoppingBag, charge: CircleDollarSign, confirm: ShieldCheck, deliver: PackageCheck, ai: Lightbulb, buttons: GitBranch, condition: GitBranch, wait: Clock3, reminder: Clock3, handoff: UserRound, back: ArrowLeft, tag: Tag, assign: UserRound, end: CircleCheck };
@@ -241,6 +243,44 @@ function RunHistory({runs,onFocus}) {
   </VStack>);
 }
 
+function FlowLibrary({info,flows,loading,busy,onWorkspace,onOpen,onNew,onDemo,status,number,mode,changeMode}) {
+  const [query,setQuery]=useState('');
+  const selected=info?.workspaces.find(space=>space.id===info.identity.company.id);
+  const visible=flows.filter(doc=>doc.graph.name.toLocaleLowerCase('es').includes(query.trim().toLocaleLowerCase('es')));
+  return <Layout height="fill" header={<LayoutHeader hasDivider padding={3}>
+    <HStack gap={3} hAlign="between" vAlign="center" wrap="wrap">
+      <HStack gap={2} vAlign="center"><img src="./marca.svg" alt="LAZO" style={styles.brand}/><Heading level={2}>Flujos</Heading></HStack>
+      <HStack gap={2} vAlign="center"><IconButton label={mode==='dark'?'Cambiar a modo claro':'Cambiar a modo oscuro'} variant="ghost" icon={<Icon icon={mode==='dark'?Sun:Moon} size="sm"/>} onClick={changeMode}/>
+        <Button label="Volver al CRM" variant="ghost" href="/app/" /></HStack>
+    </HStack>
+  </LayoutHeader>}>
+    <LayoutContent padding={4}><VStack gap={4} width="100%" style={{maxWidth:'68rem',marginInline:'auto'}}>
+      {info&&<>
+        <HStack gap={3} wrap="wrap" hAlign="between" vAlign="end">
+          <Selector label="Número de WhatsApp o espacio" value={selected?.id} width="min(100%, 23rem)"
+            isDisabled={busy} hasSearch={info.workspaces.length>8} presentation="adaptive"
+            options={info.workspaces.map(space=>({value:space.id,label:space.name+' · '+(space.id===selected?.id&&number?.number?number.number:space.phoneId?'ID Meta …'+space.phoneId.slice(-6):'Sin número conectado')}))}
+            onChange={onWorkspace} />
+          <Button label="Nuevo flujo" icon={<Icon icon={Plus} size="sm" />} variant="primary" isDisabled={busy} onClick={onNew}/>
+        </HStack>
+        {selected?.phoneId&&!number?.canActivate&&number&&<Text color="secondary" size="sm">Puedes preparar borradores en este espacio. La activación está disponible para cuentas de prueba verificadas.</Text>}
+        {!selected?.phoneId&&<Text color="secondary" size="sm">Vincula el número desde Conexiones del CRM para usar WhatsApp en este espacio.</Text>}
+        <TextInput label="Buscar un flujo" type="search" value={query} onChange={setQuery} hasClear />
+        <VStack gap={2} aria-label="Flujos guardados">
+          {visible.map(doc=><HStack key={doc.id} gap={3} padding={3} hAlign="between" vAlign="center" wrap="wrap" style={styles.note}>
+            <VStack gap={1}><Text weight="semibold">{doc.graph.name}</Text>
+              <Text size="sm" color="secondary">{doc.active?'Activo':doc.publishedRevision?'Pausado':'Borrador'} · {doc.graph.nodes.length} bloques</Text></VStack>
+            <Button label={'Editar '+doc.graph.name} size="sm" isDisabled={busy} onClick={()=>onOpen(doc)}/>
+          </HStack>)}
+          {!visible.length&&<Text color="secondary">{flows.length?'No encontramos un flujo con ese nombre.':'Este espacio todavía no tiene flujos guardados.'}</Text>}
+        </VStack>
+      </>}
+      {!info&&!loading&&<Button label="Abrir simulador" onClick={onDemo} />}
+      <Text size="sm" color="secondary" role="status">{loading?'Cargando tus flujos…':status}</Text>
+    </VStack></LayoutContent>
+  </Layout>;
+}
+
 function Editor() {
   const initial = useRef(null); if (!initial.current) initial.current = loadInitial();
   const [nodes, setNodes, applyNodes] = useNodesState(initial.current.flow.nodes);
@@ -249,7 +289,9 @@ function Editor() {
   const [selectedId, setSelectedId] = useState('bienvenida');
   const [dirty, setDirty] = useState(false);
   const [status, setStatus] = useState(initial.current.issue || (initial.current.restored ? 'Borrador recuperado de este navegador.' : 'Ejemplo listo para explorar.'));
-  const [mode, setMode] = useState(() => { try { return localStorage.getItem('lazo.lab.theme') === 'light' ? 'light' : 'dark'; } catch { return 'dark'; } });
+  const [mode, setMode] = useState(readWorkspaceTheme);
+  const [library,setLibrary]=useState(true);
+  const [number,setNumber]=useState(null);
   const [panel, setPanel] = useState('');
   const [snapshot, setSnapshot] = useState(null);
   const [path, setPath] = useState([]);
@@ -278,11 +320,34 @@ function Editor() {
     let cancelled=false;
     connectFlowsServer().then(info=>{
       if(cancelled)return;setServerInfo(info);setSavedFlows(info.flows);
-      if(editEpoch.current===0) { if(info.flows.length)showDocument(info.flows.find(item=>item.active)||info.flows[0]);else {const next=chainedWelcomeFlow();setNodes(next.nodes);setEdges(next.edges);setName(next.name);setSelectedId(next.nodes[1].id);} }
-      setStatus(`Conectado a ${info.identity.company.name}. Guarda el borrador antes de activar.`);
+      setStatus('');
     }).catch(error=>{if(!cancelled)setStatus(error.message);}).finally(()=>{if(!cancelled)setServerLoading(false);});
     return ()=>{cancelled=true;};
   }, []);
+  useEffect(()=>{
+    let cancelled=false;
+    if(serverInfo?.workspaces.some(space=>space.id===serverInfo.identity.company.id&&space.phoneId)){
+      serverInfo.request('/flow-number').then(result=>{if(!cancelled)setNumber(result);}).catch(()=>{});
+    }
+    return ()=>{cancelled=true;};
+  },[serverInfo]);
+  useEffect(()=>{
+    const sync=event=>{if(event.type==='pageshow'||event.key===themeKey)setMode(readWorkspaceTheme());};
+    window.addEventListener('storage',sync);
+    window.addEventListener('pageshow',sync);
+    return ()=>{window.removeEventListener('storage',sync);window.removeEventListener('pageshow',sync);};
+  },[]);
+  async function switchWorkspace(companyId) {
+    if(!serverInfo||serverBusy||dirty||!companyId||companyId===serverInfo.identity.company.id)return;
+    setServerBusy(true);
+    try{
+      await serverInfo.request('/companies/switch','POST',{companyId});
+      setServerInfo(null);setSavedFlows([]);setServerDoc(null);setNumber(null);
+      const info=await connectFlowsServer();
+      setServerInfo(info);setSavedFlows(info.flows);setStatus('');
+    }catch(error){serverFailure(error);}
+    finally{setServerBusy(false);}
+  }
   function serverFailure(error) {setStatus(error.message);if(error.contextChanged){setServerInfo(null);setServerDoc(null);setSavedFlows([]);setRunHistory([]);const next=exampleFlow();setNodes(next.nodes);setEdges(next.edges);setName(next.name);setDirty(false);setStatus('La sesión o empresa cambió. Recarga esta página para confirmar tu acceso.');}}
   async function saveServer() {
     if(serverBusy)return;
@@ -296,9 +361,17 @@ function Editor() {
     setServerBusy(true);
     try{const result=await serverInfo.request('/flows/'+serverDoc.id+'/'+action,'POST',{revision:serverDoc.revision});setServerDoc(result);setSavedFlows(current=>[result,...current.filter(item=>item.id!==result.id)]);setStatus(action==='pause'?'Flujo pausado. No iniciará nuevas ejecuciones.':'Flujo activo para los nuevos mensajes de la cuenta de prueba.');}catch(error){serverFailure(error);}finally{setServerBusy(false);}
   }
-  async function openSaved() {if(!serverInfo||serverBusy)return;setServerBusy(true);try{const result=await serverInfo.request('/flows');setSavedFlows(result.flows);setPanel('saved');}catch(error){serverFailure(error);}finally{setServerBusy(false);}}
+  async function openSaved() {
+    if(dirty){setStatus('Guarda los cambios actuales antes de volver a tus flujos.');return;}
+    setLibrary(true);setPanel('');
+    if(!serverInfo||serverBusy)return;
+    setServerBusy(true);
+    try{const result=await serverInfo.request('/flows');setSavedFlows(result.flows);setStatus('');}
+    catch(error){serverFailure(error);}
+    finally{setServerBusy(false);}
+  }
   async function openHistory() {if(!serverInfo||!serverDoc||serverBusy)return;setServerBusy(true);try{const result=await serverInfo.request('/flows/'+serverDoc.id+'/runs');setRunHistory(result.runs);setPanel('history');}catch(error){serverFailure(error);}finally{setServerBusy(false);}}
-  function newServerFlow(graph=chainedWelcomeFlow()) {if(dirty||serverBusy)return setStatus('Guarda el borrador actual antes de crear otro.');showDocument({graph});setServerDoc(null);setDirty(true);setPanel('');setStatus('Plantilla preparada. Completa los datos y guarda el borrador.');}
+  function newServerFlow(graph=chainedWelcomeFlow()) {if(dirty||serverBusy)return setStatus('Guarda el borrador actual antes de crear otro.');showDocument({graph});setServerDoc(null);setDirty(true);setPanel('');setLibrary(false);setStatus('Plantilla preparada. Completa los datos y guarda el borrador.');}
   useEffect(() => { const warn = event => { if (dirty) { event.preventDefault(); event.returnValue = ''; } }; window.addEventListener('beforeunload', warn); return () => window.removeEventListener('beforeunload', warn); }, [dirty]);
   const update = patch => { setNodes(current => current.map(node => node.id === selectedId ? { ...node, data: { ...node.data, ...patch } } : node)); mutate(); };
   const [insertion,setInsertion]=useState(null);
@@ -328,7 +401,7 @@ function Editor() {
   const restore = () => { const next = exampleFlow(); setNodes(next.nodes); setEdges(next.edges); setName(next.name); setSelectedId('bienvenida'); setRestoreConfirm(false); mutate(); setStatus('Ejemplo restaurado. Guarda para reemplazar el borrador anterior.'); requestAnimationFrame(() => api.fitView({ padding: '12%', duration: motion ? 250 : 0 })); };
   const onConnect = connection => { try { const next = connectNodes(connection, nodes, edges); setEdges(next); mutate(); setStatus('Conexión creada. Cada salida tiene un único destino.'); } catch (error) { setStatus(error.message); } };
   const showSimulation = () => { try { setSnapshot(parseDraft(JSON.stringify(flow))); setPath([]); setStoppedAt(null); setPanel('simulation'); } catch { setStatus('No se puede simular este borrador. Reduce su tamaño o mueve los bloques más cerca del inicio.'); } };
-  const changeMode = () => { const next = mode === 'dark' ? 'light' : 'dark'; setMode(next); try { localStorage.setItem('lazo.lab.theme', next); } catch { /* La apariencia de esta sesión sigue funcionando. */ } };
+  const changeMode = () => { const next = mode === 'dark' ? 'light' : 'dark'; saveWorkspaceTheme(next);setMode(next); };
   const renderedNodes = useMemo(() => nodes.map(node => ({ ...node, selected: node.id === selectedId, data: { ...node.data, assigneeLabel:serverInfo?.members.find(member=>member.id===node.data.value)?.name, running: path.some(step => step.id === node.id),stopped:node.id===stoppedAt } })), [nodes, selectedId, path,stoppedAt,serverInfo]);
   const renderedEdges = useMemo(() => { const visited = new Set(traversedEdgeIds(path, edges)); return edges.map(edge => ({ ...edge, type:'insertable', data:{insert:openInsert}, animated: motion&&visited.has(edge.id), markerEnd: { type: MarkerType.ArrowClosed }, style: { stroke: visited.has(edge.id) ? 'var(--lazo-mint)' : 'var(--color-border-emphasized)',strokeWidth:visited.has(edge.id)?3:2 } })); }, [edges, motion, path,openInsert]);
   const palette = <Palette onAdd={add} count={nodes.length} />;
@@ -352,6 +425,19 @@ function Editor() {
     api.fitView({nodes:[{id:run.step}],maxZoom:1,padding:.35,duration:motion?280:0});
   }
 
+  const templates=<Drawer isOpen={panel==='templates'} onOpenChange={open=>!open&&setPanel('')} label="Elegir plantilla" width="24rem">
+    <VStack gap={3}><DrawerHeader title="Nuevo flujo" subtitle={serverInfo?.identity.company.name} onOpenChange={()=>setPanel('')} />
+      <Button label="Bienvenida con botones" onClick={()=>newServerFlow()} />
+      <Button label="Venta con pago anticipado" onClick={()=>newServerFlow(digitalSaleFlow())} />
+      <Button label="Venta contra entrega digital" onClick={()=>newServerFlow(digitalSaleFlow('postpaid'))} />
+    </VStack>
+  </Drawer>;
+  if(library)return <Theme theme={lazoTheme} mode={mode}><VStack style={styles.app} gap={0}>
+    <FlowLibrary info={serverInfo} flows={savedFlows} loading={serverLoading} busy={serverBusy}
+      onWorkspace={switchWorkspace} onNew={()=>setPanel('templates')} onDemo={()=>setLibrary(false)}
+      onOpen={doc=>{showDocument(doc);setLibrary(false);setStatus('');}} status={status} number={number} mode={mode} changeMode={changeMode}/>
+    {templates}
+  </VStack></Theme>;
   return <Theme theme={lazoTheme} mode={mode}><VStack style={styles.app} gap={0}>
       <Layout height="fill" padding={0} header={<LayoutHeader hasDivider padding={0}>
         <VStack paddingInline={3} paddingBlock={2} gap={2}>
@@ -367,16 +453,15 @@ function Editor() {
               <Button label="Guardar" size="sm" isDisabled={serverBusy||serverLoading} icon={<Icon icon={Save} size="sm" />} onClick={saveServer} />
               <Button label="Probar" size="sm" icon={<Icon icon={Play} size="sm" />} onClick={showSimulation} />
               <IconButton label={mode==='dark'?'Cambiar a modo claro':'Cambiar a modo oscuro'} variant="ghost" icon={<Icon icon={mode==='dark'?Sun:Moon} size="sm" />} onClick={changeMode} />
-              {!mobile&&<Button label="CRM" variant="ghost" size="sm" href="https://lazo.espacio-sereno.com/app/" target="_blank" rel="noopener noreferrer" />}
+              <Button label="Mis flujos" variant="ghost" size="sm" onClick={openSaved} isDisabled={serverBusy} />
             </HStack>
           </HStack>
           {serverInfo&&<HStack gap={2} wrap="wrap" vAlign="center">
-            <Button label="Mis flujos" size="sm" onClick={openSaved} isDisabled={serverBusy} />
             <Button label="Nuevo flujo" size="sm" onClick={()=>setPanel('templates')} isDisabled={serverBusy||dirty} />
-            <Button label="Activar versión guardada" size="sm" onClick={()=>activation('activate')} isDisabled={serverBusy||!serverDoc||dirty||(serverDoc.active&&serverDoc.publishedRevision===serverDoc.revision)} />
+            <Button label="Activar versión guardada" size="sm" onClick={()=>activation('activate')} isDisabled={serverBusy||!serverDoc||dirty||!number?.canActivate||(serverDoc.active&&serverDoc.publishedRevision===serverDoc.revision)} />
             {serverDoc?.active&&<Button label="Pausar flujo" size="sm" onClick={()=>activation('pause')} isDisabled={serverBusy} />}
             <Button label="Historial de ejecuciones" size="sm" onClick={openHistory} isDisabled={serverBusy||!serverDoc} />
-            <Text size="sm" color="secondary">Cuenta de prueba</Text>
+            <Text size="sm" color="secondary">{serverInfo.identity.company.name}{number?.number?' · '+number.number:''}{number?.canActivate?' · Cuenta de prueba':''}</Text>
           </HStack>}
         </VStack>
       </LayoutHeader>} footer={<LayoutFooter hasDivider padding={2}>
@@ -398,12 +483,7 @@ function Editor() {
             </ReactFlow>
           </VStack></LayoutContent>
       </Layout>
-    <Drawer isOpen={panel==='templates'} onOpenChange={open=>!open&&setPanel('')} label="Elegir plantilla" width="24rem">
-      <VStack gap={3}><DrawerHeader title="Nuevo flujo" onOpenChange={()=>setPanel('')} />
-      <Button label="Bienvenida con botones" onClick={()=>newServerFlow()} />
-      <Button label="Venta con pago anticipado" onClick={()=>newServerFlow(digitalSaleFlow())} />
-      <Button label="Venta contra entrega digital" onClick={()=>newServerFlow(digitalSaleFlow('postpaid'))} /></VStack>
-    </Drawer>
+    {templates}
     <Drawer isOpen={panel==='insert'} onOpenChange={open=>!open&&setPanel('')} label="Insertar bloque" side="start" width="20rem">
       <Layout height="fill" header={<LayoutHeader padding={3}><DrawerHeader title="Insertar en la conexión" onOpenChange={()=>setPanel('')} /></LayoutHeader>}>
         <LayoutContent padding={3}><Palette onAdd={add} count={nodes.length} inserting /></LayoutContent>
@@ -412,7 +492,6 @@ function Editor() {
     <Drawer isOpen={panel === 'palette'} onOpenChange={open => !open && setPanel('')} label="Biblioteca de bloques" side="start" width="20rem" padding={0}><Layout height="fill" header={<LayoutHeader padding={3}><DrawerHeader title="Bloques del flujo" onOpenChange={() => setPanel('')} /></LayoutHeader>}><LayoutContent padding={3}>{palette}</LayoutContent></Layout></Drawer>
     <Drawer isOpen={panel === 'inspector'} onOpenChange={open => !open && setPanel('')} label="Propiedades del bloque" width="22rem" padding={0}><Layout height="fill" header={<LayoutHeader padding={3}><DrawerHeader title="Configurar bloque" onOpenChange={() => setPanel('')} /></LayoutHeader>}><LayoutContent padding={0}>{inspector}</LayoutContent></Layout></Drawer>
     <Drawer isOpen={panel === 'simulation'} onOpenChange={open => !open && setPanel('')} label="Simular el flujo" width="30rem" padding={0}><Layout height="fill" header={<LayoutHeader padding={4} hasDivider><DrawerHeader title="Prueba tu conversación" subtitle="Una vista previa de cómo avanza el flujo" onOpenChange={() => setPanel('')} /></LayoutHeader>}><LayoutContent padding={0}>{snapshot && <Simulation key={snapshot.name + JSON.stringify(snapshot.nodes)} flow={snapshot} onPath={markSimulation} />}</LayoutContent></Layout></Drawer>
-    <Drawer isOpen={panel === 'saved'} onOpenChange={open=>!open&&setPanel('')} label="Flujos guardados" width="26rem"><VStack gap={4}><DrawerHeader title="Flujos de tu empresa" onOpenChange={()=>setPanel('')} />{savedFlows.length ? savedFlows.map(doc=><Button key={doc.id} label={doc.graph.name+(doc.active?' · Activo':' · Pausado')} isDisabled={dirty || serverBusy} onClick={()=>{showDocument(doc);setPanel('');setStatus('Borrador recuperado del servidor.');}} />):<Text>Todavía no guardaste ningún flujo.</Text>}{dirty&&<Text>Guarda los cambios actuales antes de abrir otro flujo.</Text>}</VStack></Drawer>
     <Drawer isOpen={panel === 'history'} onOpenChange={open=>!open&&setPanel('')} label="Historial de ejecuciones" width="28rem"><VStack gap={4}><DrawerHeader title="Últimas ejecuciones" subtitle="El mensaje aceptado se comprueba como entregado en Conversaciones." onOpenChange={()=>setPanel('')} /><RunHistory runs={runHistory} onFocus={locateRun} /></VStack></Drawer>
     <Drawer isOpen={isRestoreConfirm} onOpenChange={setRestoreConfirm} label="Restaurar ejemplo" width="24rem"><VStack gap={5}><DrawerHeader title="¿Volver al ejemplo inicial?" onOpenChange={setRestoreConfirm} /><Text>Reemplazará lo que ves en el lienzo. Tu borrador guardado se conserva hasta que vuelvas a guardar.</Text><Button label="Restaurar ejemplo inicial" onClick={restore} /><Button label="Seguir editando" variant="ghost" onClick={() => setRestoreConfirm(false)} /></VStack></Drawer>
   </VStack></Theme>;

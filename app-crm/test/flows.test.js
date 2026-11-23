@@ -78,6 +78,7 @@ async function fixture(database=':memory:'){
   const sent=[],aiInputs=[],aiOutcomes=[];
   const config={database,origin:'http://127.0.0.1:3031',masterKey:randomBytes(32).toString('base64'),secureCookies:false};
   const server=createServer(config,{fetchImpl:async(url,request)=>{
+    if(url.endsWith('/10001?fields=id,display_phone_number'))return Response.json({id:'10001',display_phone_number:'+1 555 0100'});
     if(url==='https://api.openai.com/v1/responses') {
       aiInputs.push(JSON.parse(request.body));
       const next=aiOutcomes.shift();
@@ -107,10 +108,14 @@ test('flows API: tenant, roles, CSRF, draft CAS, published snapshot and pause',a
     assert.equal((await f.api('/flows/'+id,'PUT',{graph:changed,revision:1})).status,200);
     assert.equal((await f.api('/flows/'+id,'PUT',{graph:changed,revision:1})).status,409);
     assert.equal(JSON.parse(f.store.get('SELECT published FROM flows WHERE id=?',id).published).nodes[1].data.value,f.graph.nodes[1].data.value);
+    assert.deepEqual((await f.api('/flow-workspaces')).body.workspaces.map(row=>row.id),[f.company]);
+    assert.deepEqual((await f.api('/flow-number')).body,{number:'+1 555 0100',canActivate:true});
     assert.throws(()=>f.flows.pause(f.other,id,f.user),/Flujo no encontrado/);
     assert.equal((await f.api('/flows/'+id+'/pause','POST',{})).body.active,false);
     f.store.run("UPDATE memberships SET role='agent' WHERE company_id=?",f.company);
     assert.equal((await f.api('/flows')).status,403);
+    assert.equal((await f.api('/flow-workspaces')).status,403);
+    assert.equal((await f.api('/flow-number')).status,403);
   }finally{await f.close();}
 });
 test('signed input atomically queues once and executes welcome, tag and assignment',async()=>{

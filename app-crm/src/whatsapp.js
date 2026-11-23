@@ -14,6 +14,7 @@ export function validSignature(raw, signature, secret) {
 export function whatsapp(store, config, fetchImpl = fetch, onIncoming = () => {}) {
   const secrets = vault(config.masterKey);
   const media=mediaFiles(store,config,fetchImpl,credentials);
+  const flowNumbers=new Map();
   function credentials(company) {
     const row = store.get('SELECT * FROM connections WHERE company_id=?', company);
     return row ? { ...row, ...secrets.open(row.config, company) } : null;
@@ -42,6 +43,22 @@ export function whatsapp(store, config, fetchImpl = fetch, onIncoming = () => {}
       error.metaCode=String(result?.error?.code||response.status);throw error;
     }
     return result;
+  }
+  async function flowNumber(company) {
+    const connection=credentials(company);
+    if(!connection)return {number:null,canActivate:false};
+    const canActivate=Boolean(connection.testRecipient&&connection.appSecret&&connection.verified);
+    const cached=flowNumbers.get(company);
+    if(cached?.phoneId===connection.phone_id&&cached.until>now())return {number:cached.number,canActivate};
+    let number=null;
+    try{
+      const result=await graph(connection,connection.phone_id+'?fields=id,display_phone_number');
+      if(result.id===connection.phone_id&&typeof result.display_phone_number==='string'&&/^\+?[()\d .-]{7,32}$/.test(result.display_phone_number))
+        number=result.display_phone_number;
+    }catch{ /* The workspace and Meta ID remain available if Meta cannot return the number. */ }
+    if(flowNumbers.size>=256)flowNumbers.delete(flowNumbers.keys().next().value);
+    flowNumbers.set(company,{phoneId:connection.phone_id,until:now()+(number?3600000:60000),number});
+    return {number,canActivate};
   }
   function saveRaw(company,c,verified=0) {
     const existing=store.get('SELECT company_id FROM connections WHERE phone_id=?',c.phoneId);
@@ -194,5 +211,5 @@ export function whatsapp(store, config, fetchImpl = fetch, onIncoming = () => {}
     requireThat(result.success===true,'Meta no confirmó la suscripción de la app a esta cuenta.',502);
     store.audit(company,actor,'whatsapp.subscribed');return {ok:true};
   }
-  return {credentials,safe,connect,send,templates,verify,receive,subscribe,saveRaw,media,providerWebhookReady};
+  return {credentials,safe,connect,send,templates,verify,receive,subscribe,saveRaw,media,providerWebhookReady,flowNumber};
 }
