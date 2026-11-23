@@ -114,11 +114,47 @@ async function inboxOverview() {
   const query=sourceId?'?company='+encodeURIComponent(sourceId):'';
   const {sources,conversations}=await api('/inbox-overview'+query);
   if(view!=='overview'||epoch!==workspaceEpoch||sourceId!==overviewSource)return;
-  const root=$('view');
-  root.innerHTML=`<section class="connection-card"><label>Número conectado<select id="overview-source"><option value="">Todos los números</option>${sources.map(source=>`<option value="${esc(source.id)}" ${source.id===overviewSource?'selected':''}>${esc(source.name)} · ID ${esc(source.phone_id)}</option>`).join('')}</select></label>
-    <div id="overview-list">${conversations.map(c=>`<button class="conversation" data-contact="${esc(c.id)}"><span class="summary"><strong>${esc(c.name)}</strong><small>${esc(c.source)}</small><p>${esc(c.last_message||'Sin vista previa')}</p></span>${c.unread?`<span class="unread-badge">${c.unread}</span>`:''}</button>`).join('')||'<p class="empty">No hay conversaciones en los números seleccionados.</p>'}</div></section>`;
-  $('overview-source').onchange=event=>{overviewSource=event.target.value;inboxOverview().catch(error=>notice(error.message,true));};
-  $('overview-list').onclick=async event=>{
+  if(!$('overview-list')){
+    $('view').innerHTML=`<section class="overview-inbox" aria-label="Conversaciones de tus números conectados">
+      <header class="overview-toolbar">
+        <p>Consulta los chats de todos tus números de WhatsApp. Al abrir uno, responderás desde su número de origen.</p>
+        <label for="overview-source">Filtrar por conexión</label>
+        <select id="overview-source"></select>
+      </header>
+      <div id="overview-list"></div>
+    </section>`;
+    $('overview-source').onchange=event=>{
+      overviewSource=event.target.value;
+      inboxOverview().catch(error=>notice(error.message,true));
+    };
+  }
+  const select=$('overview-source'),list=$('overview-list');
+  const sourceOptions=options([
+    {id:'',name:'Todos los números'},
+    ...sources.map(source=>({
+      id:source.id,
+      name:sources.some(other=>other.id!==source.id&&other.name===source.name)
+        ?source.name+' · ID '+source.phone_id.slice(-6):source.name,
+    })),
+  ],'');
+  if(select.dataset.options!==sourceOptions){
+    select.innerHTML=sourceOptions;
+    select.dataset.options=sourceOptions;
+  }
+  if(select.value!==sourceId)select.value=sourceId;
+  const rows=conversations.map(c=>`<button class="overview-chat" type="button" data-contact="${esc(c.id)}" aria-label="Abrir conversación de ${esc(c.name)} en ${esc(c.source)}">
+    <span class="avatar" aria-hidden="true">${esc(initials(c.name))}</span>
+    <span class="overview-chat-content"><strong>${esc(c.name)}</strong><span class="overview-chat-source">${esc(c.source)}</span>
+      <span class="overview-preview">${esc(c.last_message||'Sin vista previa')}</span>
+    </span>
+    ${c.unread?`<span class="unread-badge" aria-label="${c.unread} sin leer">${c.unread}</span>`:''}
+    <span class="overview-open" aria-hidden="true">›</span>
+  </button>`).join('')||'<p class="empty">No hay conversaciones para esta selección.</p>';
+  if(list.dataset.rows!==rows){
+    list.innerHTML=rows;
+    list.dataset.rows=rows;
+  }
+  list.onclick=async event=>{
     const contact=conversations.find(c=>c.id===event.target.closest('[data-contact]')?.dataset.contact);
     if(!contact||epoch!==workspaceEpoch)return;
     $('root').inert=true;

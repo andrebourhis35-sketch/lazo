@@ -152,3 +152,48 @@
   .visual-preview .app[data-view="conversations"] #message{font-size:16px;min-height:48px;height:48px}
   .visual-preview .app[data-view="conversations"] .composer-bottom .send{min-height:40px;padding:8px 12px}
 }
+
+/* Global inbox: readable on the dark CRM surface and the default theme. */
+.app[data-view="overview"] .overview-inbox{
+  border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#fff;color:#17253d;
+}
+.app[data-view="overview"] .overview-toolbar{
+  padding:14px 16px;border-bottom:1px solid var(--line);
+}
+.app[data-view="overview"] .overview-toolbar p{margin:0 0 12px;font-size:14px;line-height:1.5}
+.app[data-view="overview"] .overview-toolbar label{display:block;font-size:13px;font-weight:700;margin-bottom:5px}
+.app[data-view="overview"] #overview-source{
+  width:min(100%,23rem);min-height:40px;padding:7px 10px;font:inherit;color:#17253d;
+  background:#fff;border:1px solid #8194b3;border-radius:8px;
+}
+.app[data-view="overview"] .overview-chat{
+  display:flex;align-items:center;gap:12px;width:100%;padding:12px 16px;text-align:start;
+  background:transparent;color:inherit;border:0;border-bottom:1px solid var(--line);cursor:pointer;
+}
+.app[data-view="overview"] .overview-chat:last-child{border-bottom:0}
+.app[data-view="overview"] .overview-chat:hover{background:#edf3ff}
+.app[data-view="overview"] .overview-chat:focus-visible,
+.app[data-view="overview"] #overview-source:focus-visible{outline:2px solid #6c8bff;outline-offset:-2px}
+.app[data-view="overview"] .overview-chat-content{display:grid;gap:3px;flex:1;min-width:0}
+.app[data-view="overview"] .overview-chat-content strong{font-size:15px}
+.app[data-view="overview"] .overview-chat-source{font-size:13px;color:#485d7c}
+.app[data-view="overview"] .overview-preview{
+  font-size:var(--lazo-chat-text-size,15px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#34496b;
+}
+.app[data-view="overview"] .overview-open{font-size:22px}
+.visual-preview .app[data-view="overview"] .topbar{min-height:62px;padding:8px 14px;margin-bottom:10px;border-radius:14px}
+.visual-preview .app[data-view="overview"] .topbar h1{font-size:23px;margin:3px 0 0}
+.visual-preview .app[data-view="overview"] .topbar .top-actions{align-self:center;margin:0}
+.visual-preview .app[data-view="overview"] .orbita-scene{top:-64px;right:140px;transform:scale(.48);opacity:.8}
+.visual-preview .app[data-view="overview"] .overview-inbox{border-color:#3a5274;background:#14233b;color:#f5f7fb}
+.visual-preview .app[data-view="overview"] .overview-toolbar,
+.visual-preview .app[data-view="overview"] .overview-chat{border-color:#324868}
+.visual-preview .app[data-view="overview"] #overview-source{color-scheme:dark;color:#f5f7fb;background:#0e1b30;border-color:#6581a9}
+.visual-preview .app[data-view="overview"] .overview-chat:hover{background:#1d3456}
+.visual-preview .app[data-view="overview"] .overview-chat-source{color:#a8bcdb}
+.visual-preview .app[data-view="overview"] .overview-preview{color:#d0dcf1}
+@media(max-width:620px){
+  .visual-preview .app[data-view="overview"] .topbar h1{font-size:20px}
+  .app[data-view="overview"] .overview-toolbar,.app[data-view="overview"] .overview-chat{padding:10px 12px}
+  .app[data-view="overview"] #overview-source{font-size:16px}
+}
