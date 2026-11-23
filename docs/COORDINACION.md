@@ -1,5 +1,10 @@
 # Coordinación Codex y Claude
 
+### Más espacio de trabajo en el CRM (23 de noviembre de 2026)
+
+- Reserva: presentación Órbita del CRM, cabeceras, navegación y bandeja; rama codex/espacio-crm. Cabeceras y barra lateral reducidas, tablas más compactas y filtros de Conversaciones plegables con contador. Se conserva la preferencia de tamaño de lectura.
+- QA en navegador con datos ficticios: a 1280 × 720, historial de 873 × 408 píxeles y botón Enviar dentro de la pantalla; a 390 × 844, historial de 373 × 395 y Enviar visible. Filtros aplicados/limpiados; Contactos, Ventas, Estadísticas, Conexiones y Ajustes sin desbordamiento horizontal en escritorio.
+
 ### Comprobantes PDF y notas de voz (23 de noviembre de 2026)
 
 - Reserva: CRM, webhooks, adjuntos y lectura de IA; rama codex/comprobantes-pdf-voz. Lectura de comprobantes PDF desde el pedido. Recepción y reproducción Ogg Opus con transcripción solicitada en el chat, cifrada y vinculada al mensaje.
