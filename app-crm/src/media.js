@@ -2,17 +2,21 @@ import { randomUUID, createHash } from 'node:crypto';
 import { HttpError, now, requireThat, vault } from './core.js';
 
 export const mediaLimits = { 'image/jpeg':5*1024*1024, 'image/png':5*1024*1024, 'application/pdf':10*1024*1024 };
+const incomingLimits={...mediaLimits,'audio/ogg':16*1024*1024};
+const mediaType=value=>typeof value==='string'?value.split(';')[0].trim().toLowerCase():'';
 export function mediaFilename(value,mime) {
-  const extension=mime==='application/pdf'?'.pdf':mime==='image/png'?'.png':'.jpg';
+  const extension=mime==='audio/ogg'?'.ogg':mime==='application/pdf'?'.pdf':mime==='image/png'?'.png':'.jpg';
   let name=Array.from(String(value||'archivo').toWellFormed().replace(/[/\\<>\x00-\x1f\x7f\u202a-\u202e\u2066-\u2069]/g,'_').trim()).slice(0,120).join('')||'archivo';
   if(!(mime==='image/jpeg'?/\.jpe?g$/i:new RegExp('\\'+extension+'$','i')).test(name))name+=extension;
   return name;
 }
 export function validateMedia(bytes,mime) {
-  const max=mediaLimits[mime];
-  requireThat(max,'Elige una imagen JPG/PNG o un documento PDF.',415);
-  requireThat(bytes.length>0&&bytes.length<=max,'Archivo demasiado grande. Máximo 5 MB por imagen y 10 MB por PDF.',413);
+  const max=incomingLimits[mime];
+  requireThat(max,'Tipo de archivo no admitido.',415);
+  requireThat(bytes.length>0&&bytes.length<=max,'El archivo supera el tamaño permitido.',413);
   const valid=mime==='application/pdf'?bytes.subarray(0,5).toString()==='%PDF-':
+    mime==='audio/ogg'?bytes.length>=47&&bytes.subarray(0,5).equals(Buffer.from('OggS\0'))&&bytes[26]>0&&
+      bytes.subarray(27+bytes[26],35+bytes[26]).toString()==='OpusHead':
     mime==='image/jpeg'?bytes.length>3&&bytes[0]===255&&bytes[1]===216&&bytes[2]===255:
     bytes.length>=24&&bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))&&bytes.subarray(12,16).toString()==='IHDR';
   requireThat(valid,'El contenido no coincide con el tipo del archivo.',415);
@@ -47,7 +51,9 @@ export function mediaFiles(store,config,fetchImpl,credentials) {
     return total+size<=totalLimit&&own+size<=companyLimit;
   }
   function saveUpload(company,file) {
-    const bytes=Buffer.from(file.bytes),mime=file.mime;validateMedia(bytes,mime);
+    const bytes=Buffer.from(file.bytes),mime=file.mime;
+    requireThat(mediaLimits[mime],'Elige una imagen JPG/PNG o un documento PDF.',415);
+    validateMedia(bytes,mime);
     const asset={id:randomUUID(),company_id:company};
     const filename=mediaFilename(file.filename,mime),hash=createHash('sha256').update(bytes).digest('hex');
     requireThat(hasSpace(company,bytes.length),'La empresa alcanzó su espacio disponible para archivos.',409);
@@ -56,11 +62,12 @@ export function mediaFiles(store,config,fetchImpl,credentials) {
     return asset.id;
   }
   function incoming(company,type,part,created) {
-    if(!part||!['image','document'].includes(type)||!/^\d{1,60}$/.test(part.id||'')||!mediaLimits[part.mime_type])return null;
-    if(type==='image'&&!part.mime_type.startsWith('image/')||type==='document'&&part.mime_type!=='application/pdf')return null;
-    const id=randomUUID(),size=mediaLimits[part.mime_type],room=hasSpace(company,size);
+    const mime=mediaType(part?.mime_type);
+    const supported={image:['image/jpeg','image/png'],document:['application/pdf'],audio:['audio/ogg']};
+    if(!Object.hasOwn(supported,type)||!supported[type].includes(mime)||!/^\d{1,60}$/.test(part.id||''))return null;
+    const id=randomUUID(),size=incomingLimits[mime],room=hasSpace(company,size);
     store.run("INSERT INTO media_assets(id,company_id,wa_id,mime,filename,size,sha256,state,created) VALUES(?,?,?,?,?,?,?,?,?)",
-      id,company,part.id,part.mime_type,mediaFilename(part.filename||type,part.mime_type),room?size:0,String(part.sha256||'').slice(0,128),room?'pending':'unavailable',created);
+      id,company,part.id,mime,mediaFilename(part.filename||(type==='audio'?'nota-de-voz':type),mime),room?size:0,String(part.sha256||'').slice(0,128),room?'pending':'unavailable',created);
     return id;
   }
   async function jsonResponse(response) {
@@ -90,14 +97,15 @@ export function mediaFiles(store,config,fetchImpl,credentials) {
     if(pending.has(key))return pending.get(key);
     requireThat(downloads<2,'Hay otros archivos descargándose. Intenta nuevamente en unos segundos.',429);
     requireThat(a.wa_id&&a.created>now()-7*86400000,'El archivo ya no está disponible en WhatsApp. Pide al contacto que lo reenvíe.',410);
-    requireThat(hasSpace(company,mediaLimits[a.mime],id),'La empresa alcanzó su espacio disponible para archivos.',409);
+    const max=incomingLimits[a.mime];
+    requireThat(hasSpace(company,max,id),'La empresa alcanzó su espacio disponible para archivos.',409);
     const task=(async()=>{
-      downloads++;store.run("UPDATE media_assets SET state='pending',size=?,attempts=attempts+1,retry_at=? WHERE company_id=? AND id=?",mediaLimits[a.mime],now()+60000,company,id);
+      downloads++;store.run("UPDATE media_assets SET state='pending',size=?,attempts=attempts+1,retry_at=? WHERE company_id=? AND id=?",max,now()+60000,company,id);
       try {
         const c=credentials(company);requireThat(c,'Conecta WhatsApp para descargar este archivo.',409);
         const signal=AbortSignal.timeout(15000),authorization={Authorization:'Bearer '+c.accessToken};
         const info=await jsonResponse(await fetchImpl('https://graph.facebook.com/'+c.graphVersion+'/'+a.wa_id+'?phone_number_id='+c.phone_id,{headers:authorization,signal,redirect:'error'}));
-        requireThat(String(info.id)===a.wa_id&&info.mime_type===a.mime&&Number(info.file_size)>0&&Number(info.file_size)<=mediaLimits[a.mime],'El archivo no cumple los límites admitidos.',413);
+        requireThat(String(info.id)===a.wa_id&&mediaType(info.mime_type)===a.mime&&Number(info.file_size)>0&&Number(info.file_size)<=max,'El archivo no cumple los límites admitidos.',413);
         requireThat(typeof info.sha256==='string'&&/^(?:[a-f\d]{64}|[A-Za-z\d+/]{43}=?)$/i.test(info.sha256),'Meta no confirmó la integridad del archivo.',502);
         let url=trustedMediaUrl(info.url),response;
         for(let redirects=0;redirects<=2;redirects++) {
@@ -107,10 +115,10 @@ export function mediaFiles(store,config,fetchImpl,credentials) {
           url=trustedMediaUrl(new URL(response.headers.get('location')||'',url).href);
         }
         requireThat(response.ok&&response.body,'No se pudo descargar el archivo de WhatsApp.',502);
-        const contentType=(response.headers.get('content-type')||'').split(';')[0].trim();
+        const contentType=mediaType(response.headers.get('content-type'));
         requireThat(contentType===a.mime,'El contenido recibido no coincide con el archivo.',415);
         const chunks=[];let size=0;
-        for await(const chunk of response.body) {size+=chunk.length;requireThat(size<=mediaLimits[a.mime],'Archivo demasiado grande.',413);chunks.push(chunk);}
+        for await(const chunk of response.body) {size+=chunk.length;requireThat(size<=max,'Archivo demasiado grande.',413);chunks.push(chunk);}
         const bytes=Buffer.concat(chunks);validateMedia(bytes,a.mime);
         requireThat(bytes.length===Number(info.file_size)&&matchesHash(bytes,info.sha256)&&matchesHash(bytes,a.sha256),'No se pudo comprobar la integridad del archivo.',502);
         // The company quota was reserved before the asynchronous download.
@@ -119,7 +127,7 @@ export function mediaFiles(store,config,fetchImpl,credentials) {
         return {bytes,mime:a.mime,filename:a.filename};
       } catch(error) {
         a=find(company,id);
-        store.run("UPDATE media_assets SET state=?,size=? WHERE company_id=? AND id=?",a.attempts>=3?'unavailable':'pending',a.attempts>=3?0:mediaLimits[a.mime],company,id);
+        store.run("UPDATE media_assets SET state=?,size=? WHERE company_id=? AND id=?",a.attempts>=3?'unavailable':'pending',a.attempts>=3?0:max,company,id);
         if(error instanceof HttpError)throw error;
         throw new HttpError(502,'No se pudo descargar el archivo. Intenta nuevamente.');
       } finally {downloads--;pending.delete(key);}

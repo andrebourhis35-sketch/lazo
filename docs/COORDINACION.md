@@ -1,5 +1,12 @@
 # Coordinación Codex y Claude
 
+### Comprobantes PDF y notas de voz (23 de noviembre de 2026)
+
+- Reserva: CRM, webhooks, adjuntos y lectura de IA; rama codex/comprobantes-pdf-voz. Lectura de comprobantes PDF desde el pedido. Recepción y reproducción Ogg Opus con transcripción solicitada en el chat, cifrada y vinculada al mensaje.
+- QA en navegador con proveedores simulados: reproducción Ogg Opus de 2 segundos, transcripción persistente tras recarga y lectura de importe y referencia de un PDF sin confirmación automática. Prueba de webhook firmado, cifrado, deduplicación y aislamiento por empresa.
+
+- Publicado voice-13747af tras respaldo del CRM, 88 pruebas en OVH y migración en copia con huellas de filas existentes intactas. HTTPS verificó HTML, JS, CSS, política del reproductor y acceso denegado sin sesión. PR #72.
+
 ### Operación de ventas en LAZO (23 de noviembre de 2026)
 
 - Reserva: CRM, motor de pedidos y editor de flujos; rama codex/operacion-ventas. Catálogo por empresa con variantes por mercado, chat con oferta y ficha de pedido, bandeja por cobro/verificación/entrega, lectura de comprobantes por IA y diagnóstico de flujos.

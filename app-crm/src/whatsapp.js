@@ -169,7 +169,7 @@ export function whatsapp(store, config, fetchImpl = fetch, onIncoming = () => {}
           }
           const part=msg[msg.type],attachment=media.incoming(c.company_id,msg.type,part,created);
           const reply=msg.type==='interactive'&&msg.interactive?.type==='button_reply'?msg.interactive.button_reply:null;
-          const body=reply?String(reply.title||'Botón').slice(0,20):msg.type==='text'?String(msg.text?.body||'').slice(0,4000):attachment?String(part.caption||part.filename||(msg.type==='image'?'Imagen':'Documento PDF')).slice(0,1024):`[Mensaje recibido: ${String(msg.type||'desconocido').slice(0,30)}]`;
+          const body=reply?String(reply.title||'Botón').slice(0,20):msg.type==='text'?String(msg.text?.body||'').slice(0,4000):attachment?String(part.caption||part.filename||({image:'Imagen',document:'Documento PDF',audio:'Nota de voz'})[msg.type]).slice(0,1024):`[Mensaje recibido: ${String(msg.type||'desconocido').slice(0,30)}]`;
           const messageId=randomUUID();
           store.run("INSERT INTO messages(id,company_id,contact_id,direction,body,type,status,wa_id,created,updated,attachment_id) VALUES(?,?,?,'in',?,?,'received',?,?,?,?)",messageId,c.company_id,contact.id,body,msg.type||'other',msg.id,created,now(),attachment);
           store.run('UPDATE contacts SET unread=unread+1,resolved=0,last_inbound=MAX(last_inbound,?),updated=MAX(updated,?) WHERE id=? AND company_id=?',created,created,contact.id,c.company_id);
