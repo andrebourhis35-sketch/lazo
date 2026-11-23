@@ -2,7 +2,7 @@ export const DRAFT_KEY = 'lazo.laboratorio.flujos.v1';
 export const BLOCKS = {
   trigger: { name: 'Inicio', description: 'Cuando llega una palabra clave', group: 'Entrada' },
   message: { name: 'Mensaje', description: 'Texto con variables de contacto', group: 'Conversación' },
-  buttons: { name: 'Botones de respuesta', description: 'Envía dos opciones y sigue la elegida', group: 'Conversación' },
+  buttons: { name: 'Botones de respuesta', description: 'Envía hasta tres opciones y sigue la elegida', group: 'Conversación' },
   condition: { name: 'Condición', description: 'Dos caminos según la respuesta', group: 'Lógica' },
   wait: { name: 'Espera', description: 'Avanza el tiempo de la simulación', group: 'Lógica' },
   tag: { name: 'Etiqueta', description: 'Organiza el contacto', group: 'Acciones' },
@@ -29,14 +29,18 @@ export function buttonWelcomeFlow() {
     createNode('trigger', 'inicio', { x: 40, y: 150 }),
     createNode('buttons', 'bienvenida', { x: 340, y: 150 }),
     createNode('message', 'catalogo', { x: 640, y: 30 }),
-    createNode('message', 'horarios', { x: 640, y: 290 }),
+    createNode('message', 'horarios', { x: 640, y: 255 }),
+    createNode('message', 'pedido', { x: 640, y: 480 }),
     createNode('end', 'fin', { x: 940, y: 150 }),
   ];
+  nodes[1].data.choices.push('Consultar pedido');
+  nodes[4].data.value = 'Comparte tu número de pedido para que podamos revisar su estado.';
   nodes[2].data.value = 'Cuéntanos qué producto te interesa y te compartiremos las opciones.';
   nodes[3].data.value = '¿Qué día te gustaría consultar? Indícanos si prefieres la mañana o la tarde.';
   const edges = [
     ['inicio', 'bienvenida', 'next'], ['bienvenida', 'catalogo', 'option-1'],
     ['bienvenida', 'horarios', 'option-2'], ['catalogo', 'fin', 'next'], ['horarios', 'fin', 'next'],
+    ['bienvenida', 'pedido', 'option-3'], ['pedido', 'fin', 'next'],
   ].map(([source, target, sourceHandle]) => ({ id: source + '-' + sourceHandle, source, target, sourceHandle, type: 'smoothstep' }));
   return { version: 1, name: 'Bienvenida con botones', nodes, edges };
 }
@@ -60,7 +64,11 @@ export function exampleFlow() {
 
 const normalize = value => String(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es').trim();
 export const summarizeNode = data => data.kind === 'wait' ? `${data.value || '0'} minutos` : data.kind === 'end' ? 'El contacto sale del flujo' : data.value;
-export const outputsFor = kind => kind === 'end' ? [] : kind === 'condition' ? ['yes', 'no'] : kind === 'buttons' ? ['option-1', 'option-2'] : ['next'];
+export function outputsFor({kind, choices}) {
+  if (kind === 'buttons') return choices.map((_, index) => 'option-' + (index + 1));
+  if (kind === 'condition') return ['yes', 'no'];
+  return kind === 'end' ? [] : ['next'];
+}
 
 export function connectionProblem(connection, nodes, edges) {
   const source = nodes.find(node => node.id === connection.source);
@@ -68,7 +76,7 @@ export function connectionProblem(connection, nodes, edges) {
   if (!source || !target) return 'Selecciona dos bloques del lienzo.';
   if (source.id === target.id) return 'Un bloque debe conectarse con otro bloque.';
   if (target.data.kind === 'trigger') return 'Inicio no puede recibir conexiones.';
-  if (!outputsFor(source.data.kind).includes(connection.sourceHandle || 'next')) return 'Elige una salida disponible del bloque.';
+  if (!outputsFor(source.data).includes(connection.sourceHandle || 'next')) return 'Elige una salida disponible del bloque.';
   const remaining = edges.filter(edge => !(edge.source === source.id && (edge.sourceHandle || 'next') === (connection.sourceHandle || 'next')));
   const pending = [target.id], visited = new Set();
   while (pending.length) {
@@ -102,9 +110,9 @@ export function validateFlow(flow) {
     if (node.data.kind === 'buttons') {
       const choices = node.data.choices.map(choice => choice.trim());
       if (!node.data.value.trim() || node.data.value.length > 1024) errors.push('Escribe un mensaje de hasta 1024 caracteres para los botones.');
-      if (choices.some(choice => !choice || choice.length > 20 || /[\r\n]/.test(choice)) || new Set(choices.map(normalize)).size !== 2) errors.push('Escribe dos opciones distintas, de hasta 20 caracteres cada una.');
+      if (choices.length < 2 || choices.length > 3 || choices.some(choice => !choice || choice.length > 20 || /[\r\n]/.test(choice)) || new Set(choices.map(normalize)).size !== choices.length) errors.push('Escribe dos o tres opciones distintas, de hasta 20 caracteres cada una.');
     }
-    for (const output of outputsFor(node.data.kind)) {
+    for (const output of outputsFor(node.data)) {
       const targets = edges.filter(edge => edge.source === node.id && (edge.sourceHandle || 'next') === output);
       if (targets.length !== 1) errors.push(`Conecta ${output === 'yes' ? 'la salida «Sí»' : output === 'no' ? 'la salida «No»' : output.startsWith('option-') ? 'el botón ' + output.slice(-1) : 'la salida'} de «${node.data.label}».`);
     }
@@ -133,13 +141,13 @@ export function parseDraft(raw) {
   const nodes = flow.nodes.map(node => {
     if (!node || typeof node.id !== 'string' || !/^[\w-]{1,80}$/.test(node.id) || ids.has(node.id) || !Object.hasOwn(BLOCKS, node.data?.kind) || typeof node.data.label !== 'string' || node.data.label.length > 90 || typeof node.data.value !== 'string' || node.data.value.length > 2000 || !Number.isFinite(node.position?.x) || !Number.isFinite(node.position?.y) || Math.abs(node.position.x) > 20000 || Math.abs(node.position.y) > 20000) throw new Error('El borrador contiene un bloque incompatible.');
     const { kind, label, value, choices } = node.data;
-    if (kind === 'buttons' && (!Array.isArray(choices) || choices.length !== 2 || choices.some(choice => typeof choice !== 'string' || choice.length > 20))) throw new Error('El borrador contiene botones incompatibles.');
+    if (kind === 'buttons' && (!Array.isArray(choices) || (choices.length < 2 || choices.length > 3) || choices.some(choice => typeof choice !== 'string' || choice.length > 20))) throw new Error('El borrador contiene botones incompatibles.');
     ids.add(node.id);
     return { id: node.id, type: 'lazo', position: { x: node.position.x, y: node.position.y }, data: { kind, label, value, ...(kind === 'buttons' ? { choices } : {}) } };
   });
   const edgeIds = new Set();
   const edges = flow.edges.map(edge => {
-    if (!edge || typeof edge.id !== 'string' || edge.id.length > 180 || edgeIds.has(edge.id) || !ids.has(edge.source) || !ids.has(edge.target) || !['next', 'yes', 'no', 'option-1', 'option-2'].includes(edge.sourceHandle || 'next')) throw new Error('El borrador contiene una conexión incompatible.');
+    if (!edge || typeof edge.id !== 'string' || edge.id.length > 180 || edgeIds.has(edge.id) || !ids.has(edge.source) || !ids.has(edge.target) || !['next', 'yes', 'no', 'option-1', 'option-2', 'option-3'].includes(edge.sourceHandle || 'next')) throw new Error('El borrador contiene una conexión incompatible.');
     edgeIds.add(edge.id);
     return { id: edge.id, source: edge.source, target: edge.target, sourceHandle: edge.sourceHandle || 'next', type: 'smoothstep' };
   });

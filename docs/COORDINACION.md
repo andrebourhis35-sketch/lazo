@@ -1,5 +1,11 @@
 # Coordinación Codex y Claude
 
+### Tercera opción en los flujos (22 de noviembre de 2026)
+
+- Codex, rama codex/tercer-boton. Editor, modelo, ejecución y prueba de integración amplían los menús a dos o tres opciones. El ejemplo nuevo incluye «Consultar pedido». Los borradores y ejecuciones con dos botones siguen siendo compatibles.
+
+- Publicado third-df99e3d en CRM y editor con respaldo cifrado. 78 pruebas del CRM y 11 del editor aprobadas. Salud del servicio y huellas de HTML, JS y CSS verificadas por HTTPS. PR #60. Prueba de WhatsApp real pendiente.
+
 ### Bienvenida con botones (22 de noviembre de 2026)
 
 - Codex, rama codex/flujos-botones. Cambios en modelo, motor y transporte de flujos, pruebas de integración y editor visual. El borrador inicial de un flujo nuevo ofrece dos botones editables. Cada botón lleva a su propia rama y se valida contra el menú original y el contacto. Pausar o cambiar la versión cancela menús pendientes. Se conserva la activación en cuenta de prueba. Pruebas con webhook firmado y Meta simulado para ambas ramas, contexto incorrecto y respuestas repetidas.

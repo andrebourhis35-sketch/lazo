@@ -89,10 +89,15 @@ test('draft, active version and pending input survive reopening the database',as
 
 
 test('welcome buttons resume only the selected branch for the original menu', async () => {
-  for (const index of [0,1]) {
+  for (const [count, index] of [[2,0],[2,1],[3,2]]) {
     const f=await fixture();
     try {
       const graph=buttonWelcomeFlow();
+      if(count===2) {
+        graph.nodes[1].data.choices.pop();
+        graph.nodes=graph.nodes.filter(node=>node.id!=='pedido');
+        graph.edges=graph.edges.filter(edge=>edge.source!=='pedido'&&edge.target!=='pedido');
+      }
       const flow=f.flows.save(f.company,null,{graph},f.user);
       f.flows.publish(f.company,flow.id,{revision:1},f.user);
       f.receive();
@@ -100,6 +105,7 @@ test('welcome buttons resume only the selected branch for the original menu', as
       assert.equal(f.flows.runs(f.company,flow.id)[0].state,'waiting');
       const menu=f.sent[0].interactive;
       assert.equal(menu.type,'button');
+      assert.equal(menu.action.buttons.length,count);
       assert.match(menu.body.text,/Hola Lucía/);
       const reply=menu.action.buttons[index].reply;
       const fields={type:'interactive',interactive:{type:'button_reply',button_reply:reply}};
