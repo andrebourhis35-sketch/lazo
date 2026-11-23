@@ -6,7 +6,7 @@ import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createServer} from '../src/server.js';
-import {buttonWelcomeFlow,createNode,simulateFlow} from '../src/flow-model.js';
+import {buttonWelcomeFlow,chainedWelcomeFlow,createNode,simulateFlow} from '../src/flow-model.js';
 
 function welcome(owner){
   const nodes=['trigger','message','tag','assign','end'].map((kind,i)=>createNode(kind,'n'+i,{x:i*300,y:100}));
@@ -124,4 +124,108 @@ test('welcome buttons resume only the selected branch for the original menu', as
       assert.equal(simulation.steps[2].detail,f.sent[1].text.body);
     } finally { await f.close(); }
   }
+});
+
+
+test('chained menus can return and reject a tap from an older menu', async () => {
+  const f=await fixture();
+  try {
+    const graph=chainedWelcomeFlow();
+    const flow=f.flows.save(f.company,null,{graph},f.user);
+    f.flows.publish(f.company,flow.id,{revision:1},f.user);
+    const tap=(sendIndex,buttonIndex)=>f.receive('',0,{type:'interactive',
+      context:{id:'wamid.out.'+(sendIndex+1)},
+      interactive:{type:'button_reply',button_reply:f.sent[sendIndex].interactive.action.buttons[buttonIndex].reply}});
+    f.receive();
+    await f.flows.flush();
+    tap(0,0);
+    await f.flows.flush();
+    tap(1,2);
+    await f.flows.flush();
+    assert.equal(f.calls,3);
+    assert.equal(f.sent[2].interactive.body.text,f.sent[0].interactive.body.text);
+    tap(0,1);
+    await f.flows.flush();
+    assert.equal(f.calls,3);
+    tap(2,1);
+    await f.flows.flush();
+    assert.match(f.sent[3].text.body,/horarios|día/);
+    assert.deepEqual(simulateFlow(graph,{answer:'Ver catálogo\nVolver\nConsultar horarios'}).errors,[]);
+    const contact=f.store.get('SELECT id FROM contacts');
+    const history=await f.api('/contacts/'+contact.id+'/automation');
+    assert.equal(history.status,200);
+    assert.ok(history.body.runs[0].steps.some(step=>step.detail==='Volvió al menú anterior'));
+    assert.ok(history.body.runs[0].steps.some(step=>step.body===f.sent[3].text.body));
+  } finally{await f.close();}
+});
+
+function linearGraph(kinds) {
+  const nodes=kinds.map((kind,index)=>createNode(kind,'step-'+index,{x:index*300,y:100}));
+  return {version:1,name:'Prueba',nodes,edges:nodes.slice(0,-1).map((node,index)=>({id:'edge-'+index,source:node.id,target:nodes[index+1].id,sourceHandle:'next'}))};
+}
+
+test('follow-up sends only at its deadline and cancels on reply, sale or takeover', async () => {
+  for(const outcome of ['send','reply','sale','takeover','assignment']) {
+    const f=await fixture();
+    try {
+      const graph=linearGraph(['trigger','reminder','message','end']);
+      const flow=f.flows.save(f.company,null,{graph},f.user);
+      f.flows.publish(f.company,flow.id,{revision:1},f.user);
+      f.receive();
+      await f.flows.flush();
+      assert.equal(f.flows.runs(f.company,flow.id)[0].state,'scheduled');
+      await f.flows.flush();
+      assert.equal(f.calls,0);
+      const contact=f.store.get('SELECT id FROM contacts');
+      if(outcome==='reply')f.receive('Gracias');
+      if(outcome==='sale')f.store.updateContact(f.company,contact.id,{stage:'Venta ganada'},f.user);
+      if(outcome==='takeover')assert.equal((await f.api('/contacts/'+contact.id+'/automation','POST',{paused:true})).status,200);
+      if(outcome==='assignment')f.store.updateContact(f.company,contact.id,{ownerId:''},f.user);
+      f.store.run('UPDATE flow_runs SET due=?',Date.now()-1);
+      await f.flows.flush();
+      assert.equal(f.calls,outcome==='send'?1:0);
+      assert.equal(f.flows.runs(f.company,flow.id)[0].state,outcome==='send'?'done':'cancelled');
+    } finally{await f.close();}
+  }
+});
+
+test('handoff assigns the chat and suppresses automation until the team resumes it', async () => {
+  const f=await fixture();
+  try {
+    const graph=linearGraph(['trigger','message','handoff']);
+    graph.nodes[2].data.value=f.user;
+    const flow=f.flows.save(f.company,null,{graph},f.user);
+    f.flows.publish(f.company,flow.id,{revision:1},f.user);
+    f.receive();
+    await f.flows.flush();
+    const contact=f.store.get('SELECT id,owner_id,automation_paused FROM contacts');
+    assert.equal(contact.owner_id,f.user);
+    assert.equal(contact.automation_paused,1);
+    f.store.run('UPDATE flow_runs SET created=?',Date.now()-61000);
+    f.receive();
+    await f.flows.flush();
+    assert.equal(f.calls,1);
+    assert.equal((await f.api('/contacts/'+contact.id+'/automation','POST',{paused:false})).status,200);
+    f.receive();
+    await f.flows.flush();
+    assert.equal(f.calls,2);
+  } finally{await f.close();}
+});
+
+test('global inbox lists only numbers and conversations accessible to the session user', async () => {
+  const f=await fixture();
+  try {
+    f.receive();
+    f.wa.saveRaw(f.other,{phoneId:'10002',wabaId:'20002',accessToken:'synthetic',appSecret:'synthetic-secret',testRecipient:'51900000001',graphVersion:'v25.0'},1);
+    const contact=f.store.addContact(f.other,{name:'Contacto B',phone:'51900000002'},null);
+    const stamp=Date.now();
+    f.store.run("INSERT INTO messages(id,company_id,contact_id,direction,body,type,status,created,updated) VALUES(?,?,?,'in','Segundo número','text','received',?,?)",randomUUID(),f.other,contact.id,stamp,stamp);
+    assert.equal((await f.api('/inbox-overview')).body.conversations.length,1);
+    assert.equal((await f.api('/inbox-overview?company='+f.other)).status,403);
+    f.store.run('INSERT INTO memberships VALUES(?,?,?)',f.other,f.user,'agent');
+    assert.equal((await f.api('/inbox-overview')).body.conversations.length,2);
+    const filtered=await f.api('/inbox-overview?company='+f.other);
+    assert.deepEqual(filtered.body.conversations.map(c=>c.id),[contact.id]);
+    assert.equal((await f.api('/contacts/'+contact.id+'/automation')).status,404);
+  } finally{await f.close();}
 });

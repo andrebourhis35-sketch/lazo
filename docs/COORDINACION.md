@@ -1,5 +1,9 @@
 # Coordinación Codex y Claude
 
+### Flujos avanzados y bandeja global (22 de noviembre de 2026)
+
+- Codex, rama codex/flujos-avanzados. Editor, motor, almacenamiento, API y CRM. Menús encadenados y retorno, seguimiento por inactividad, traspaso, historial por contacto y vista global de números autorizados. Cada chat permanece en su espacio de origen y todas las automatizaciones reales conservan la restricción de cuenta de prueba.
+
 ### Tercera opción en los flujos (22 de noviembre de 2026)
 
 - Codex, rama codex/tercer-boton. Editor, modelo, ejecución y prueba de integración amplían los menús a dos o tres opciones. El ejemplo nuevo incluye «Consultar pedido». Los borradores y ejecuciones con dos botones siguen siendo compatibles.

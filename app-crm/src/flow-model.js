@@ -4,6 +4,9 @@ export const BLOCKS = {
   message: { name: 'Mensaje', description: 'Texto con variables de contacto', group: 'Conversación' },
   buttons: { name: 'Botones de respuesta', description: 'Envía hasta tres opciones y sigue la elegida', group: 'Conversación' },
   condition: { name: 'Condición', description: 'Dos caminos según la respuesta', group: 'Lógica' },
+  reminder: { name: 'Esperar sin respuesta', description: 'Continúa solo si el cliente no responde', group: 'Lógica' },
+  handoff: { name: 'Traspasar a asesor', description: 'Asigna el chat y pausa la automatización', group: 'Acciones' },
+  back: { name: 'Volver al menú anterior', description: 'Regresa al menú previo de este recorrido', group: 'Lógica' },
   wait: { name: 'Espera', description: 'Avanza el tiempo de la simulación', group: 'Lógica' },
   tag: { name: 'Etiqueta', description: 'Organiza el contacto', group: 'Acciones' },
   assign: { name: 'Asignar asesor', description: 'Continúa con una persona', group: 'Acciones' },
@@ -16,6 +19,9 @@ export function createNode(kind, id, position = { x: 0, y: 0 }) {
     message: { label: 'Enviar mensaje', value: 'Hola {{nombre}}, ¿cómo podemos ayudarte?' },
     buttons: { label: 'Elegir una opción', value: 'Hola {{nombre}}, ¿qué te gustaría consultar?', choices: ['Ver catálogo', 'Consultar horarios'] },
     condition: { label: '¿Qué necesita el contacto?', value: 'catálogo' },
+    reminder: { label: 'Esperar antes del seguimiento', value: '30' },
+    handoff: { label: 'Traspasar al equipo', value: '' },
+    back: { label: 'Volver al menú anterior', value: '' },
     wait: { label: 'Dar tiempo para responder', value: '30' },
     tag: { label: 'Organizar contacto', value: 'Interesado' },
     assign: { label: 'Continuar con un asesor', value: 'Equipo comercial' },
@@ -45,6 +51,34 @@ export function buttonWelcomeFlow() {
   return { version: 1, name: 'Bienvenida con botones', nodes, edges };
 }
 
+export function chainedWelcomeFlow() {
+  const nodes = [
+    createNode('trigger', 'inicio', { x: 40, y: 150 }),
+    createNode('buttons', 'bienvenida', { x: 340, y: 150 }),
+    createNode('buttons', 'catalogo', { x: 640, y: 30 }),
+    createNode('message', 'horarios', { x: 640, y: 255 }),
+    createNode('message', 'pedido', { x: 640, y: 480 }),
+    createNode('end', 'fin', { x: 1240, y: 290 }),
+    createNode('message', 'novedades', { x: 940, y: 30 }),
+    createNode('message', 'ofertas', { x: 940, y: 240 }),
+    createNode('back', 'volver', { x: 940, y: -180 }),
+  ];
+  nodes[1].data.choices.push('Consultar pedido');
+  nodes[4].data.value = 'Comparte tu número de pedido para que podamos revisar su estado.';
+  nodes[2].data.value = '¿Qué quieres ver del catálogo?';
+  nodes[2].data.choices = ['Novedades', 'Ofertas', 'Volver'];
+  nodes[6].data.value = 'Cuéntanos qué tipo de producto buscas y te compartiremos las novedades.';
+  nodes[7].data.value = 'Dinos qué producto te interesa y revisaremos las ofertas disponibles.';
+  nodes[3].data.value = '¿Qué día te gustaría consultar? Indícanos si prefieres la mañana o la tarde.';
+  const edges = [
+    ['inicio', 'bienvenida', 'next'], ['bienvenida', 'catalogo', 'option-1'],
+    ['bienvenida', 'horarios', 'option-2'], ['catalogo', 'novedades', 'option-1'], ['catalogo', 'ofertas', 'option-2'],
+    ['catalogo', 'volver', 'option-3'], ['novedades', 'fin', 'next'], ['ofertas', 'fin', 'next'], ['horarios', 'fin', 'next'],
+    ['bienvenida', 'pedido', 'option-3'], ['pedido', 'fin', 'next'],
+  ].map(([source, target, sourceHandle]) => ({ id: source + '-' + sourceHandle, source, target, sourceHandle, type: 'smoothstep' }));
+  return { version: 1, name: 'Bienvenida con botones', nodes, edges };
+}
+
 export function exampleFlow() {
   const definitions = [
     ['inicio', 'trigger', 40, 150, 'Mensaje recibido', 'hola'],
@@ -63,11 +97,11 @@ export function exampleFlow() {
 }
 
 const normalize = value => String(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es').trim();
-export const summarizeNode = data => data.kind === 'wait' ? `${data.value || '0'} minutos` : data.kind === 'end' ? 'El contacto sale del flujo' : data.value;
+export const summarizeNode = data => ['wait', 'reminder'].includes(data.kind) ? `${data.value || '0'} minutos` : data.kind === 'end' ? 'El contacto sale del flujo' : data.value;
 export function outputsFor({kind, choices}) {
   if (kind === 'buttons') return choices.map((_, index) => 'option-' + (index + 1));
   if (kind === 'condition') return ['yes', 'no'];
-  return kind === 'end' ? [] : ['next'];
+  return ['end', 'handoff', 'back'].includes(kind) ? [] : ['next'];
 }
 
 export function connectionProblem(connection, nodes, edges) {
@@ -105,7 +139,8 @@ export function validateFlow(flow) {
   if (starts.length !== 1) errors.push('El flujo necesita exactamente un bloque de inicio.');
   for (const node of nodes) {
     if (!node.data.label.trim()) errors.push('Todos los bloques necesitan un nombre.');
-    if (['message', 'condition', 'tag', 'assign'].includes(node.data.kind) && !node.data.value.trim()) errors.push(`Completa el contenido de «${node.data.label || BLOCKS[node.data.kind].name}».`);
+    if (['message', 'condition', 'tag', 'assign', 'handoff'].includes(node.data.kind) && !node.data.value.trim()) errors.push(`Completa el contenido de «${node.data.label || BLOCKS[node.data.kind].name}».`);
+    if (node.data.kind === 'reminder' && (!/^\d+$/.test(node.data.value) || Number(node.data.value) < 1 || Number(node.data.value) > 1380)) errors.push('La espera sin respuesta debe ser de 1 a 1380 minutos.');
     if (node.data.kind === 'wait' && (!/^\d+$/.test(node.data.value) || Number(node.data.value) < 1 || Number(node.data.value) > 10080)) errors.push(`La espera de «${node.data.label}» debe ser de 1 a 10080 minutos.`);
     if (node.data.kind === 'buttons') {
       const choices = node.data.choices.map(choice => choice.trim());
@@ -127,6 +162,16 @@ export function validateFlow(flow) {
       const id = pending.pop();
       if (visited.has(id)) continue;
       visited.add(id); pending.push(...edges.filter(edge => edge.source === id).map(edge => edge.target));
+    }
+    const byId = new Map(nodes.map(node => [node.id, node]));
+    const contexts = [[starts[0].id, 0]], seen = new Set();
+    while (contexts.length) {
+      const [id, depth] = contexts.pop(), key = id + ':' + depth;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const kind = byId.get(id)?.data.kind;
+      if (kind === 'back' && depth < 2) errors.push('Conecta «Volver al menú anterior» desde un submenú.');
+      for (const edge of edges.filter(edge => edge.source === id)) contexts.push([edge.target, Math.min(2, depth + Number(kind === 'buttons'))]);
     }
     if (nodes.some(node => !visited.has(node.id))) errors.push('Hay bloques que no se alcanzan desde Inicio. Conéctalos o retíralos.');
   }
@@ -158,6 +203,9 @@ export function simulateFlow(flow, { name = 'Lucía', incoming = 'Hola', answer 
   const errors = validateFlow(flow);
   if (errors.length) return { errors, steps: [], tags: [], assigned: '', minutes: 0 };
   const steps = [], tags = new Set(); let assigned = '', minutes = 0;
+  const answers = String(answer).split('\n').map(item => item.trim()).filter(Boolean);
+  const menus = [];
+  let answerIndex = 0;
   let current = flow.nodes.find(node => node.data.kind === 'trigger');
   if (current.data.value.trim() && !normalize(incoming).includes(normalize(current.data.value))) return { errors: ['El mensaje de prueba no coincide con la palabra clave de Inicio.'], steps, tags: [], assigned, minutes };
   for (let count = 0; current && count < 90; count++) {
@@ -166,22 +214,33 @@ export function simulateFlow(flow, { name = 'Lucía', incoming = 'Hola', answer 
     if (kind === 'trigger') detail = `Mensaje recibido: «${incoming}»`;
     if (kind === 'message') detail = value.replaceAll('{{nombre}}', name.trim() || 'Contacto');
     if (kind === 'buttons') {
-      const index = current.data.choices.findIndex(choice => normalize(choice) === normalize(answer));
+      const index = current.data.choices.findIndex(choice => normalize(choice) === normalize(answers[answerIndex] || ''));
       detail = value.replaceAll('{{nombre}}', name.trim() || 'Contacto');
       if (index < 0) {
         steps.push({ id: current.id, kind, label, detail, minutes, output: '' });
-        return { errors: ['Para seguir, escribe el nombre exacto de uno de los botones: ' + current.data.choices.join(' o ') + '.'], steps, tags: [...tags], assigned, minutes };
+        return { errors: [], waiting: current.data.choices, steps, tags: [...tags], assigned, minutes };
       }
+      answerIndex++;
+      menus.push(current.id);
       output = 'option-' + (index + 1);
       detail += ' · Opción elegida: ' + current.data.choices[index];
     }
     if (kind === 'condition') { output = normalize(answer).includes(normalize(value)) ? 'yes' : 'no'; detail = `Respuesta: «${answer}». Camino: ${output === 'yes' ? 'Sí' : 'No'}.`; }
     if (kind === 'wait') { minutes += Number(value); detail = `Se adelantan ${value} minutos. La prueba no espera en tiempo real.`; }
+    if (kind === 'reminder') { minutes += Number(value); detail = 'Sin respuesta en ' + value + ' minutos simulados.'; }
+    if (kind === 'back') {
+      menus.pop();
+      const previous = menus.pop();
+      if (!previous) return { errors: ['Todavía no hay un menú anterior.'], steps, tags: [...tags], assigned, minutes };
+      steps.push({ id: current.id, kind, label, detail: 'Volver al menú anterior', minutes, output: '' });
+      current = flow.nodes.find(node => node.id === previous);
+      continue;
+    }
     if (kind === 'tag') { tags.add(value); detail = `Etiqueta añadida: ${value}`; }
-    if (kind === 'assign') { assigned = value; detail = `Asignado a ${value}`; }
+    if (kind === 'assign' || kind === 'handoff') { assigned = value; detail = `Asignado a ${value}`; }
     if (kind === 'end') detail = 'Simulación terminada. Ningún mensaje fue enviado.';
     steps.push({ id: current.id, kind, label, detail, minutes, output });
-    if (kind === 'end') return { errors: [], steps, tags: [...tags], assigned, minutes };
+    if (kind === 'end' || kind === 'handoff') return { errors: [], steps, tags: [...tags], assigned, minutes };
     const edge = flow.edges.find(item => item.source === current.id && (item.sourceHandle || 'next') === output);
     current = flow.nodes.find(node => node.id === edge?.target);
   }
