@@ -125,7 +125,7 @@
   .visual-preview .app[data-view="sales"] .sidebar nav{
     display:grid;grid-template-columns:repeat(7,minmax(0,1fr));
   }
-  .visual-preview .app[data-view="sales"] .sidebar nav button{
+  .visual-preview .app[data-view="sales"] .sidebar nav :is(button,a){
     min-width:0;padding-inline:2px;white-space:normal;overflow-wrap:anywhere;
   }
   .visual-preview .app[data-view="sales"] .topbar h1{font-size:20px}

@@ -2,7 +2,7 @@
 {
   const style = document.createElement('link');
   style.rel = 'stylesheet';
-  style.href = '/app/visual-preview.css?v=20261123-espacio';
+  style.href = '/app/visual-preview.css?v=20261123-menu-flujos';
   document.head.append(style);
   document.body.classList.add('visual-preview', 'motion-on');
   document.body.classList.remove('quiet-preview');
@@ -11,27 +11,26 @@
   banner.setAttribute('aria-label', 'Apariencia de LAZO');
   const label = document.createElement('span');
   label.textContent = 'LAZO · Órbita';
-  const flows = document.createElement('a');
-  flows.href = '/flujos/';
-  flows.textContent = 'Flujos · laboratorio';
-  banner.append(label, flows);
+  banner.append(label);
   document.body.prepend(banner);
 
   const paths = {
     conversations: '<path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8A8.5 8.5 0 0 1 12.5 20a8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8A8.5 8.5 0 0 1 12.5 3H13a8.5 8.5 0 0 1 8 8v.5Z"/><path d="M8 10h9M8 14h6"/>',
     contacts: '<circle cx="9" cy="8" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6M21 21v-2a6 6 0 0 0-3-5.2"/>',
     sales: '<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16M15 4v16M3 10h18"/>',
+    flows: '<rect x="3" y="9" width="6" height="6" rx="1.5"/><rect x="15" y="3" width="6" height="6" rx="1.5"/><rect x="15" y="15" width="6" height="6" rx="1.5"/><path d="M9 12h3m0 0V6h3m-3 6v6h3"/>',
     statistics: '<path d="M4 4v16h17M8 15l4-5 4 3 5-8"/><circle cx="12" cy="10" r="1"/>',
     connections: '<path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-2 2M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l2-2"/>',
     settings: '<path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="16" cy="17" r="3"/>'
   };
   function decorateNavigation() {
-    for (const button of document.querySelectorAll('.sidebar nav [data-view]')) {
-      const slot = button.querySelector('span');
-      if (!slot || slot.dataset.orbitaIcon || !paths[button.dataset.view]) continue;
+    for (const item of document.querySelectorAll('.sidebar nav :is([data-view],[data-nav-icon])')) {
+      const slot = item.querySelector('span');
+      const icon = paths[item.dataset.navIcon || item.dataset.view];
+      if (!slot || slot.dataset.orbitaIcon || !icon) continue;
       slot.dataset.orbitaIcon = '1';
       // Only fixed, local icon paths are used here; no user content is inserted.
-      slot.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + paths[button.dataset.view] + '</svg>';
+      slot.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + icon + '</svg>';
     }
     const heading = document.querySelector('.details-heading');
     if (heading && !heading.querySelector('#close-details, .visual-close-details')) {

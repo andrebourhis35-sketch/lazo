@@ -32,8 +32,8 @@
   width:188px;flex-shrink:0;margin:12px 0 12px 12px;padding:18px 12px;overflow-y:auto;
 }
 .visual-preview .app[data-view="conversations"] .sidebar nav{gap:7px}
-.visual-preview .app[data-view="conversations"] .sidebar nav button{min-height:43px;padding:9px;font-size:12px}
-.visual-preview .app[data-view="conversations"] .sidebar nav button>span{width:27px;height:27px;border-radius:8px}
+.visual-preview .app[data-view="conversations"] .sidebar nav :is(button,a){min-height:43px;padding:9px;font-size:12px}
+.visual-preview .app[data-view="conversations"] .sidebar nav :is(button,a)>span{width:27px;height:27px;border-radius:8px}
 .visual-preview .app[data-view="conversations"] .sidebar .demo-card{padding:10px;font-size:10px}
 .visual-preview .app[data-view="conversations"] .sidebar .demo-card p{margin:7px 0 0;font-size:10px;line-height:1.5}
 .visual-preview .app[data-view="conversations"] .list-title{padding:14px}
@@ -135,8 +135,8 @@
   .visual-preview .app[data-view="conversations"]{height:calc(100dvh - 48px);display:flex;flex-direction:column}
   .visual-preview .app[data-view="conversations"] .sidebar{width:calc(100% - 20px);flex-shrink:0;margin:6px 10px 0;padding:6px;overflow:visible}
   .visual-preview .app[data-view="conversations"] .sidebar nav{gap:2px}
-  .visual-preview .app[data-view="conversations"] .sidebar nav button{min-height:42px;font-size:8px;padding:5px 2px;gap:4px}
-  .visual-preview .app[data-view="conversations"] .sidebar nav button>span{width:17px;height:17px}
+  .visual-preview .app[data-view="conversations"] .sidebar nav :is(button,a){min-height:42px;font-size:8px;padding:5px 2px;gap:4px}
+  .visual-preview .app[data-view="conversations"] .sidebar nav :is(button,a)>span{width:17px;height:17px}
   .visual-preview .app[data-view="conversations"] main{flex:1;padding:8px 10px}
   .visual-preview .app[data-view="conversations"] .topbar{flex-basis:50px;min-height:50px;padding:6px 10px;margin-bottom:8px}
   .visual-preview .app[data-view="conversations"] .topbar h1{font-size:20px;margin:2px 0 0}

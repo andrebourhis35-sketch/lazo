@@ -1,5 +1,12 @@
 # Coordinación Codex y Claude
 
+### Flujos en el menú principal (23 de noviembre de 2026)
+
+- Reserva: menú del CRM y recursos de presentación, rama codex/flujos-menu. Flujos pasa al menú principal entre Ventas y Estadísticas y abre el editor existente. Se retira el enlace superior.
+- QA en navegador: enlace visible en escritorio y a 390 × 844, sin desbordamiento de la página. Al abrirlo carga el editor y el botón Agregar bloque.
+
+- Publicado flow-nav-75d7b47 con respaldo y 88 pruebas aprobadas en OVH. HTTPS confirmó los ocho recursos del CRM y la ruta del editor. PR #74.
+
 ### Más espacio de trabajo en el CRM (23 de noviembre de 2026)
 
 - Reserva: presentación Órbita del CRM, cabeceras, navegación y bandeja; rama codex/espacio-crm. Cabeceras y barra lateral reducidas, tablas más compactas y filtros de Conversaciones plegables con contador. Se conserva la preferencia de tamaño de lectura.
