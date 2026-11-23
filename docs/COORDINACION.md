@@ -5,6 +5,8 @@
 - Reserva: estilos base de navegación del CRM, rama codex/alinear-flujos. El enlace Flujos comparte la disposición, peso, centrado y foco con los botones adyacentes.
 - QA en navegador: Ventas, Flujos y Estadísticas miden 38 px y comparten las posiciones del icono en escritorio. En móvil, Flujos conserva la columna de icono y texto. La navegación abre el editor.
 
+- Publicado flow-align-1eaec00 con respaldo y 88 pruebas aprobadas en OVH. HTML, JS y ambas hojas de estilo verificados por HTTPS. PR #75.
+
 ### Flujos en el menú principal (23 de noviembre de 2026)
 
 - Reserva: menú del CRM y recursos de presentación, rama codex/flujos-menu. Flujos pasa al menú principal entre Ventas y Estadísticas y abre el editor existente. Se retira el enlace superior.
