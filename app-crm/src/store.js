@@ -35,6 +35,7 @@ export function openStore(filename) {
     CREATE TABLE IF NOT EXISTS flows(id TEXT PRIMARY KEY,company_id TEXT NOT NULL REFERENCES companies(id),draft TEXT NOT NULL,revision INTEGER NOT NULL DEFAULT 1,published TEXT,published_revision INTEGER,activation INTEGER NOT NULL DEFAULT 0,active INTEGER NOT NULL DEFAULT 0,actor_id TEXT,created INTEGER NOT NULL,updated INTEGER NOT NULL);
     CREATE UNIQUE INDEX IF NOT EXISTS flows_one_active ON flows(company_id) WHERE active=1;
     CREATE TABLE IF NOT EXISTS flow_runs(id TEXT PRIMARY KEY,company_id TEXT NOT NULL,flow_id TEXT NOT NULL,contact_id TEXT NOT NULL,message_id TEXT NOT NULL,revision INTEGER NOT NULL,activation INTEGER NOT NULL,snapshot TEXT NOT NULL,state TEXT NOT NULL,step TEXT,reason TEXT NOT NULL DEFAULT '',created INTEGER NOT NULL,updated INTEGER NOT NULL,UNIQUE(flow_id,message_id));
+    CREATE TABLE IF NOT EXISTS flow_ai_settings(company_id TEXT PRIMARY KEY REFERENCES companies(id),secret TEXT NOT NULL,enabled INTEGER NOT NULL DEFAULT 0);
     CREATE TABLE IF NOT EXISTS flow_steps(id INTEGER PRIMARY KEY,run_id TEXT NOT NULL REFERENCES flow_runs(id) ON DELETE CASCADE,label TEXT NOT NULL,detail TEXT NOT NULL,message_id TEXT,created INTEGER NOT NULL);
     CREATE INDEX IF NOT EXISTS flow_steps_run ON flow_steps(run_id,id);
     CREATE INDEX IF NOT EXISTS flow_runs_queue ON flow_runs(state,created);

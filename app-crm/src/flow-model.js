@@ -4,10 +4,11 @@ export const BLOCKS = {
   message: { name: 'Mensaje', description: 'Texto con variables de contacto', group: 'Conversación' },
   buttons: { name: 'Botones de respuesta', description: 'Envía hasta tres opciones y sigue la elegida', group: 'Conversación' },
   condition: { name: 'Condición', description: 'Dos caminos según la respuesta', group: 'Lógica' },
+  ai: { name: 'Agente IA', description: 'Responde con información de tu negocio', group: 'Conversación' },
   reminder: { name: 'Esperar sin respuesta', description: 'Continúa solo si el cliente no responde', group: 'Lógica' },
   handoff: { name: 'Traspasar a asesor', description: 'Asigna el chat y pausa la automatización', group: 'Acciones' },
   back: { name: 'Volver al menú anterior', description: 'Regresa al menú previo de este recorrido', group: 'Lógica' },
-  wait: { name: 'Espera', description: 'Avanza el tiempo de la simulación', group: 'Lógica' },
+  wait: { name: 'Espera', description: 'Pausa el recorrido durante un tiempo fijo', group: 'Lógica' },
   tag: { name: 'Etiqueta', description: 'Organiza el contacto', group: 'Acciones' },
   assign: { name: 'Asignar asesor', description: 'Continúa con una persona', group: 'Acciones' },
   end: { name: 'Finalizar', description: 'Cierra este recorrido', group: 'Acciones' },
@@ -19,10 +20,11 @@ export function createNode(kind, id, position = { x: 0, y: 0 }) {
     message: { label: 'Enviar mensaje', value: 'Hola {{nombre}}, ¿cómo podemos ayudarte?' },
     buttons: { label: 'Elegir una opción', value: 'Hola {{nombre}}, ¿qué te gustaría consultar?', choices: ['Ver catálogo', 'Consultar horarios'] },
     condition: { label: '¿Qué necesita el contacto?', value: 'catálogo' },
+    ai: { label: 'Responder con IA', value: '' },
     reminder: { label: 'Esperar antes del seguimiento', value: '30' },
     handoff: { label: 'Traspasar al equipo', value: '' },
     back: { label: 'Volver al menú anterior', value: '' },
-    wait: { label: 'Dar tiempo para responder', value: '30' },
+    wait: { label: 'Pausar antes del siguiente mensaje', value: '30' },
     tag: { label: 'Organizar contacto', value: 'Interesado' },
     assign: { label: 'Continuar con un asesor', value: 'Equipo comercial' },
     end: { label: 'Recorrido completo', value: '' },
@@ -100,6 +102,7 @@ const normalize = value => String(value).normalize('NFD').replace(/[\u0300-\u036
 export const summarizeNode = data => ['wait', 'reminder'].includes(data.kind) ? `${data.value || '0'} minutos` : data.kind === 'end' ? 'El contacto sale del flujo' : data.value;
 export function outputsFor({kind, choices}) {
   if (kind === 'buttons') return choices.map((_, index) => 'option-' + (index + 1));
+  if (kind === 'ai') return ['answered','handoff'];
   if (kind === 'condition') return ['yes', 'no'];
   return ['end', 'handoff', 'back'].includes(kind) ? [] : ['next'];
 }
@@ -139,7 +142,7 @@ export function validateFlow(flow) {
   if (starts.length !== 1) errors.push('El flujo necesita exactamente un bloque de inicio.');
   for (const node of nodes) {
     if (!node.data.label.trim()) errors.push('Todos los bloques necesitan un nombre.');
-    if (['message', 'condition', 'tag', 'assign', 'handoff'].includes(node.data.kind) && !node.data.value.trim()) errors.push(`Completa el contenido de «${node.data.label || BLOCKS[node.data.kind].name}».`);
+    if (['message', 'condition', 'tag', 'assign', 'handoff', 'ai'].includes(node.data.kind) && !node.data.value.trim()) errors.push(`Completa el contenido de «${node.data.label || BLOCKS[node.data.kind].name}».`);
     if (node.data.kind === 'reminder' && (!/^\d+$/.test(node.data.value) || Number(node.data.value) < 1 || Number(node.data.value) > 1380)) errors.push('La espera sin respuesta debe ser de 1 a 1380 minutos.');
     if (node.data.kind === 'wait' && (!/^\d+$/.test(node.data.value) || Number(node.data.value) < 1 || Number(node.data.value) > 10080)) errors.push(`La espera de «${node.data.label}» debe ser de 1 a 10080 minutos.`);
     if (node.data.kind === 'buttons') {
@@ -149,7 +152,7 @@ export function validateFlow(flow) {
     }
     for (const output of outputsFor(node.data)) {
       const targets = edges.filter(edge => edge.source === node.id && (edge.sourceHandle || 'next') === output);
-      if (targets.length !== 1) errors.push(`Conecta ${output === 'yes' ? 'la salida «Sí»' : output === 'no' ? 'la salida «No»' : output.startsWith('option-') ? 'el botón ' + output.slice(-1) : 'la salida'} de «${node.data.label}».`);
+      if (targets.length !== 1) errors.push(`Conecta ${output === 'yes' ? 'la salida «Sí»' : output === 'no' ? 'la salida «No»' : output === 'answered' ? 'la salida «Respondió»' : output === 'handoff' ? 'la salida «Asesor»' : output.startsWith('option-') ? 'el botón ' + output.slice(-1) : 'la salida'} de «${node.data.label}».`);
     }
   }
   for (const edge of edges) {
@@ -192,14 +195,14 @@ export function parseDraft(raw) {
   });
   const edgeIds = new Set();
   const edges = flow.edges.map(edge => {
-    if (!edge || typeof edge.id !== 'string' || edge.id.length > 180 || edgeIds.has(edge.id) || !ids.has(edge.source) || !ids.has(edge.target) || !['next', 'yes', 'no', 'option-1', 'option-2', 'option-3'].includes(edge.sourceHandle || 'next')) throw new Error('El borrador contiene una conexión incompatible.');
+    if (!edge || typeof edge.id !== 'string' || edge.id.length > 180 || edgeIds.has(edge.id) || !ids.has(edge.source) || !ids.has(edge.target) || !['next', 'yes', 'no', 'option-1', 'option-2', 'option-3', 'answered', 'handoff'].includes(edge.sourceHandle || 'next')) throw new Error('El borrador contiene una conexión incompatible.');
     edgeIds.add(edge.id);
     return { id: edge.id, source: edge.source, target: edge.target, sourceHandle: edge.sourceHandle || 'next', type: 'smoothstep' };
   });
   return { version: 1, name: flow.name, nodes, edges };
 }
 
-export function simulateFlow(flow, { name = 'Lucía', incoming = 'Hola', answer = 'Quiero el catálogo' } = {}) {
+export function simulateFlow(flow, { aiOutcome = 'answered', name = 'Lucía', incoming = 'Hola', answer = 'Quiero el catálogo' } = {}) {
   const errors = validateFlow(flow);
   if (errors.length) return { errors, steps: [], tags: [], assigned: '', minutes: 0 };
   const steps = [], tags = new Set(); let assigned = '', minutes = 0;
@@ -227,6 +230,10 @@ export function simulateFlow(flow, { name = 'Lucía', incoming = 'Hola', answer 
     }
     if (kind === 'condition') { output = normalize(answer).includes(normalize(value)) ? 'yes' : 'no'; detail = `Respuesta: «${answer}». Camino: ${output === 'yes' ? 'Sí' : 'No'}.`; }
     if (kind === 'wait') { minutes += Number(value); detail = `Se adelantan ${value} minutos. La prueba no espera en tiempo real.`; }
+    if (kind === 'ai') {
+      output = aiOutcome === 'handoff' ? 'handoff' : 'answered';
+      detail = output === 'handoff' ? 'Simulación: se necesita un asesor.' : 'Simulación: el agente responde con la información del negocio.';
+    }
     if (kind === 'reminder') { minutes += Number(value); detail = 'Sin respuesta en ' + value + ' minutos simulados.'; }
     if (kind === 'back') {
       menus.pop();
