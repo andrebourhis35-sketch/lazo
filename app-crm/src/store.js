@@ -35,6 +35,8 @@ export function openStore(filename) {
     CREATE TABLE IF NOT EXISTS flows(id TEXT PRIMARY KEY,company_id TEXT NOT NULL REFERENCES companies(id),draft TEXT NOT NULL,revision INTEGER NOT NULL DEFAULT 1,published TEXT,published_revision INTEGER,activation INTEGER NOT NULL DEFAULT 0,active INTEGER NOT NULL DEFAULT 0,actor_id TEXT,created INTEGER NOT NULL,updated INTEGER NOT NULL);
     CREATE UNIQUE INDEX IF NOT EXISTS flows_one_active ON flows(company_id) WHERE active=1;
     CREATE TABLE IF NOT EXISTS flow_runs(id TEXT PRIMARY KEY,company_id TEXT NOT NULL,flow_id TEXT NOT NULL,contact_id TEXT NOT NULL,message_id TEXT NOT NULL,revision INTEGER NOT NULL,activation INTEGER NOT NULL,snapshot TEXT NOT NULL,state TEXT NOT NULL,step TEXT,reason TEXT NOT NULL DEFAULT '',created INTEGER NOT NULL,updated INTEGER NOT NULL,UNIQUE(flow_id,message_id));
+    CREATE TABLE IF NOT EXISTS flow_steps(id INTEGER PRIMARY KEY,run_id TEXT NOT NULL REFERENCES flow_runs(id) ON DELETE CASCADE,label TEXT NOT NULL,detail TEXT NOT NULL,message_id TEXT,created INTEGER NOT NULL);
+    CREATE INDEX IF NOT EXISTS flow_steps_run ON flow_steps(run_id,id);
     CREATE INDEX IF NOT EXISTS flow_runs_queue ON flow_runs(state,created);
   `);
   const run = (sql, ...args) => db.prepare(sql).run(...args);
@@ -44,6 +46,11 @@ export function openStore(filename) {
   tx(()=>{
     if(!all('PRAGMA table_info(contacts)').some(c=>c.name==='tags'))db.exec("ALTER TABLE contacts ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'");
     if(!all('PRAGMA table_info(messages)').some(c=>c.name==='attachment_id'))db.exec('ALTER TABLE messages ADD COLUMN attachment_id TEXT');
+    const runColumns=new Set(all('PRAGMA table_info(flow_runs)').map(c=>c.name));
+    if(!runColumns.has('due'))db.exec('ALTER TABLE flow_runs ADD COLUMN due INTEGER');
+    if(!runColumns.has('visits'))db.exec('ALTER TABLE flow_runs ADD COLUMN visits INTEGER NOT NULL DEFAULT 0');
+    if(!runColumns.has('menus'))db.exec("ALTER TABLE flow_runs ADD COLUMN menus TEXT NOT NULL DEFAULT '[]'");
+    if(!all('PRAGMA table_info(contacts)').some(c=>c.name==='automation_paused'))db.exec('ALTER TABLE contacts ADD COLUMN automation_paused INTEGER NOT NULL DEFAULT 0');
     for(const company of all('SELECT id FROM companies'))ensureWorkspace(company.id);
   });
   function ensureWorkspace(company) {
@@ -91,6 +98,7 @@ export function openStore(filename) {
   function updateContact(company,id,data,actor) {
     ensureWorkspace(company);
     const c=contact(company,id);
+    const previousOwner=c.owner_id;
     const beforeWon=Boolean(get('SELECT is_won FROM pipeline_stages WHERE company_id=? AND name=?',company,c.stage)?.is_won);
     if (data.stage!==undefined) {requireThat(get('SELECT 1 FROM pipeline_stages WHERE company_id=? AND name=?',company,data.stage),'Etapa no válida.');c.stage=data.stage;}
     if (data.note!==undefined) c.note=text(data.note,4000);
@@ -107,6 +115,9 @@ export function openStore(filename) {
     tx(()=>{
       run('UPDATE contacts SET stage=?,note=?,name=?,owner_id=?,resolved=?,tags=?,updated=? WHERE company_id=? AND id=?',c.stage,c.note,c.name,c.owner_id,c.resolved,c.tags,now(),company,id);
       if(beforeWon!==afterWon)run('INSERT INTO sale_events VALUES(?,?,?,?,?)',randomUUID(),company,id,afterWon?'won':'reopened',now());
+      if(afterWon||data.ownerId!==undefined&&c.owner_id!==previousOwner) {
+        run("UPDATE flow_runs SET state='cancelled',reason=?,updated=? WHERE company_id=? AND contact_id=? AND due IS NOT NULL AND state IN ('pending','scheduled','running')",afterWon?'Venta ganada.':'Se asignó un asesor.',now(),company,id);
+      }
       audit(company,actor,'contact.updated');
     });
     return contact(company,id);

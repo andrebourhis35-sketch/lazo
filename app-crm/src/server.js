@@ -193,6 +193,19 @@ export function createServer(config,{store=openStore(config.database),fetchImpl=
         store.tx(()=>{store.run('DELETE FROM sessions WHERE company_id=? AND user_id=?',s.company_id,member.user_id);store.run('UPDATE contacts SET owner_id=? WHERE company_id=? AND owner_id=?',s.user_id,s.company_id,member.user_id);store.run('DELETE FROM memberships WHERE company_id=? AND user_id=?',s.company_id,member.user_id);store.audit(s.company_id,s.user_id,'member.removed');});
         return response(res,200,{ok:true});
       }
+      if(method==='GET'&&route==='/inbox-overview') {
+        const url=new URL(req.url,config.origin),company=url.searchParams.get('company')||null;
+        const sources=store.all(`SELECT c.id,c.name,w.phone_id FROM memberships m JOIN companies c ON c.id=m.company_id
+          JOIN connections w ON w.company_id=c.id WHERE m.user_id=? ORDER BY c.name,c.id`,s.user_id);
+        requireThat(!company||sources.some(source=>source.id===company),'Número no disponible.',403);
+        const conversations=store.all(`SELECT c.id,c.company_id,c.name,c.unread,c.updated,company.name AS source,
+          (SELECT body FROM messages m WHERE m.company_id=c.company_id AND m.contact_id=c.id ORDER BY m.created DESC,m.id DESC LIMIT 1) AS last_message
+          FROM contacts c JOIN memberships access ON access.company_id=c.company_id AND access.user_id=?
+          JOIN companies company ON company.id=c.company_id JOIN connections w ON w.company_id=c.company_id
+          WHERE (? IS NULL OR c.company_id=?) AND EXISTS(SELECT 1 FROM messages m WHERE m.company_id=c.company_id AND m.contact_id=c.id)
+          ORDER BY c.updated DESC,c.id LIMIT 100`,s.user_id,company,company);
+        return response(res,200,{sources,conversations});
+      }
       if(method==='GET'&&route==='/contacts')return response(res,200,{contacts:store.all(`SELECT c.*,(SELECT body FROM messages m WHERE m.company_id=c.company_id AND m.contact_id=c.id ORDER BY m.created DESC LIMIT 1) AS last_message FROM contacts c WHERE company_id=? ORDER BY updated DESC LIMIT 1000`,s.company_id)});
       if(method==='POST'&&route==='/contacts')return response(res,201,await authorizedJson(req,s,data=>store.addContact(s.company_id,data,s.user_id)));
       const fileMatch=route.match(/^\/messages\/([a-f\d-]+)\/attachment$/);
@@ -203,10 +216,16 @@ export function createServer(config,{store=openStore(config.database),fetchImpl=
         const name=encodeURIComponent(file.filename).replace(/['()*]/g,c=>'%'+c.charCodeAt(0).toString(16).toUpperCase());
         return response(res,200,file.bytes,file.mime,{'Content-Disposition':"attachment; filename=\"archivo"+(file.mime==='application/pdf'?'.pdf':file.mime==='image/png'?'.png':'.jpg')+"\"; filename*=UTF-8''"+name,'Content-Length':String(file.bytes.length),'Content-Security-Policy':"sandbox; default-src 'none'"});
       }
-      const contactMatch=route.match(/^\/contacts\/([a-f\d-]+)(?:\/(messages|read|attachments))?$/);
+      const contactMatch=route.match(/^\/contacts\/([a-f\d-]+)(?:\/(messages|read|attachments|automation))?$/);
       if(contactMatch) {
-        const id=contactMatch[1],action=contactMatch[2];store.contact(s.company_id,id);
+        const id=contactMatch[1],action=contactMatch[2],contact=store.contact(s.company_id,id);
+        if(method==='GET'&&!action)return response(res,200,{contact});
         if(method==='PATCH'&&!action)return response(res,200,await authorizedJson(req,s,data=>store.updateContact(s.company_id,id,data,s.user_id)));
+        if(action==='automation'&&method==='GET')return response(res,200,{paused:Boolean(store.contact(s.company_id,id).automation_paused),runs:flows.contactHistory(s.company_id,id)});
+        if(action==='automation'&&method==='POST')return response(res,200,await authorizedJson(req,s,data=>{
+          requireThat(typeof data.paused==='boolean','Estado no válido.');
+          return flows.setAutomation(s.company_id,id,data.paused,s.user_id);
+        }));
         if(method==='POST'&&action==='read') {store.run('UPDATE contacts SET unread=0 WHERE company_id=? AND id=?',s.company_id,id);return response(res,200,{ok:true});}
         if(method==='GET'&&action==='messages') {
           const messages=store.all('SELECT * FROM messages WHERE company_id=? AND contact_id=? ORDER BY created DESC,id DESC LIMIT 100',s.company_id,id).reverse();
@@ -225,6 +244,7 @@ export function createServer(config,{store=openStore(config.database),fetchImpl=
             requireThat(mediaLimits[file.type]&&file.size<=mediaLimits[file.type]&&file.size>0,'Usa JPG/PNG de hasta 5 MB o PDF de hasta 10 MB.',413);
             requireThat(typeof clientId==='string'&&/^[a-f\d-]{36}$/.test(clientId),'Identificador de envío no válido.');
             const content=Buffer.from(await file.arrayBuffer());assertSession(s);
+            flows.cancelReminder(s.company_id,id,'Un asesor intervino.');
             const result=await wa.send(s.company_id,id,{type:file.type==='application/pdf'?'document':'image',text:form.get('caption')||'',clientId,file:{bytes:content,mime:file.type,filename:file.name}},s.user_id);
             return response(res,200,result);
           } finally {fileUploads--;}
@@ -232,6 +252,7 @@ export function createServer(config,{store=openStore(config.database),fetchImpl=
         if(method==='POST'&&action==='messages') {
           store.limit('send:'+s.company_id,30,60000);const data=await json(req);assertSession(s);
           requireThat(typeof data.clientId==='string'&&/^[a-f\d-]{36}$/.test(data.clientId),'Identificador de envío no válido.');
+          flows.cancelReminder(s.company_id,id,'Un asesor intervino.');
           return response(res,200,await wa.send(s.company_id,id,data,s.user_id));
         }
       }
