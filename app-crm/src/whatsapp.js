@@ -15,13 +15,15 @@ export function whatsapp(store, config, fetchImpl = fetch, onIncoming = () => {}
   const secrets = vault(config.masterKey);
   const media=mediaFiles(store,config,fetchImpl,credentials);
   const flowNumbers=new Map();
-  function credentials(company) {
-    const row = store.get('SELECT * FROM connections WHERE company_id=?', company);
+  function credentials(company, phoneId) {
+    const row=phoneId
+      ?store.get('SELECT * FROM connections WHERE company_id=? AND phone_id=?',company,phoneId)
+      :store.get('SELECT * FROM connections WHERE company_id=? ORDER BY rowid LIMIT 1',company);
     return row ? { ...row, ...secrets.open(row.config, company) } : null;
   }
-  function safe(company) {
-    const c=credentials(company);
-    return c ? { configured:true, phoneId:c.phone_id, wabaId:c.waba_id, graphVersion:c.graphVersion,
+  function safe(company,phoneId) {
+    const c=credentials(company,phoneId);
+    return c ? { configured:true, number:c.display_number, phoneId:c.phone_id, wabaId:c.waba_id, graphVersion:c.graphVersion,
       checkedAt:c.checked, webhookAt:c.webhook_at, webhookVerified:Boolean(c.verified),
       hasAppSecret:Boolean(c.appSecret), testOnly:Boolean(c.testRecipient),
       callbackUrl:`${config.origin}/webhooks/whatsapp`, verifyToken:c.verifyToken } : {configured:false};
@@ -44,59 +46,80 @@ export function whatsapp(store, config, fetchImpl = fetch, onIncoming = () => {}
     }
     return result;
   }
-  async function flowNumber(company) {
-    const connection=credentials(company);
+  async function flowNumber(company,phoneId) {
+    const connection=credentials(company,phoneId);
     if(!connection)return {number:null,canActivate:false};
     const canActivate=Boolean(connection.testRecipient&&connection.appSecret&&connection.verified);
-    const cached=flowNumbers.get(company);
+    if(connection.display_number)return {number:connection.display_number,canActivate};
+    const cached=flowNumbers.get(connection.phone_id);
     if(cached?.phoneId===connection.phone_id&&cached.until>now())return {number:cached.number,canActivate};
     let number=null;
     try{
       const result=await graph(connection,connection.phone_id+'?fields=id,display_phone_number');
       if(result.id===connection.phone_id&&typeof result.display_phone_number==='string'&&/^\+?[()\d .-]{7,32}$/.test(result.display_phone_number))
         number=result.display_phone_number;
+      if(number)store.run("UPDATE connections SET display_number=? WHERE company_id=? AND phone_id=? AND config=?",
+        number,company,connection.phone_id,connection.config);
     }catch{ /* The workspace and Meta ID remain available if Meta cannot return the number. */ }
     if(flowNumbers.size>=256)flowNumbers.delete(flowNumbers.keys().next().value);
-    flowNumbers.set(company,{phoneId:connection.phone_id,until:now()+(number?3600000:60000),number});
+    flowNumbers.set(connection.phone_id,{phoneId:connection.phone_id,until:now()+(number?3600000:60000),number});
     return {number,canActivate};
   }
   function saveRaw(company,c,verified=0) {
-    const existing=store.get('SELECT company_id FROM connections WHERE phone_id=?',c.phoneId);
+    const existing=store.get('SELECT company_id,phone_id FROM connections WHERE phone_id=?',c.phoneId);
     requireThat(!existing||existing.company_id===company,'Ese número ya está conectado a otra empresa.',409);
-    store.run('INSERT INTO connections(company_id,phone_id,waba_id,config,checked,verified) VALUES(?,?,?,?,?,?) ON CONFLICT(company_id) DO UPDATE SET phone_id=excluded.phone_id,waba_id=excluded.waba_id,config=excluded.config,checked=excluded.checked,verified=excluded.verified',
-      company,c.phoneId,c.wabaId,secrets.seal(c,company),now(),verified);
+    const first=!store.numbers(company).length;
+    store.run(`INSERT INTO connections(company_id,phone_id,waba_id,config,checked,verified,display_number)
+      VALUES(?,?,?,?,?,?,?) ON CONFLICT(phone_id) DO UPDATE SET waba_id=excluded.waba_id,config=excluded.config,
+      checked=excluded.checked,verified=excluded.verified,display_number=COALESCE(NULLIF(excluded.display_number,''),connections.display_number)`,
+      company,c.phoneId,c.wabaId,secrets.seal(c,company),now(),verified,c.displayNumber||'');
+    if(first)store.run("UPDATE contacts SET phone_id=? WHERE company_id=? AND phone_id=''",c.phoneId,company);
   }
   function providerWebhookReady(secret){
-    return Boolean(secret)&&store.all('SELECT company_id FROM connections WHERE verified=1').some(row=>credentials(row.company_id)?.appSecret===secret);
+    return Boolean(secret)&&store.all('SELECT company_id,phone_id FROM connections WHERE verified=1').some(row=>credentials(row.company_id,row.phone_id)?.appSecret===secret);
+  }
+  function numbers(company){
+    return store.numbers(company).map(row=>{
+      const c=credentials(company,row.phone_id);
+      return {phoneId:row.phone_id,number:row.display_number||flowNumbers.get(row.phone_id)?.number||null,
+        canActivate:Boolean(c.testRecipient&&c.appSecret&&c.verified)};
+    });
   }
   async function connect(company,data,actor,ensureCurrent=()=>{},verifiedProvider=false) {
-    const old=credentials(company);
+    const old=data.phoneId?credentials(company,data.phoneId):store.numbers(company).length===1?credentials(company):null;
     const c={ accessToken:text(data.accessToken||old?.accessToken||'',4096,true),appSecret:text(data.appSecret||old?.appSecret||'',256),
       phoneId:text(data.phoneId||old?.phone_id||'',50,true),wabaId:text(data.wabaId||old?.waba_id||'',50,true),
       graphVersion:text(data.graphVersion||old?.graphVersion||'',12,true),verifyToken:old?.verifyToken||token(),
-      testRecipient:old?.testRecipient||config.testRecipient||'' };
+      testRecipient:old?.testRecipient??config.testRecipient??'' };
     requireThat(/^\d+$/.test(c.phoneId)&&/^\d+$/.test(c.wabaId)&&/^v\d+\.\d+$/.test(c.graphVersion),'Revisa los identificadores y la versión de la API.');
-    requireThat(!old||(old.phone_id===c.phoneId&&old.waba_id===c.wabaId),
-      'Para conectar otro número o cuenta, crea un espacio de empresa separado en Conexiones. La conexión actual conserva su historial y sus flujos.',409);
+    requireThat(!old||old.waba_id===c.wabaId,'La cuenta de Meta de este número no coincide.',409);
+    requireThat(!store.get('SELECT 1 FROM connections WHERE phone_id=? AND company_id<>?',c.phoneId,company),'Ese número ya está conectado a otra empresa.',409);
     requireThat(!c.testRecipient||/^\d{8,15}$/.test(c.testRecipient),'Destinatario de prueba no válido.');
-    const phones=await graph(c,`${c.wabaId}/phone_numbers?fields=id&limit=100`);
-    requireThat(phones.data?.some(p=>p.id===c.phoneId),'El número no pertenece a esta cuenta de WhatsApp.');
+    const phones=await graph(c,`${c.wabaId}/phone_numbers?fields=id,display_phone_number&limit=100`);
+    const asset=phones.data?.find(p=>p.id===c.phoneId);
+    requireThat(asset,'El número no pertenece a esta cuenta de WhatsApp.');
+    if(typeof asset.display_phone_number==='string'&&/^\+?[()\d .-]{7,32}$/.test(asset.display_phone_number))c.displayNumber=asset.display_phone_number;
+    if(verifiedProvider)await subscribeAccount(c);
     ensureCurrent();
     requireThat(!verifiedProvider||providerWebhookReady(c.appSecret),'El webhook del proveedor todavía no está verificado.',409);
-    const current=store.get('SELECT config FROM connections WHERE company_id=?',company);
+    const current=store.get('SELECT config FROM connections WHERE company_id=? AND phone_id=?',company,c.phoneId);
     requireThat((current?.config||null)===(old?.config||null),'La conexión cambió mientras se comprobaba. Recarga Conexiones antes de guardar.',409);
-    saveRaw(company,c,verifiedProvider?1:old?.phone_id===c.phoneId&&old?.appSecret===c.appSecret?old.verified:0);
-    store.audit(company,actor,'whatsapp.connected');return safe(company);
+    store.tx(()=>{
+      saveRaw(company,c,verifiedProvider?1:old&&old.appSecret===c.appSecret?old.verified:0);
+      store.audit(company,actor,'whatsapp.connected');
+    });
+    return safe(company,c.phoneId);
   }
-  async function templates(company) {
-    const c=credentials(company);requireThat(c,'Conecta WhatsApp en Ajustes.',409);
+  async function templates(company,phoneId) {
+    const c=credentials(company,phoneId);requireThat(c,'Conecta WhatsApp en Ajustes.',409);
     const result=await graph(c,`${c.waba_id}/message_templates?fields=name,language,status,components&limit=100`);
     return (result.data||[]).filter(t=>t.status==='APPROVED'&&(t.components||[]).every(part=>part.type==='BODY'||part.type==='FOOTER'||(part.type==='HEADER'&&part.format==='TEXT'&&!/{{/.test(part.text||''))))
       .map(t=>({name:t.name,language:t.language,body:t.components?.find(p=>p.type==='BODY')?.text||'',parameters:[...new Set((t.components?.find(p=>p.type==='BODY')?.text||'').match(/{{\d+}}/g)||[])].length}));
   }
   async function send(company,contactId,data,actor,{flow=false}={}) {
-    const c=credentials(company);requireThat(c,'Conecta WhatsApp en Ajustes.',409);
     const contact=store.contact(company,contactId);
+    const c=credentials(company,contact.phone_id);
+    requireThat(c&&(contact.phone_id||store.numbers(company).length===1),'Elige el número de esta conversación.',409);
     requireThat(!c.testRecipient||contact.phone===c.testRecipient,'Solo se puede enviar al destinatario de prueba autorizado.',403);
     requireThat(typeof data.clientId==='string'&&/^[a-zA-Z\d-]{12,80}$/.test(data.clientId),'Identificador de envío no válido.');
     const old=store.get('SELECT * FROM messages WHERE company_id=? AND client_id=?',company,data.clientId);
@@ -116,7 +139,7 @@ export function whatsapp(store, config, fetchImpl = fetch, onIncoming = () => {}
       body=text(data.text||'',1024);
     } else {
       requireThat(type==='template','Tipo de mensaje no válido.');
-      const available=await templates(company);
+      const available=await templates(company,c.phone_id);
       const template=available.find(t=>t.name===data.templateName&&t.language===data.language);
       requireThat(template,'Elige una plantilla aprobada de la cuenta.');
       const parameters=data.parameters||[];
@@ -144,7 +167,7 @@ export function whatsapp(store, config, fetchImpl = fetch, onIncoming = () => {}
       const result=await graph(c,`${c.phone_id}/messages`,'POST',{messaging_product:'whatsapp',recipient_type:'individual',to:contact.phone,...payload});
       const waId=result.messages?.[0]?.id;
       requireThat(typeof waId==='string','Meta no confirmó el identificador del mensaje.',502);
-      const event=store.get('SELECT * FROM status_events WHERE company_id=? AND wa_id=?',company,waId);
+      const event=store.get("SELECT * FROM status_events WHERE company_id=? AND wa_id=? AND phone_id IN (?,'')",company,waId,c.phone_id);
       const status=laterStatus('accepted',event?.status||'accepted');
       store.run('UPDATE messages SET wa_id=?,status=?,error_code=?,updated=? WHERE id=? AND company_id=?',waId,status,event?.error_code||null,now(),id,company);
       store.run('UPDATE contacts SET resolved=0,updated=? WHERE company_id=? AND id=?',now(),company,contactId);
@@ -156,14 +179,14 @@ export function whatsapp(store, config, fetchImpl = fetch, onIncoming = () => {}
     return store.get('SELECT * FROM messages WHERE company_id=? AND id=?',company,id);
   }
   function verify(query) {
-    const rows=store.all('SELECT company_id FROM connections');
-    const c=rows.map(r=>credentials(r.company_id)).find(c=>c.verifyToken===query.get('hub.verify_token'));
+    const rows=store.all('SELECT company_id,phone_id FROM connections');
+    const c=rows.map(r=>credentials(r.company_id,r.phone_id)).find(c=>c.verifyToken===query.get('hub.verify_token'));
     requireThat(c&&query.get('hub.mode')==='subscribe'&&c.appSecret,'Verificación no válida.',403);
     const challenge=query.get('hub.challenge');requireThat(challenge&&/^\d{1,100}$/.test(challenge),'Challenge no válido.');
-    store.run('UPDATE connections SET verified=1 WHERE company_id=?',c.company_id);return challenge;
+    store.run('UPDATE connections SET verified=1 WHERE company_id=? AND phone_id=?',c.company_id,c.phone_id);return challenge;
   }
   function receive(raw,signature) {
-    const cs=store.all('SELECT company_id FROM connections').map(r=>credentials(r.company_id));
+    const cs=store.all('SELECT company_id,phone_id FROM connections').map(r=>credentials(r.company_id,r.phone_id));
     requireThat(cs.some(c=>validSignature(raw,signature,c.appSecret)),'Firma de Meta no válida.',403);
     let event;try{event=JSON.parse(raw);}catch{throw new HttpError(400,'JSON no válido.');}
     requireThat(event.object==='whatsapp_business_account'&&Array.isArray(event.entry),'Evento no válido.');
@@ -173,43 +196,48 @@ export function whatsapp(store, config, fetchImpl = fetch, onIncoming = () => {}
         const value=change.value;
         const c=cs.find(c=>c.phone_id===value?.metadata?.phone_number_id&&c.waba_id===entry.id);
         if(!c||!validSignature(raw,signature,c.appSecret))continue;
-        store.run('UPDATE connections SET webhook_at=? WHERE company_id=?',now(),c.company_id);
+        store.run('UPDATE connections SET webhook_at=? WHERE company_id=? AND phone_id=?',now(),c.company_id,c.phone_id);
         for(const msg of value.messages||[]) {
           if(typeof msg.id!=='string'||store.get('SELECT 1 FROM messages WHERE wa_id=?',msg.id))continue;
           if(!/^\d{8,15}$/.test(msg.from||'')||(c.testRecipient&&msg.from!==c.testRecipient))continue;
           const created=Math.min(now(),Number(msg.timestamp)*1000||now());
-          let contact=store.get('SELECT * FROM contacts WHERE company_id=? AND phone=?',c.company_id,msg.from);
+          let contact=store.get('SELECT * FROM contacts WHERE company_id=? AND phone=? AND phone_id=?',c.company_id,msg.from,c.phone_id);
           if(!contact) {
             const user=store.get("SELECT user_id FROM memberships WHERE company_id=? AND role='owner' LIMIT 1",c.company_id);
             const name=value.contacts?.find(p=>p.wa_id===msg.from)?.profile?.name||msg.from;
-            contact=store.addContact(c.company_id,{name:String(name).slice(0,80),phone:msg.from},user.user_id);
+            contact=store.addContact(c.company_id,{name:String(name).slice(0,80),phone:msg.from,phoneId:c.phone_id},user.user_id);
           }
-          const part=msg[msg.type],attachment=media.incoming(c.company_id,msg.type,part,created);
+          const part=msg[msg.type],attachment=media.incoming(c.company_id,msg.type,part,created,c.phone_id);
           const reply=msg.type==='interactive'&&msg.interactive?.type==='button_reply'?msg.interactive.button_reply:null;
           const body=reply?String(reply.title||'Botón').slice(0,20):msg.type==='text'?String(msg.text?.body||'').slice(0,4000):attachment?String(part.caption||part.filename||({image:'Imagen',document:'Documento PDF',audio:'Nota de voz'})[msg.type]).slice(0,1024):`[Mensaje recibido: ${String(msg.type||'desconocido').slice(0,30)}]`;
           const messageId=randomUUID();
           store.run("INSERT INTO messages(id,company_id,contact_id,direction,body,type,status,wa_id,created,updated,attachment_id) VALUES(?,?,?,'in',?,?,'received',?,?,?,?)",messageId,c.company_id,contact.id,body,msg.type||'other',msg.id,created,now(),attachment);
           store.run('UPDATE contacts SET unread=unread+1,resolved=0,last_inbound=MAX(last_inbound,?),updated=MAX(updated,?) WHERE id=? AND company_id=?',created,created,contact.id,c.company_id);
-          onIncoming({id:messageId,company_id:c.company_id,contact_id:contact.id,body,type:msg.type||'other',created,buttonId:reply?.id,contextId:msg.context?.id,attachmentId:attachment});
+          onIncoming({id:messageId,company_id:c.company_id,contact_id:contact.id,phone_id:c.phone_id,body,type:msg.type||'other',created,buttonId:reply?.id,contextId:msg.context?.id,attachmentId:attachment});
         }
         for(const status of value.statuses||[]) {
           if(!['sent','delivered','read','failed'].includes(status.status)||typeof status.id!=='string')continue;
           const old=store.get('SELECT * FROM status_events WHERE wa_id=?',status.id);
-          if(old&&old.company_id!==c.company_id)continue;
+          const message=store.get(`SELECT m.* FROM messages m JOIN contacts c ON c.id=m.contact_id
+            WHERE m.company_id=? AND m.wa_id=? AND c.phone_id=?`,c.company_id,status.id,c.phone_id);
+          if(old&&(old.company_id!==c.company_id||(old.phone_id&&old.phone_id!==c.phone_id)))continue;
+          if(!message&&store.get('SELECT 1 FROM messages WHERE wa_id=?',status.id))continue;
           const state=laterStatus(old?.status||'queued',status.status),code=String(status.errors?.[0]?.code||'')||null;
-          store.run('INSERT INTO status_events(wa_id,company_id,status,error_code,updated) VALUES(?,?,?,?,?) ON CONFLICT(wa_id) DO UPDATE SET status=excluded.status,error_code=excluded.error_code,updated=excluded.updated',status.id,c.company_id,state,code,now());
-          const message=store.get('SELECT * FROM messages WHERE company_id=? AND wa_id=?',c.company_id,status.id);
+          store.run('INSERT INTO status_events(wa_id,company_id,status,error_code,updated,phone_id) VALUES(?,?,?,?,?,?) ON CONFLICT(wa_id) DO UPDATE SET status=excluded.status,error_code=excluded.error_code,updated=excluded.updated,phone_id=excluded.phone_id',status.id,c.company_id,state,code,now(),c.phone_id);
           if(message)store.run('UPDATE messages SET status=?,error_code=?,updated=? WHERE id=? AND company_id=?',laterStatus(message.status,state),code,now(),message.id,c.company_id);
         }
       }
       return {ok:true};
     });
   }
-  async function subscribe(company,actor) {
-    const c=credentials(company);requireThat(c?.appSecret&&c.verified,'Guarda el secreto y verifica primero la URL de devolución en Meta.');
-    const result=await graph(c,`${c.waba_id}/subscribed_apps`,'POST',{});
+  async function subscribeAccount(c){
+    const result=await graph(c,`${c.waba_id||c.wabaId}/subscribed_apps`,'POST',{});
     requireThat(result.success===true,'Meta no confirmó la suscripción de la app a esta cuenta.',502);
+  }
+  async function subscribe(company,actor,phoneId) {
+    const c=credentials(company,phoneId);requireThat(c?.appSecret&&c.verified,'Guarda el secreto y verifica primero la URL de devolución en Meta.');
+    await subscribeAccount(c);
     store.audit(company,actor,'whatsapp.subscribed');return {ok:true};
   }
-  return {credentials,safe,connect,send,templates,verify,receive,subscribe,saveRaw,media,providerWebhookReady,flowNumber};
+  return {credentials,safe,numbers,connect,send,templates,verify,receive,subscribe,saveRaw,media,providerWebhookReady,flowNumber};
 }

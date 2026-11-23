@@ -8,8 +8,8 @@ export async function connectFlowsServer() {
     if(!result.ok){const error=new Error(body.error||'No se pudo completar la operación.');error.contextChanged=[401,403].includes(result.status)||body.code==='CONTEXT_CHANGED';throw error;}
     return body;
   };
-  const [flows,members,catalog,workspace]=await Promise.all([request('/flows'),request('/members'),request('/sales-catalog'),request('/flow-workspaces')]);
-  return {identity,request,flows:flows.flows,members:members.members,offers:catalog.offers,workspaces:workspace.workspaces};
+  const [flows,members,catalog,workspace,numbers]=await Promise.all([request('/flows'),request('/members'),request('/sales-catalog'),request('/flow-workspaces'),request('/whatsapp/numbers')]);
+  return {identity,request,flows:flows.flows,members:members.members,offers:catalog.offers,workspaces:workspace.workspaces,numbers:numbers.numbers};
 }
 
 export function welcomeFlow(memberId) {

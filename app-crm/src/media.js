@@ -61,13 +61,13 @@ export function mediaFiles(store,config,fetchImpl,credentials) {
       asset.id,company,mime,filename,bytes.length,hash,secrets.sealBytes(bytes,context(asset)),now());
     return asset.id;
   }
-  function incoming(company,type,part,created) {
+  function incoming(company,type,part,created,phoneId) {
     const mime=mediaType(part?.mime_type);
     const supported={image:['image/jpeg','image/png'],document:['application/pdf'],audio:['audio/ogg']};
     if(!Object.hasOwn(supported,type)||!supported[type].includes(mime)||!/^\d{1,60}$/.test(part.id||''))return null;
     const id=randomUUID(),size=incomingLimits[mime],room=hasSpace(company,size);
-    store.run("INSERT INTO media_assets(id,company_id,wa_id,mime,filename,size,sha256,state,created) VALUES(?,?,?,?,?,?,?,?,?)",
-      id,company,part.id,mime,mediaFilename(part.filename||(type==='audio'?'nota-de-voz':type),mime),room?size:0,String(part.sha256||'').slice(0,128),room?'pending':'unavailable',created);
+    store.run("INSERT INTO media_assets(id,company_id,wa_id,mime,filename,size,sha256,state,created,phone_id) VALUES(?,?,?,?,?,?,?,?,?,?)",
+      id,company,part.id,mime,mediaFilename(part.filename||(type==='audio'?'nota-de-voz':type),mime),room?size:0,String(part.sha256||'').slice(0,128),room?'pending':'unavailable',created,phoneId||'');
     return id;
   }
   async function jsonResponse(response) {
@@ -102,7 +102,9 @@ export function mediaFiles(store,config,fetchImpl,credentials) {
     const task=(async()=>{
       downloads++;store.run("UPDATE media_assets SET state='pending',size=?,attempts=attempts+1,retry_at=? WHERE company_id=? AND id=?",max,now()+60000,company,id);
       try {
-        const c=credentials(company);requireThat(c,'Conecta WhatsApp para descargar este archivo.',409);
+        const contact=store.get(`SELECT c.phone_id FROM messages m JOIN contacts c ON c.id=m.contact_id
+          WHERE m.company_id=? AND m.attachment_id=? LIMIT 1`,company,id);
+        const c=credentials(company,a.phone_id||contact?.phone_id);requireThat(c,'Conecta WhatsApp para descargar este archivo.',409);
         const signal=AbortSignal.timeout(15000),authorization={Authorization:'Bearer '+c.accessToken};
         const info=await jsonResponse(await fetchImpl('https://graph.facebook.com/'+c.graphVersion+'/'+a.wa_id+'?phone_number_id='+c.phone_id,{headers:authorization,signal,redirect:'error'}));
         requireThat(String(info.id)===a.wa_id&&mediaType(info.mime_type)===a.mime&&Number(info.file_size)>0&&Number(info.file_size)<=max,'El archivo no cumple los límites admitidos.',413);

@@ -75,7 +75,7 @@ test('catalog offers are scoped, preserve the order price and deliver only after
 });
 async function fixture(database=':memory:'){
   let calls=0,mode='ok',hold=null;
-  const sent=[],aiInputs=[],aiOutcomes=[];
+  const sent=[],sendPaths=[],aiInputs=[],aiOutcomes=[];
   const config={database,origin:'http://127.0.0.1:3031',masterKey:randomBytes(32).toString('base64'),secureCookies:false};
   const server=createServer(config,{fetchImpl:async(url,request)=>{
     if(url.endsWith('/10001?fields=id,display_phone_number'))return Response.json({id:'10001',display_phone_number:'+1 555 0100'});
@@ -85,7 +85,7 @@ async function fixture(database=':memory:'){
       if(!next)return new Response(null,{status:503});
       return Response.json({output:[{type:'message',content:[{type:'output_text',text:JSON.stringify(next)}]}]});
     }
-    sent.push(JSON.parse(request.body));calls++;if(hold)await hold;if(mode==='unknown')throw new Error('private upstream error');return Response.json({messages:[{id:'wamid.out.'+calls}]});}});
+    sendPaths.push(new URL(url).pathname);sent.push(JSON.parse(request.body));calls++;if(hold)await hold;if(mode==='unknown')throw new Error('private upstream error');return Response.json({messages:[{id:'wamid.out.'+calls}]});}});
   const store=server.lazo.store,wa=server.lazo.wa,flows=server.lazo.flows;
   const company=randomUUID(),user=randomUUID(),other=randomUUID();
   store.run('INSERT INTO companies VALUES(?,?,?)',company,'Empresa A',Date.now());store.run('INSERT INTO companies VALUES(?,?,?)',other,'Empresa B',Date.now());
@@ -93,10 +93,10 @@ async function fixture(database=':memory:'){
   store.run('INSERT INTO memberships VALUES(?,?,?)',company,user,'owner');
   wa.saveRaw(company,{phoneId:'10001',wabaId:'20001',accessToken:'synthetic',appSecret:'synthetic-secret',testRecipient:'51900000001',graphVersion:'v25.0'},1);
   const session=store.session(user,company),graph=welcome(user);let seq=0;
-  function receive(body='Hola',age=0,fields={}){const event={object:'whatsapp_business_account',entry:[{id:'20001',changes:[{field:'messages',value:{metadata:{phone_number_id:'10001'},contacts:[{wa_id:'51900000001',profile:{name:'Lucía'}}],messages:[{id:'wamid.in.'+(++seq),from:'51900000001',timestamp:String(Math.floor((Date.now()-age)/1000)),type:'text',text:{body},...fields}]}}]}]};const raw=Buffer.from(JSON.stringify(event));const signature='sha256='+createHmac('sha256','synthetic-secret').update(raw).digest('hex');wa.receive(raw,signature);return {raw,signature};}
+  function receive(body='Hola',age=0,fields={},phoneId='10001'){const event={object:'whatsapp_business_account',entry:[{id:'20001',changes:[{field:'messages',value:{metadata:{phone_number_id:phoneId},contacts:[{wa_id:'51900000001',profile:{name:'Lucía'}}],messages:[{id:'wamid.in.'+(++seq),from:'51900000001',timestamp:String(Math.floor((Date.now()-age)/1000)),type:'text',text:{body},...fields}]}}]}]};const raw=Buffer.from(JSON.stringify(event));const signature='sha256='+createHmac('sha256','synthetic-secret').update(raw).digest('hex');wa.receive(raw,signature);return {raw,signature};}
   server.listen(0,'127.0.0.1');await once(server,'listening');
   async function api(path,method='GET',data,extra={}){const res=await fetch(`http://127.0.0.1:${server.address().port}/api/crm${path}`,{method,headers:{Origin:config.origin,'Content-Type':'application/json','X-Lazo-Client':'1',Cookie:'lazo_dev_session='+session.secret,'X-CSRF-Token':session.csrf,'X-Lazo-Company':company,'X-Lazo-User':user,...extra},body:data?JSON.stringify(data):undefined});return {status:res.status,body:await res.json()};}
-  return {config,store,wa,flows,company,user,other,graph,receive,api,sent,aiInputs,aiOutcomes,get calls(){return calls;},setMode:v=>mode=v,hold:p=>hold=p,async close(){await flows.stop();await wa.media.stop();await server.lazo.mail.stop();await new Promise(r=>server.close(r));store.close();}};
+  return {config,store,wa,flows,company,user,other,graph,receive,api,sent,sendPaths,aiInputs,aiOutcomes,get calls(){return calls;},setMode:v=>mode=v,hold:p=>hold=p,async close(){await flows.stop();await wa.media.stop();await server.lazo.mail.stop();await new Promise(r=>server.close(r));store.close();}};
 }
 
 test('flows API: tenant, roles, CSRF, draft CAS, published snapshot and pause',async()=>{
@@ -451,4 +451,32 @@ test('sales dashboard keeps currencies separate and scopes period, geography, an
     assert.equal(filtered.currencies[0].confirmed_cents,400);
     assert.equal((await f.api('/sales-dashboard?currency=CAD')).status,400);
   } finally {await f.close();}
+});
+
+
+test('a flow publishes to selected numbers only and draft changes preserve live routing',async()=>{
+  const f=await fixture();
+  try {
+    for(const phoneId of ['10002','10003'])f.wa.saveRaw(f.company,{phoneId,wabaId:'20001',accessToken:'synthetic',
+      appSecret:'synthetic-secret',testRecipient:'51900000001',graphVersion:'v25.0'},1);
+    const {id}=f.flows.save(f.company,null,{graph:f.graph,phoneIds:['10001','10002']},f.user);
+    assert.deepEqual(f.flows.publish(f.company,id,{revision:1},f.user).activePhoneIds,['10001','10002']);
+    assert.throws(()=>f.flows.save(f.company,null,{graph:f.graph,phoneIds:['99999']},f.user),/números vinculados/);
+    const conflict=f.flows.save(f.company,null,{graph:f.graph,phoneIds:['10002']},f.user);
+    assert.throws(()=>f.flows.publish(f.company,conflict.id,{revision:1},f.user),{status:409});
+    const draft=f.flows.save(f.company,id,{graph:f.graph,revision:1,phoneIds:['10003']},f.user);
+    assert.deepEqual(draft.phoneIds,['10003']);
+    assert.deepEqual(draft.activePhoneIds,['10001','10002']);
+    for(const line of ['10001','10002','10003'])f.receive('Hola',0,{},line);
+    await f.flows.flush();
+    assert.deepEqual(f.sendPaths.sort(),['/v25.0/10001/messages','/v25.0/10002/messages']);
+    const chats=(await f.api('/contacts')).body.contacts;
+    assert.equal(chats.length,3);
+    assert.equal(new Set(chats.map(chat=>chat.id)).size,3);
+    assert.deepEqual(chats.filter(chat=>chat.phone_id==='10003').map(chat=>JSON.parse(chat.tags)),[[]]);
+    f.flows.publish(f.company,id,{revision:2},f.user);
+    f.receive('Hola',0,{},'10003');
+    await f.flows.flush();
+    assert.ok(f.sendPaths.includes('/v25.0/10003/messages'));
+  }finally{await f.close();}
 });

@@ -1,10 +1,18 @@
-import { mountMetaSignup } from './meta-signup.js?v=20261119-signup-time';
+import { mountMetaSignup } from './meta-signup.js?v=20261123-multinumero';
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const when=value=>value?new Intl.DateTimeFormat('es-PE',{dateStyle:'short',timeStyle:'short'}).format(new Date(value)):'Sin eventos todavía';
 
-export function mountConnections(root,{connection:c,api,notice,isCurrent,onSaved,onCreateCompany,canCreate}) {
-  root.innerHTML=`<div class="crm-intro"><div><span class="eyebrow">WHATSAPP CLOUD API</span><h2>Conecta tu número con LAZO</h2><p class="muted">Una conexión activa por empresa. Elige la empresa en el menú lateral antes de guardar.</p></div></div>
+export function mountConnections(root,{connection:c,api,notice,isCurrent,onSaved,onSelect}) {
+  const numbers=c.numbers||[];
+  root.innerHTML=`<div class="crm-intro"><div><span class="eyebrow">WHATSAPP CLOUD API</span><h2>Números de WhatsApp</h2><p class="muted">Conecta los números de este espacio. Podrás filtrar sus conversaciones y elegir cuáles atiende cada flujo.</p></div></div>
   <div class="settings-grid">
+    <section class="settings-card"><h2>Números conectados</h2>
+      <label>Conexión para revisar o editar<select id="wa-number">
+        <option value="new">Agregar otro número</option>
+        ${numbers.map(n=>`<option value="${esc(n.phoneId)}" ${n.phoneId===c.phoneId?'selected':''}>${esc(n.number||'ID Meta …'+n.phoneId.slice(-6))}</option>`).join('')}
+      </select></label>
+      ${!numbers.length?'<p class="muted">Todavía no hay números vinculados a este espacio.</p>':''}
+    </section>
     <section class="settings-card" id="meta-signup"></section>
     <details class="settings-card"><summary>Conexión manual avanzada</summary><h2>Credenciales de Meta</h2>
       <p class="muted">${c.configured?'API guardada. Puedes renovar sus credenciales; los identificadores pertenecen a esta conexión.':'Introduce las credenciales de una API que ya tengas configurada en Meta.'}</p>
@@ -31,11 +39,9 @@ export function mountConnections(root,{connection:c,api,notice,isCurrent,onSaved
       <p id="wa-subscribe-result" class="muted" role="status" aria-live="polite"></p>
       <p class="muted">Después, envía un mensaje desde tu WhatsApp al número conectado y comprueba que aparece en Conversaciones. Una comprobación de credenciales no acredita la entrega de mensajes.</p>`:'<p class="muted">Guarda primero las credenciales para obtener la URL y el token de verificación. Después podrás configurar la recepción en Meta.</p>'}
     </section>
-    <section class="settings-card"><h2>¿Quieres conectar otro número?</h2><p class="muted">Por ahora, cada número necesita un espacio de empresa separado, con contactos, equipo y flujos propios. La bandeja con varios números llegará en otra fase. El espacio actual conserva su cuenta de prueba y sus automatizaciones.</p>
-      ${canCreate?'<form id="wa-company"><label>Nombre del nuevo espacio<input name="name" maxlength="100" placeholder="Por ejemplo: Tienda · WhatsApp comercial" required></label><button type="submit" class="secondary">Crear espacio para otra API</button></form>':'<p class="muted">El propietario puede crear otro espacio desde su cuenta.</p>'}
-      <p class="muted">La conexión mediante WhatsApp Business en el celular se implementará con el proceso oficial de Meta. El enlace por QR todavía no está disponible.</p>
-    </section>
   </div>`;
+  const select=root.querySelector('#wa-number');
+  if(select)select.onchange=()=>onSelect(select.value).catch(error=>notice(error.message,true));
   const meta=root.querySelector('#meta-signup');
   if(meta)mountMetaSignup(meta,{api,notice,isCurrent,onSaved,connection:c});
   const form=root.querySelector('#wa-connect');
@@ -46,11 +52,11 @@ export function mountConnections(root,{connection:c,api,notice,isCurrent,onSaved
     try {
       const data=Object.fromEntries(new FormData(form));
       for(const key of Object.keys(data))data[key]=data[key].trim();
-      await api('/whatsapp',{method:'PUT',body:data});
+      const saved=await api('/whatsapp',{method:'PUT',body:data});
       // Never retain credential fields after a successful save, even if the view changed.
       form.elements.accessToken.value='';form.elements.appSecret.value='';
       if(!isCurrent())return;
-      notice('Credenciales comprobadas con Meta y guardadas. Revisa el estado de recepción.');await onSaved();
+      notice('Credenciales comprobadas con Meta y guardadas. Revisa el estado de recepción.');await onSaved(saved.phoneId);
     } catch(error){if(isCurrent()){result.textContent=error.message;notice(error.message,true);}}
     finally{button.disabled=false;form.inert=false;}
   };
@@ -60,15 +66,8 @@ export function mountConnections(root,{connection:c,api,notice,isCurrent,onSaved
   if(subscribe)subscribe.onclick=async()=>{
     if(!isCurrent())return;subscribe.disabled=true;
     const result=root.querySelector('#wa-subscribe-result');result.textContent='Vinculando…';
-    try {await api('/whatsapp/subscribe',{method:'POST',body:{}});if(isCurrent())result.textContent='Meta confirmó la suscripción de la app a la cuenta. Comprueba ahora un mensaje entrante real.';}
+    try {await api('/whatsapp/subscribe?phoneId='+encodeURIComponent(c.phoneId),{method:'POST',body:{}});if(isCurrent())result.textContent='Meta confirmó la suscripción de la app a la cuenta. Comprueba ahora un mensaje entrante real.';}
     catch(error){if(isCurrent())result.textContent=error.message;}
     finally{subscribe.disabled=false;}
-  };
-  const company=root.querySelector('#wa-company');
-  if(company)company.onsubmit=async event=>{
-    event.preventDefault();if(!isCurrent())return;const button=company.querySelector('button');button.disabled=true;
-    try {await onCreateCompany(new FormData(company).get('name'));}
-    catch(error){if(isCurrent())notice(error.message,true);}
-    finally{button.disabled=false;}
   };
 }
