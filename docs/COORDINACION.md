@@ -1,5 +1,9 @@
 # Coordinación Codex y Claude
 
+### Bandeja global legible (23 de noviembre de 2026)
+
+- Codex, rama codex/bandeja-global-legible. Filtro de conexiones con contraste y nombre legible, explicación de la bandeja, filas más claras y cabecera compacta. El sondeo no reemplaza el filtro ni las filas cuando los datos permanecen iguales.
+
 ### Tamaño de los mensajes por cuenta (23 de noviembre de 2026)
 
 - Codex, rama codex/tamano-texto-crm. Ajustes ofrece cuatro tamaños de lectura, con vista previa. Preferencia personal por usuario, común a sus espacios. Valor inicial de 15 px.
