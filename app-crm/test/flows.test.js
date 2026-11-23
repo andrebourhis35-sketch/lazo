@@ -354,3 +354,36 @@ test('digital sale matches proof to the chosen plan and delivers at the right st
     } finally {await f.close();}
   }
 });
+
+
+test('sales dashboard keeps currencies separate and scopes period, geography, and workspace', async () => {
+  const f=await fixture();
+  try {
+    const buyer=(company,name,phone)=>f.store.addContact(company,{name,phone},null);
+    const peru=buyer(f.company,'Perú','51900000003');
+    const panama=buyer(f.company,'Panamá','50760000000');
+    const sharedPrefix=buyer(f.company,'Prefijo compartido','12025550123');
+    const other=buyer(f.other,'Otra empresa','593990000000');
+    const stamp=Date.now();
+    function order(contact,currency,cents,{paid=false,proof=false,age=0}={}) {
+      f.store.run("INSERT INTO flow_orders(id,company_id,contact_id,run_id,product,plan,cents,currency,link,mode,created,charged_at,confirmed_at,proof_id) VALUES(?,?,?,?,?,?,?,?,?,'prepaid',?,?,?,?)",
+        randomUUID(),contact.company_id,contact.id,randomUUID(),'ebook','Básico',cents,currency,'https://example.test/ebook',
+        stamp-age,stamp-age,paid?stamp-age:null,proof?randomUUID():null);
+    }
+    order(peru,'PEN',2000,{paid:true});
+    order(peru,'PEN',1000,{proof:true});
+    order(panama,'USD',400,{paid:true});
+    order(sharedPrefix,'USD',500);
+    order(peru,'PEN',9999,{paid:true,age:40*86400000});
+    order(other,'USD',8000,{paid:true});
+    const summary=(await f.api('/sales-dashboard')).body;
+    assert.deepEqual(summary.currencies.map(row=>[row.currency,row.confirmed_cents,row.pending_cents,row.review_orders]),
+      [['PEN',2000,1000,1],['USD',400,500,0]]);
+    assert.deepEqual(new Set(summary.markets.map(row=>row.country)),new Set(['PER','PAN','unknown']));
+    assert.equal(summary.recent.length,4);
+    const filtered=(await f.api('/sales-dashboard?country=PAN&currency=USD&days=7')).body;
+    assert.deepEqual(filtered.recent.map(row=>row.contact),['Panamá']);
+    assert.equal(filtered.currencies[0].confirmed_cents,400);
+    assert.equal((await f.api('/sales-dashboard?currency=CAD')).status,400);
+  } finally {await f.close();}
+});

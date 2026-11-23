@@ -1,0 +1,98 @@
+/* Sales dashboard styles are scoped to the sales view. */
+.app[data-view="sales"]{
+  --sales-panel:#fff;
+  --sales-line:#d5e0ee;
+  --sales-text:#17253d;
+  --sales-muted:#465d7d;
+  --sales-map:#dde7f4;
+  --sales-highlight:#315dcb;
+  --sales-active:#207a73;
+  --sales-plot:#eff4fb;
+  --sales-track:#dce7f9;
+}
+.visual-preview .app[data-view="sales"]{
+  --sales-panel:#14233b;
+  --sales-line:#355070;
+  --sales-text:#f4f8ff;
+  --sales-muted:#b5c8e4;
+  --sales-map:#344e71;
+  --sales-highlight:#95a9ff;
+  --sales-active:#55d9bc;
+  --sales-plot:#101e33;
+  --sales-track:#3c5484;
+}
+.visual-preview .app[data-view="sales"] .topbar{
+  min-height:62px;padding:8px 14px;margin-bottom:12px;border-radius:14px;
+}
+.visual-preview .app[data-view="sales"] .topbar h1{font-size:23px;margin:3px 0 0}
+.visual-preview .app[data-view="sales"] .topbar .top-actions{align-self:center;margin:0}
+.visual-preview .app[data-view="sales"] .orbita-scene{top:-64px;right:140px;transform:scale(.48);opacity:.8}
+.app[data-view="sales"] .sales-toolbar{
+  display:flex;align-items:end;justify-content:space-between;gap:12px;
+  flex-wrap:wrap;margin-bottom:12px;
+}
+.app[data-view="sales"] .sales-filters,.app[data-view="sales"] .sales-actions{
+  display:flex;align-items:end;flex-wrap:wrap;gap:8px;
+}
+.app[data-view="sales"] .sales-filters label{display:grid;gap:4px;font-size:.8125rem;color:var(--sales-muted)}
+.app[data-view="sales"] .sales-filters select{
+  min-height:38px;padding:7px 10px;font:inherit;color:var(--sales-text);
+  background:var(--sales-panel);border:1px solid var(--sales-line);border-radius:8px;
+}
+.visual-preview .app[data-view="sales"] .sales-filters select{color-scheme:dark}
+.app[data-view="sales"] .sales-metrics,.app[data-view="sales"] .sales-grid{display:grid;gap:12px;margin-bottom:12px}
+.app[data-view="sales"] .sales-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}
+.app[data-view="sales"] .sales-grid{grid-template-columns:minmax(0,2fr) minmax(0,3fr)}
+.app[data-view="sales"] .sales-card{
+  min-width:0;padding:14px;border:1px solid var(--sales-line);border-radius:12px;
+  background:var(--sales-panel);color:var(--sales-text);
+}
+.app[data-view="sales"] .sales-metrics .sales-card{display:grid;gap:5px}
+.app[data-view="sales"] .sales-metrics strong{font-size:1.6rem;line-height:1}
+.app[data-view="sales"] .sales-metrics span,.app[data-view="sales"] .sales-muted{
+  font-size:.875rem;color:var(--sales-muted);line-height:1.45;
+}
+.app[data-view="sales"] .sales-card h2{font-size:1.125rem;margin:0 0 5px}
+.app[data-view="sales"] .sales-muted{margin:0 0 10px}
+.app[data-view="sales"] .sales-currency{padding:10px 0;border-top:1px solid var(--sales-line)}
+.app[data-view="sales"] .sales-currency h3{font-size:.9rem;margin:0 0 6px}
+.app[data-view="sales"] .sales-currency dl{display:grid;grid-template-columns:1fr auto;gap:4px 8px;margin:0}
+.app[data-view="sales"] .sales-currency dt{color:var(--sales-muted)}
+.app[data-view="sales"] .sales-currency dd{margin:0;text-align:end;font-variant-numeric:tabular-nums;font-weight:700}
+.app[data-view="sales"] .sales-money-bar progress{
+  display:block;width:100%;height:5px;margin-top:9px;border:0;border-radius:5px;
+  background:var(--sales-track);accent-color:var(--sales-active);
+}
+.app[data-view="sales"] .sales-money-bar progress::-webkit-progress-bar{background:var(--sales-track);border-radius:5px}
+.app[data-view="sales"] .sales-money-bar progress::-webkit-progress-value{background:var(--sales-active);border-radius:5px}
+.app[data-view="sales"] .sales-empty,.app[data-view="sales"] .sales-review{margin:9px 0;color:var(--sales-muted)}
+.app[data-view="sales"] .sales-map{
+  display:block;width:100%;max-height:15rem;background:var(--sales-plot);
+  border:1px solid var(--sales-line);border-radius:9px;
+}
+.app[data-view="sales"] .sales-map path,.app[data-view="sales"] .sales-map circle{stroke:var(--sales-plot);stroke-width:.5}
+.app[data-view="sales"] .sales-map .market-empty{fill:var(--sales-map)}
+.app[data-view="sales"] .sales-map .market-active{fill:var(--sales-active)}
+.app[data-view="sales"] .sales-map .market-selected{fill:var(--sales-highlight)}
+.app[data-view="sales"] .sales-country-list{list-style:none;padding:0;display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}
+.app[data-view="sales"] .sales-country-list button{display:flex;align-items:center;gap:7px;padding:5px 8px}
+.app[data-view="sales"] .sales-country-list button[aria-pressed="true"]{outline:2px solid var(--sales-highlight);outline-offset:-1px}
+.app[data-view="sales"] .sales-orders table{width:100%;white-space:nowrap}
+.app[data-view="sales"] .sales-orders .table-scroll{overflow:auto}
+.app[data-view="sales"] .sales-orders .open-chat{text-align:start}
+.app[data-view="sales"] #back-sales-summary{margin-bottom:8px}
+@media(max-width:830px){
+  .app[data-view="sales"] .sales-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .app[data-view="sales"] .sales-grid{grid-template-columns:minmax(0,1fr)}
+}
+@media(max-width:620px){
+  .visual-preview .app[data-view="sales"] .sidebar nav{
+    display:grid;grid-template-columns:repeat(7,minmax(0,1fr));
+  }
+  .visual-preview .app[data-view="sales"] .sidebar nav button{
+    min-width:0;padding-inline:2px;white-space:normal;overflow-wrap:anywhere;
+  }
+  .visual-preview .app[data-view="sales"] .topbar h1{font-size:20px}
+  .app[data-view="sales"] .sales-filters select{font-size:16px;max-width:100%}
+  .app[data-view="sales"] .sales-filters label{min-width:0}
+}
