@@ -5,6 +5,8 @@
 - Codex, rama codex/globo-fluido. Reserva del globo, panel de ventas y versiones de sus recursos. Se amplía el planeta y se reduce el ancho de su panel; giro automático, arrastre con inercia y enfoque fijo al filtrar un país.
 - QA con datos ficticios: a 1876 × 918, lienzo de 420 × 420 y tarjeta de 600 px; a 390 × 844, lienzo cuadrado sin desbordamiento. En navegador se verificó giro automático, movimiento al arrastrar, inercia tras soltar y filtro de Panamá.
 
+- Publicado globe-78169b6 en OVH con respaldo previo y 86 pruebas aprobadas. Salud correcta y cinco recursos de la versión comprobados por SHA-256 sobre HTTPS público. PR #70.
+
 ### Globo en Ventas (23 de noviembre de 2026)
 
 - Codex, rama codex/globo-ventas. Sustituye el mapa plano por un globo giratorio con iluminación y relieve visual. Los países con pedidos conservan su color; seleccionar un país lo centra en el globo.
