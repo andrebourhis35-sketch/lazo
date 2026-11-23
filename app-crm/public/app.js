@@ -92,12 +92,41 @@ function shell(){
   $('refresh').onclick=()=>refresh(true).catch(e=>notice(e.message,true));
   $('workspace').onchange=async e=>{$('root').inert=true;workspaceEpoch++;drafts.clear();sendKeys.clear();messages=[];try{await api('/companies/switch',{method:'POST',body:{companyId:e.target.value}});active=null;await startWorkspace();}catch(e){notice(e.message,true);}finally{$('root').inert=false;}};
 }
-async function showView(next){if(next==='connections'&&session.user.role==='agent')next='conversations';view=next;document.querySelector('.app').dataset.view=view;document.querySelectorAll('.sidebar nav [data-view]').forEach(b=>{b.classList.toggle('active',b.dataset.view===view);b.setAttribute('aria-current',b.dataset.view===view?'page':'false');});$('view-title').textContent=labels[view];document.title=`lazo · ${labels[view]}`;if(view==='conversations')await inbox();else if(view==='overview')await inboxOverview();else if(view==='settings')await settings();else if(view==='connections')await connectionsView();else if(view==='statistics')await statisticsView();else renderCRM();}
+async function showView(next){if(next==='connections'&&session.user.role==='agent')next='conversations';view=next;document.querySelector('.app').dataset.view=view;document.querySelectorAll('.sidebar nav [data-view]').forEach(b=>{b.classList.toggle('active',b.dataset.view===view);b.setAttribute('aria-current',b.dataset.view===view?'page':'false');});$('view-title').textContent=labels[view];document.title=`lazo · ${labels[view]}`;if(view==='conversations')await inbox();else if(view==='overview')await inboxOverview();else if(view==='settings')await settings();else if(view==='connections')await connectionsView();else if(view==='statistics')await statisticsView();else if(view==='sales')await salesView();else renderCRM();}
 async function statisticsView(){const epoch=workspaceEpoch,company=session.company.id;$('view').onclick=null;$('view').onchange=null;$('view').innerHTML='<p class="empty">Cargando estadísticas…</p>';const data=await api('/statistics?days='+statsDays);if(epoch!==workspaceEpoch||session?.company.id!==company||view!=='statistics')return;renderStatistics($('view'),data,days=>{statsDays=days;statisticsView().catch(e=>notice(e.message,true));});}
+let salesMode='summary',salesEpoch=0;
+const salesFilters={days:'30',currency:'',country:''};
+
+async function salesView() {
+  if(salesMode==='pipeline'){renderCRM();return;}
+  const epoch=workspaceEpoch,request=++salesEpoch,root=$('view');
+  if(!root.querySelector('.sales-toolbar')){
+    root.onclick=null;root.onchange=null;root.innerHTML='<p class="empty">Cargando ventas…</p>';
+  }
+  const {days,currency,country}=salesFilters;
+  const [data,{renderSales}]=await Promise.all([
+    api('/sales-dashboard?'+new URLSearchParams({days,currency,country})),
+    import('./sales-ui.js?v=20261123'),
+  ]);
+  if(view!=='sales'||epoch!==workspaceEpoch||request!==salesEpoch||salesMode!=='summary')return;
+  const focused=document.activeElement?.dataset.filter;
+  renderSales(root,data,salesFilters,{
+    onFilter:(key,value,label)=>{
+      salesFilters[key]=value;
+      if(key==='country')salesFilters.countryLabel=label;
+      salesView().catch(error=>notice(error.message,true));
+    },
+    onChat:id=>openChat(id).catch(error=>notice(error.message,true)),
+    onPipeline:()=>{salesMode='pipeline';renderCRM();},
+    onNewContact:newContact,
+  });
+  if(focused)root.querySelector('[data-filter="'+focused+'"]')?.focus();
+}
 function renderCRM(){
   const won=contacts.filter(c=>pipelineStages.some(p=>p.name===c.stage&&p.is_won)).length;
-  $('view').innerHTML=`<div class="crm-intro"><div><span class="eyebrow">${view==='sales'?'CADA CONVERSACIÓN, UN PASO MÁS':'RELACIONES QUE CRECEN'}</span><h2>${view==='sales'?'Tu proceso comercial, a la vista':'Conoce mejor a tus clientes'}</h2><p class="muted">${esc(session.company.name)} · ${view==='sales'?'Sigue el avance de tus oportunidades.':'Una agenda conectada con tu bandeja de entrada.'}</p></div><button id="new-contact" class="send">+ Nuevo contacto</button></div><div class="metric-grid">${[[contacts.length,'Contactos'],[contacts.length-won,'Oportunidades abiertas'],[won,'Ventas ganadas']].map(([n,l])=>`<article class="metric"><strong>${n}</strong><span>${l}</span></article>`).join('')}</div>${view==='contacts'?`<section class="contact-table-panel"><div class="section-heading"><h2>Todos los contactos</h2><label class="search"><span>⌕</span><input id="contacts-search" placeholder="Buscar nombre, correo o teléfono" aria-label="Buscar contactos"></label></div><div class="table-scroll"><table><thead><tr><th>Contacto</th><th>Teléfono</th><th>Responsable</th><th>Etapa</th><th>Conversación</th></tr></thead><tbody id="contact-rows"></tbody></table></div></section>`:`<div class="pipeline">${stages.map((stage,i)=>`<section class="pipeline-column"><div class="column-heading"><h2><span class="stage-dot step-${i}"></span>${esc(stage)}</h2><span class="column-count">${contacts.filter(c=>c.stage===stage).length}</span></div><div class="pipeline-cards">${contacts.filter(c=>c.stage===stage).map(c=>`<article class="opportunity"><h3>${esc(c.name)}</h3><p class="muted">${esc(c.phone)}</p><p class="opportunity-owner">Responsable <strong>${esc(ownerName(c.owner_id))}</strong></p><label>Etapa<select data-stage="${c.id}" aria-label="Etapa de ${esc(c.name)}">${options(stages,c.stage)}</select></label><button class="open-chat" data-chat="${c.id}">Ver conversación ↗</button></article>`).join('')||'<p class="column-empty">Sin oportunidades en esta etapa.</p>'}</div></section>`).join('')}</div>`}<p class="muted">${contacts.length>=1000?'Se muestran hasta 1.000 contactos.':''}</p>`;
+  $('view').innerHTML=`${view==='sales'?'<button type="button" class="secondary" id="back-sales-summary">Volver al resumen de ventas</button>':''}<div class="crm-intro"><div><span class="eyebrow">${view==='sales'?'CADA CONVERSACIÓN, UN PASO MÁS':'RELACIONES QUE CRECEN'}</span><h2>${view==='sales'?'Tu proceso comercial, a la vista':'Conoce mejor a tus clientes'}</h2><p class="muted">${esc(session.company.name)} · ${view==='sales'?'Sigue el avance de tus oportunidades.':'Una agenda conectada con tu bandeja de entrada.'}</p></div><button id="new-contact" class="send">+ Nuevo contacto</button></div><div class="metric-grid">${[[contacts.length,'Contactos'],[contacts.length-won,'Oportunidades abiertas'],[won,'Ventas ganadas']].map(([n,l])=>`<article class="metric"><strong>${n}</strong><span>${l}</span></article>`).join('')}</div>${view==='contacts'?`<section class="contact-table-panel"><div class="section-heading"><h2>Todos los contactos</h2><label class="search"><span>⌕</span><input id="contacts-search" placeholder="Buscar nombre, correo o teléfono" aria-label="Buscar contactos"></label></div><div class="table-scroll"><table><thead><tr><th>Contacto</th><th>Teléfono</th><th>Responsable</th><th>Etapa</th><th>Conversación</th></tr></thead><tbody id="contact-rows"></tbody></table></div></section>`:`<div class="pipeline">${stages.map((stage,i)=>`<section class="pipeline-column"><div class="column-heading"><h2><span class="stage-dot step-${i}"></span>${esc(stage)}</h2><span class="column-count">${contacts.filter(c=>c.stage===stage).length}</span></div><div class="pipeline-cards">${contacts.filter(c=>c.stage===stage).map(c=>`<article class="opportunity"><h3>${esc(c.name)}</h3><p class="muted">${esc(c.phone)}</p><p class="opportunity-owner">Responsable <strong>${esc(ownerName(c.owner_id))}</strong></p><label>Etapa<select data-stage="${c.id}" aria-label="Etapa de ${esc(c.name)}">${options(stages,c.stage)}</select></label><button class="open-chat" data-chat="${c.id}">Ver conversación ↗</button></article>`).join('')||'<p class="column-empty">Sin oportunidades en esta etapa.</p>'}</div></section>`).join('')}</div>`}<p class="muted">${contacts.length>=1000?'Se muestran hasta 1.000 contactos.':''}</p>`;
   $('new-contact').onclick=newContact;
+  if($('back-sales-summary'))$('back-sales-summary').onclick=()=>{salesMode='summary';salesView().catch(error=>notice(error.message,true));};
   if(view==='contacts'){$('contacts-search').oninput=e=>contactRows(e.target.value);contactRows('');}
   $('view').onclick=e=>{const b=e.target.closest('[data-chat]');if(b)openChat(b.dataset.chat).catch(e=>notice(e.message,true));};
   $('view').onchange=async e=>{if(e.target.dataset.stage)try{await updateContact(e.target.dataset.stage,{stage:e.target.value});renderCRM();notice('Etapa guardada.');}catch(e){notice(e.message,true);}};
@@ -107,7 +136,14 @@ function newContact(){
   const dialog=document.createElement('dialog');dialog.innerHTML=`<form><div class="section-heading"><h2>Nuevo contacto</h2><button type="button" class="icon close" aria-label="Cerrar">×</button></div><label>Nombre<input name="name" maxlength="80" required></label><label>Teléfono internacional<input name="phone" inputmode="tel" placeholder="51…" required></label><label>Correo (opcional)<input name="email" type="email" maxlength="254"></label><label>Ciudad (opcional)<input name="location" maxlength="100"></label><label>Responsable<select name="ownerId">${options(members,session.user.id)}</select></label><div class="dialog-actions"><button class="send" type="submit">Crear contacto</button></div></form>`;document.body.append(dialog);dialog.querySelector('.close').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove());bind(dialog.querySelector('form'),async data=>{const c=await api('/contacts',{method:'POST',body:data});contacts.unshift(c);dialog.close();await openChat(c.id);notice('Contacto guardado en tu empresa.');});dialog.showModal();
 }
 async function updateContact(id,data){const result=await api('/contacts/'+id,{method:'PATCH',body:data});contacts=contacts.map(c=>c.id===id?{...c,...result}:c);return result;}
-async function openChat(id){active=id;await showView('conversations');document.querySelector('.app').classList.add('chat-open');}
+async function openChat(id){
+  if(!contacts.some(contact=>contact.id===id)){
+    const epoch=workspaceEpoch;
+    const {contact}=await api('/contacts/'+encodeURIComponent(id));
+    if(epoch!==workspaceEpoch)return;
+    if(!contacts.some(item=>item.id===id))contacts.push(contact);
+  }
+  active=id;await showView('conversations');document.querySelector('.app').classList.add('chat-open');}
 let overviewSource='';
 async function inboxOverview() {
   const epoch=workspaceEpoch, sourceId=overviewSource;

@@ -10,6 +10,7 @@ import { mediaLimits } from './media.js';
 import { mailService } from './mail.js';
 import { automationFlows } from './flows.js';
 import { flowAI } from './flow-ai.js';
+import { salesDashboard } from './sales-dashboard.js';
 import { embeddedSignup } from './embedded-signup.js';
 
 const root=fileURLToPath(new URL('../public/',import.meta.url));
@@ -19,6 +20,9 @@ const assets={
   '/app/chat-compact.css':['chat-compact.css','text/css; charset=utf-8'],
   '/app/connections-ui.js':['connections-ui.js','text/javascript; charset=utf-8'],
   '/app/meta-signup.js':['meta-signup.js','text/javascript; charset=utf-8'],
+  '/app/sales-ui.js':['sales-ui.js','text/javascript; charset=utf-8'],
+  '/app/sales-map.js':['sales-map.js','text/javascript; charset=utf-8'],
+  '/app/sales.css':['sales.css','text/css; charset=utf-8'],
   '/app/work-ui.js':['work-ui.js','text/javascript; charset=utf-8'],
   '/app/visual-preview.js':['visual-preview.js','text/javascript; charset=utf-8'],
   '/app/visual-preview.css':['visual-preview.css','text/css; charset=utf-8'],
@@ -185,6 +189,10 @@ export function createServer(config,{store=openStore(config.database),fetchImpl=
       if(replyMatch&&['PATCH','DELETE'].includes(method)) {
         admin(s);const replies=method==='DELETE'?workspace.removeReply(s.company_id,replyMatch[1],s.user_id):await authorizedJson(req,s,data=>workspace.saveReply(s.company_id,replyMatch[1],data,s.user_id));
         return response(res,200,{replies});
+      }
+      if(method==='GET'&&route==='/sales-dashboard') {
+        store.limit('sales-dashboard:'+s.user_id,90,60000);
+        return response(res,200,salesDashboard(store,s.company_id,new URL(req.url,config.origin).searchParams));
       }
       if(method==='GET'&&route==='/statistics') {
         store.limit('stats:'+s.company_id,90,60000);
