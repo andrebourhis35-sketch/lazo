@@ -4,6 +4,8 @@
 
 - Codex, rama codex/bandeja-global-legible. Filtro de conexiones con contraste y nombre legible, explicación de la bandeja, filas más claras y cabecera compacta. El sondeo no reemplaza el filtro ni las filas cuando los datos permanecen iguales.
 
+- Publicado overview-2feacdf con respaldo cifrado y 85 pruebas aprobadas. HTTPS confirmó las huellas. QA con dos conexiones ficticias confirmó contraste, filtrado por conexión y apertura del chat en su espacio de origen. PR #67.
+
 ### Tamaño de los mensajes por cuenta (23 de noviembre de 2026)
 
 - Codex, rama codex/tamano-texto-crm. Ajustes ofrece cuatro tamaños de lectura, con vista previa. Preferencia personal por usuario, común a sus espacios. Valor inicial de 15 px.
