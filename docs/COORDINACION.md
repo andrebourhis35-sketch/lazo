@@ -1,5 +1,11 @@
 # Coordinación Codex y Claude
 
+### Tamaño de los mensajes por cuenta (23 de noviembre de 2026)
+
+- Codex, rama codex/tamano-texto-crm. Ajustes ofrece cuatro tamaños de lectura, con vista previa. Preferencia personal por usuario, común a sus espacios. Valor inicial de 15 px.
+
+- Publicado reading-1d3cbc5 con respaldo cifrado y 85 pruebas aprobadas. HTTPS confirmó las huellas del HTML, JS y CSS. En una sesión ficticia se guardó 14 px, se recargó la página y se midió el mismo tamaño en el historial. PR #66.
+
 ### Historial amplio en Conversaciones (23 de noviembre de 2026)
 
 - Codex, rama codex/chat-historial-amplio. La ficha se abre bajo demanda. La bandeja se puede ocultar en escritorio. Historial con texto mayor, cabecera unificada y compositor más bajo. Conserva Órbita y la edición del contacto.
