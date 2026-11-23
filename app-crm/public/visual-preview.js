@@ -36,7 +36,7 @@
       slot.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + paths[button.dataset.view] + '</svg>';
     }
     const heading = document.querySelector('.details-heading');
-    if (heading && !heading.querySelector('.visual-close-details')) {
+    if (heading && !heading.querySelector('#close-details, .visual-close-details')) {
       const close = document.createElement('button');
       close.type = 'button';
       close.className = 'icon visual-close-details';

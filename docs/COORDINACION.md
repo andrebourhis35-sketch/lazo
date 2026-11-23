@@ -1,5 +1,9 @@
 # Coordinación Codex y Claude
 
+### Historial amplio en Conversaciones (23 de noviembre de 2026)
+
+- Codex, rama codex/chat-historial-amplio. La ficha se abre bajo demanda. La bandeja se puede ocultar en escritorio. Historial con texto mayor, cabecera unificada y compositor más bajo. Conserva Órbita y la edición del contacto.
+
 ### Lienzo de flujos a ancho completo (23 de noviembre de 2026)
 
 - Codex, rama codex/lienzo-amplio. Se retiran las columnas fijas del editor. Biblioteca y propiedades quedan en paneles bajo demanda. Se compacta la barra y se ajusta el flujo al abrir el lienzo. Solo se publica el sitio estático de flujos.
