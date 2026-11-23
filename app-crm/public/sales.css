@@ -4,7 +4,6 @@
   --sales-line:#d5e0ee;
   --sales-text:#17253d;
   --sales-muted:#465d7d;
-  --sales-map:#dde7f4;
   --sales-highlight:#315dcb;
   --sales-active:#207a73;
   --sales-plot:#eff4fb;
@@ -15,7 +14,6 @@
   --sales-line:#355070;
   --sales-text:#f4f8ff;
   --sales-muted:#b5c8e4;
-  --sales-map:#344e71;
   --sales-highlight:#95a9ff;
   --sales-active:#55d9bc;
   --sales-plot:#101e33;
@@ -66,14 +64,26 @@
 .app[data-view="sales"] .sales-money-bar progress::-webkit-progress-bar{background:var(--sales-track);border-radius:5px}
 .app[data-view="sales"] .sales-money-bar progress::-webkit-progress-value{background:var(--sales-active);border-radius:5px}
 .app[data-view="sales"] .sales-empty,.app[data-view="sales"] .sales-review{margin:9px 0;color:var(--sales-muted)}
-.app[data-view="sales"] .sales-map{
-  display:block;width:100%;max-height:15rem;background:var(--sales-plot);
-  border:1px solid var(--sales-line);border-radius:9px;
+.app[data-view="sales"] .sales-globe-stage{
+  display:grid;justify-items:center;gap:4px;padding:4px 8px 10px;
+  background:radial-gradient(ellipse at 50% 47%,#294c8555,transparent 70%),var(--sales-plot);
+  border:1px solid var(--sales-line);border-radius:10px;
 }
-.app[data-view="sales"] .sales-map path,.app[data-view="sales"] .sales-map circle{stroke:var(--sales-plot);stroke-width:.5}
-.app[data-view="sales"] .sales-map .market-empty{fill:var(--sales-map)}
-.app[data-view="sales"] .sales-map .market-active{fill:var(--sales-active)}
-.app[data-view="sales"] .sales-map .market-selected{fill:var(--sales-highlight)}
+.app[data-view="sales"] .sales-globe-stage canvas{
+  display:block;width:min(100%,17rem);height:auto;aspect-ratio:1;
+  cursor:grab;touch-action:pan-y;border-radius:50%;
+}
+.app[data-view="sales"] .sales-globe-stage canvas.is-dragging{cursor:grabbing}
+.app[data-view="sales"] .sales-globe-stage canvas:focus-visible{
+  outline:2px solid var(--sales-highlight);outline-offset:-2px;
+}
+.app[data-view="sales"] .sales-globe-controls{
+  display:flex;justify-content:center;gap:5px;max-width:100%;flex-wrap:wrap;
+}
+.app[data-view="sales"] .sales-globe-controls button{padding:5px 8px;font-size:.78rem}
+.app[data-view="sales"] .sales-globe-help{
+  margin:6px 0;color:var(--sales-muted);font-size:.78rem;
+}
 .app[data-view="sales"] .sales-country-list{list-style:none;padding:0;display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}
 .app[data-view="sales"] .sales-country-list button{display:flex;align-items:center;gap:7px;padding:5px 8px}
 .app[data-view="sales"] .sales-country-list button[aria-pressed="true"]{outline:2px solid var(--sales-highlight);outline-offset:-1px}

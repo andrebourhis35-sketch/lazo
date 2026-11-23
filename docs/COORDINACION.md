@@ -1,5 +1,10 @@
 # Coordinación Codex y Claude
 
+### Globo en Ventas (23 de noviembre de 2026)
+
+- Codex, rama codex/globo-ventas. Sustituye el mapa plano por un globo giratorio con iluminación y relieve visual. Los países con pedidos conservan su color; seleccionar un país lo centra en el globo.
+- Publicado globe-dfcd4ae con respaldo previo y 86 pruebas aprobadas en OVH. Se verificaron por SHA-256 los seis recursos en HTTPS público. En navegador con datos ficticios se comprobó el giro, el filtro de Panamá y el botón para volver a América. PR #69.
+
 ### Panel de ventas por moneda y país (23 de noviembre de 2026)
 
 - Codex, rama codex/panel-ventas. Resumen de pedidos con cobros confirmados y pendientes por moneda, filtros, mapa parcial por prefijo telefónico identificado y pedidos recientes. Conserva el embudo. Cartografía mundial Natural Earth 1:110m v5.1.2 de dominio público.
