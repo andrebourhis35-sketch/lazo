@@ -173,7 +173,7 @@ export function whatsapp(store, config, fetchImpl = fetch, onIncoming = () => {}
           const messageId=randomUUID();
           store.run("INSERT INTO messages(id,company_id,contact_id,direction,body,type,status,wa_id,created,updated,attachment_id) VALUES(?,?,?,'in',?,?,'received',?,?,?,?)",messageId,c.company_id,contact.id,body,msg.type||'other',msg.id,created,now(),attachment);
           store.run('UPDATE contacts SET unread=unread+1,resolved=0,last_inbound=MAX(last_inbound,?),updated=MAX(updated,?) WHERE id=? AND company_id=?',created,created,contact.id,c.company_id);
-          onIncoming({id:messageId,company_id:c.company_id,contact_id:contact.id,body,type:msg.type||'other',created,buttonId:reply?.id,contextId:msg.context?.id});
+          onIncoming({id:messageId,company_id:c.company_id,contact_id:contact.id,body,type:msg.type||'other',created,buttonId:reply?.id,contextId:msg.context?.id,attachmentId:attachment});
         }
         for(const status of value.statuses||[]) {
           if(!['sent','delivered','read','failed'].includes(status.status)||typeof status.id!=='string')continue;

@@ -163,12 +163,12 @@ async function renderChat(){
   await api('/contacts/'+c.id+'/read',{method:'POST',body:{}});if(!current())return;
   messages=loaded.messages;c.unread=0;renderList();
   $('chat-panel').innerHTML=`<header class="chat-header"><button id="back" class="icon mobile-only" aria-label="Volver a conversaciones">←</button><span class="avatar">${esc(initials(c.name))}</span><div class="chat-person"><h2>${esc(c.name)}</h2><span>WhatsApp · ${esc(c.phone)}</span></div><button id="show-details" class="icon" aria-label="Mostrar ficha del cliente">☷</button></header><div class="chat-toolbar"><span class="channel">WhatsApp</span><span class="stage" id="chat-stage">${esc(c.stage)}</span><button id="resolve" class="secondary">${c.resolved?'Reabrir':'Resolver'}</button></div><div class="messages" id="messages" role="log" aria-label="Mensajes"></div><div class="composer-area"><form id="send-form"><div class="send-options"><label>Tipo<select name="type" id="send-type"><option value="text">Texto o archivo</option><option value="template">Plantilla aprobada</option></select></label><label id="template-label" hidden>Plantilla<select id="template" name="template"></select></label><button type="button" id="quick-reply" class="secondary">Respuestas rápidas</button></div><div id="parameters"></div><label class="reply-label" id="message-label" for="message">Tu respuesta</label><textarea id="message" name="text" maxlength="4000" rows="2" placeholder="Escribe aquí para responder al contacto…"></textarea><div id="file-composer"><input id="attachment-file" type="file" accept="image/jpeg,image/png,application/pdf" hidden><div class="attachment-controls"><button type="button" id="attach-file" class="secondary">Adjuntar imagen o PDF</button><span class="muted">JPG/PNG: 5 MB · PDF: 10 MB</span></div><div id="selected-file" class="selected-file" hidden><span></span><button type="button" class="icon" aria-label="Quitar archivo">×</button></div></div><div class="composer-bottom"><span>Texto y archivos: hasta 24 h desde el último mensaje del contacto.</span><button class="send" type="submit">Enviar</button></div></form><p class="status">Texto y archivos: hasta 24 h · Últimos 100 mensajes · Estados de Meta.</p></div>`;
-  $('details').innerHTML=`<div class="details-heading"><h2>Información del cliente</h2></div><div class="profile"><span class="avatar">${esc(initials(c.name))}</span><h3>${esc(c.name)}</h3><span class="profile-label">${esc(c.phone)}</span></div><section class="detail-section"><h3>Datos del contacto</h3><p>${esc(c.email||'Sin correo')}</p><p>${esc(c.location||'Sin ubicación')}</p></section><form id="details-form"><label>Etapa del embudo<select name="stage" aria-label="Etapa del embudo">${options(stages,c.stage)}</select></label><label>Responsable<select name="ownerId"><option value="" ${!c.owner_id?'selected':''}>Sin asignar</option>${options(members,c.owner_id)}</select></label><label>Etiquetas<input name="tags" maxlength="247" placeholder="Interesado, Mayorista" value="${esc(contactTags(c).join(', '))}"><small>Hasta 8 etiquetas, separadas por comas.</small></label><label>Nota interna<textarea name="note" maxlength="4000" rows="4">${esc(c.note)}</textarea></label><button class="secondary" type="submit">Guardar cambios</button></form><section class="detail-section" id="contact-automation"><button class="secondary" id="show-automation">Historial del flujo</button><div id="automation-history"></div></section>`;
+  $('details').innerHTML=`<div class="details-heading"><h2>Información del cliente</h2></div><div class="profile"><span class="avatar">${esc(initials(c.name))}</span><h3>${esc(c.name)}</h3><span class="profile-label">${esc(c.phone)}</span></div><section class="detail-section"><h3>Datos del contacto</h3><p>${esc(c.email||'Sin correo')}</p><p>${esc(c.location||'Sin ubicación')}</p></section><form id="details-form"><label>Etapa del embudo<select name="stage" aria-label="Etapa del embudo">${options(stages,c.stage)}</select></label><label>Responsable<select name="ownerId"><option value="" ${!c.owner_id?'selected':''}>Sin asignar</option>${options(members,c.owner_id)}</select></label><label>Etiquetas<input name="tags" maxlength="247" placeholder="Interesado, Mayorista" value="${esc(contactTags(c).join(', '))}"><small>Hasta 8 etiquetas, separadas por comas.</small></label><label>Nota interna<textarea name="note" maxlength="4000" rows="4">${esc(c.note)}</textarea></label><button class="secondary" type="submit">Guardar cambios</button></form><section class="detail-section" id="contact-automation"><button class="secondary" id="show-automation">Historial del flujo</button><div id="automation-history"></div></section><section class="detail-section"><button class="secondary" id="show-orders">Pedidos y abonos</button><div id="contact-orders"></div></section>`;
   async function loadAutomation() {
     const data=await api('/contacts/'+c.id+'/automation');
     if(!current())return;
     const history=$('automation-history');
-    const states={pending:'En cola',running:'En ejecución',waiting:'Esperando una opción',scheduled:'Seguimiento programado',delayed:'Pausa programada',agent_wait:'Esperando más datos',done:'Completado',cancelled:'Cancelado',failed:'Error',interrupted:'Interrumpido'};
+    const states={pending:'En cola',running:'En ejecución',waiting:'Esperando una opción',scheduled:'Seguimiento programado',delayed:'Pausa programada',agent_wait:'Esperando más datos',payment_wait:'Esperando confirmar abono',done:'Completado',cancelled:'Cancelado',failed:'Error',interrupted:'Interrumpido'};
     history.innerHTML=`<button class="secondary" id="toggle-chat-automation">${data.paused?'Reanudar automatización':'Tomar conversación'}</button>${data.runs.map(run=>`<details><summary>${esc(run.name)} · ${esc(states[run.state]||run.state)}</summary>${run.reason?`<p>${esc(run.reason)}</p>`:''}<ol>${run.steps.map(step=>`<li><strong>${esc(step.label)}</strong><p>${esc(step.detail)}</p>${step.body?`<p>${esc(step.body)} · ${esc(statusNames[step.status]||step.status||'')}</p>`:''}</li>`).join('')}</ol></details>`).join('')||'<p>Aún no hay ejecuciones.</p>'}`;
     $('toggle-chat-automation').onclick=async event=>{
       event.target.disabled=true;
@@ -178,6 +178,53 @@ async function renderChat(){
       }catch(error){notice(error.message,true);if(current())event.target.disabled=false;}
     };
   }
+  async function loadOrders() {
+    const {orders}=await api('/contacts/'+c.id+'/orders');
+    if(!current())return;
+    const list=$('contact-orders');
+    list.innerHTML=orders.map(order=>{
+      const amount=(order.cents/100).toFixed(2);
+      const status=order.confirmed_at?'Abono verificado':order.proof_id?'Archivo recibido · Falta verificar':'Pendiente de abono';
+      return `<details><summary>${esc(order.plan)} · ${esc(order.currency)} ${amount}</summary>
+        <p>${status}${order.delivery_id?' · Acceso '+esc(statusNames[order.delivery_status]||'registrado'):''}</p>
+        ${order.proof_id?`<button type="button" class="secondary" data-proof="${esc(order.proof_id)}">Descargar archivo recibido</button>`:''}
+        ${order.delivery_id&&session.user.role!=='agent'?`<button type="button" class="secondary" data-resend-order="${esc(order.id)}">Reenviar acceso</button>`:''}
+        ${order.confirmed_at?`<p>Referencia: ${esc(order.reference)}</p>`:order.charged_at&&session.user.role!=='agent'?`<form data-order="${esc(order.id)}"><p>Confirma solo después de ver el abono en tu cuenta.</p><label>Importe abonado<input name="amount" required inputmode="decimal" maxlength="12"></label><label>Referencia de operación<input name="reference" required maxlength="64"></label><button class="secondary" type="submit">Registrar abono verificado</button></form>`:''}
+      </details>`;
+    }).join('')||'<p>Aún no hay pedidos en esta conversación.</p>';
+    list.querySelectorAll('[data-proof]').forEach(button=>button.onclick=async()=>{
+      try{
+        const blob=await api('/messages/'+button.dataset.proof+'/attachment',{binary:true});
+        if(!current())return;
+        const url=URL.createObjectURL(blob);
+        const link=document.createElement('a');
+        link.href=url;
+        link.download='archivo-recibido'+({'application/pdf':'.pdf','image/png':'.png','image/jpeg':'.jpg'}[blob.type]||'');
+        link.click();
+        setTimeout(()=>URL.revokeObjectURL(url),1000);
+      }catch(error){notice(error.message,true);}
+    });
+    list.querySelectorAll('[data-resend-order]').forEach(button=>{
+      const requestId=crypto.randomUUID();
+      button.onclick=async()=>{
+        button.disabled=true;
+        try {
+          await api('/contacts/'+c.id+'/orders',{method:'POST',body:{action:'resend',orderId:button.dataset.resendOrder,requestId}});
+          if(!current())return;
+          notice('Acceso reenviado.');
+          await loadOrders();
+        } catch(error){notice(error.message,true);button.disabled=false;}
+      };
+    });
+    list.querySelectorAll('[data-order]').forEach(form=>bind(form,async fields=>{
+      if(!current())return;
+      const result=await api('/contacts/'+c.id+'/orders',{method:'POST',body:{...fields,orderId:form.dataset.order}});
+      if(!current())return;
+      notice(result.resumed?'Abono registrado. El flujo continuará.':'Abono registrado. Revisa el estado del flujo.');
+      await loadOrders();
+    }));
+  }
+  $('show-orders').onclick=()=>loadOrders().catch(error=>notice(error.message,true));
   $('show-automation').onclick=()=>loadAutomation().catch(error=>notice(error.message,true));
   $('message').value=drafts.get(c.id)||'';$('message').oninput=e=>drafts.set(c.id,e.target.value);
   function showFile(){const selected=fileDrafts.get(c.id);$('selected-file').hidden=!selected;$('selected-file').querySelector('span').textContent=selected?selected.file.name+' · '+(selected.file.size/1024/1024).toFixed(2)+' MB':'';$('message').maxLength=selected?1024:4000;}
