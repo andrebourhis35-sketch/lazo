@@ -4,6 +4,8 @@
 
 - Codex, rama codex/venta-infoproductos. Añadidos bloques de venta, cobro, confirmación por el equipo y entrega por enlace. El archivo recibido se vincula al pedido para revisión. La comprobación en cuenta y la referencia se registran por separado. Plantillas de pago anticipado y contra entrega, y botón para insertar un bloque en una conexión del lienzo.
 
+- Publicado sales-02e954c en OVH tras respaldo cifrado. Pasaron 85 pruebas del CRM y 11 del editor. HTTPS verificó huellas de los recursos y la ruta de pedidos respondió 401 sin sesión. En navegador, el menú Venta/Pago/Entrega apareció y el botón de conexión insertó una espera correctamente, sin guardar el borrador. PR #63. Los flujos conservan el modo de cuenta de prueba. No se conectó banco ni pasarela.
+
 ### Agente IA y espera real (22 de noviembre de 2026)
 
 - Codex, rama codex/agente-ia-flujos. Se añade el agente con información del negocio, una aclaración y salida a un asesor. La clave de API se guarda cifrada por espacio y el propietario activa el uso. Espera fija ejecuta el siguiente bloque después de la pausa aunque haya respuesta. Esperar sin respuesta sigue siendo un recordatorio que se cancela al intervenir el cliente o el equipo.
