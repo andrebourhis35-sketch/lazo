@@ -1,5 +1,9 @@
 # Coordinación Codex y Claude
 
+### Lienzo de flujos a ancho completo (23 de noviembre de 2026)
+
+- Codex, rama codex/lienzo-amplio. Se retiran las columnas fijas del editor. Biblioteca y propiedades quedan en paneles bajo demanda. Se compacta la barra y se ajusta el flujo al abrir el lienzo. Solo se publica el sitio estático de flujos.
+
 ### Infoproductos y abonos (23 de noviembre de 2026)
 
 - Codex, rama codex/venta-infoproductos. Añadidos bloques de venta, cobro, confirmación por el equipo y entrega por enlace. El archivo recibido se vincula al pedido para revisión. La comprobación en cuenta y la referencia se registran por separado. Plantillas de pago anticipado y contra entrega, y botón para insertar un bloque en una conexión del lienzo.
