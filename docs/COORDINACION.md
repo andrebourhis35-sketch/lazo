@@ -4,6 +4,8 @@
 
 - Codex, rama codex/panel-ventas. Resumen de pedidos con cobros confirmados y pendientes por moneda, filtros, mapa parcial por prefijo telefónico identificado y pedidos recientes. Conserva el embudo. Cartografía mundial Natural Earth 1:110m v5.1.2 de dominio público.
 
+- Publicado sales-panel-61e61e1 con respaldo cifrado y 86 pruebas aprobadas. HTTPS verificó los cinco recursos y el endpoint de ventas sin sesión devolvió 401. QA con pedidos ficticios confirmó separación PEN/USD, filtro Panamá, retorno desde el embudo y ancho móvil sin desborde. PR #68.
+
 ### Bandeja global legible (23 de noviembre de 2026)
 
 - Codex, rama codex/bandeja-global-legible. Filtro de conexiones con contraste y nombre legible, explicación de la bandeja, filas más claras y cabecera compacta. El sondeo no reemplaza el filtro ni las filas cuando los datos permanecen iguales.
