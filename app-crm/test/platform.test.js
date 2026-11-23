@@ -15,7 +15,7 @@ test('platform: accounts, tenant isolation, persistence and signed WhatsApp life
   let calls=0,mode='ok',beforeResponse=null,phoneGate=null;
   const fakeFetch=async(url,options)=>{
     const path=new URL(url).pathname;
-    if(path.endsWith('/phone_numbers')){if(phoneGate){const gate=phoneGate;phoneGate=null;await gate();}return Response.json({data:[{id:'10001'}]});}
+    if(path.endsWith('/phone_numbers')){if(phoneGate){const gate=phoneGate;phoneGate=null;await gate();}return Response.json({data:[{id:'10001'},{id:'10002',display_phone_number:'+51 900 000 002'}]});}
     if(path.endsWith('/message_templates'))return Response.json({data:[{name:'hello_world',language:'en_US',status:'APPROVED',components:[{type:'BODY',text:'Hello World'}]}]});
     if(path.endsWith('/messages')){
       calls++;if(mode==='timeout')throw new Error('Timeout with SECRET_SHOULD_NOT_LEAK');
@@ -84,14 +84,6 @@ test('platform: accounts, tenant isolation, persistence and signed WhatsApp life
       assert.equal((await api(owner,'/whatsapp','PUT',credentials)).status,409);
       await api(owner,'/companies/switch','POST',{companyId:companyA});await session(owner);
     });
-    await t.test('another number or WABA cannot overwrite a company connection',async()=>{
-      const before=store.get('SELECT * FROM connections WHERE company_id=?',companyA);
-      for(const change of [{phoneId:'99999'},{wabaId:'99999'}]) {
-        const r=await api(owner,'/whatsapp','PUT',{...credentials,...change});
-        assert.equal(r.status,409);assert.match(r.data.error,/espacio de empresa separado/);
-        assert.deepEqual(store.get('SELECT * FROM connections WHERE company_id=?',companyA),before);
-      }
-    });
     await t.test('token renewal preserves secrets and refuses a concurrent stale update',async()=>{
       let release,entered;const waiting=new Promise(resolve=>{entered=resolve;});
       phoneGate=()=>{entered();return new Promise(resolve=>{release=resolve;});};
@@ -139,6 +131,26 @@ test('platform: accounts, tenant isolation, persistence and signed WhatsApp life
       mode='timeout';const clientId=randomUUID(),payload={type:'template',templateName:'hello_world',language:'en_US',clientId};
       const result=await api(owner,`/contacts/${contact.id}/messages`,'POST',payload);assert.equal(result.status,502);assert.equal(JSON.stringify(result.data).includes('SECRET_SHOULD_NOT_LEAK'),false);
       const count=calls;assert.equal((await api(owner,`/contacts/${contact.id}/messages`,'POST',payload)).data.status,'unknown');assert.equal(calls,count);mode='ok';
+    });
+    await t.test('a second number in one workspace preserves the first connection and routes its own chats',async()=>{
+      await api(owner,'/companies/switch','POST',{companyId:companyA});await session(owner);
+      const before=store.get('SELECT * FROM connections WHERE phone_id=?','10001');
+      const second=await api(owner,'/whatsapp','PUT',{phoneId:'10002',wabaId:'20001',graphVersion:'v25.0',
+        accessToken:'second-fake-token',appSecret:'fake-app-secret'});
+      assert.equal(second.status,200);
+      assert.equal(second.data.phoneId,'10002');
+      assert.deepEqual(store.get('SELECT * FROM connections WHERE phone_id=?','10001'),before);
+      assert.equal((await api(owner,'/whatsapp','PUT',{phoneId:'10001',wabaId:'99999',graphVersion:'v25.0'})).status,409);
+      const available=await api(owner,'/whatsapp/numbers');
+      assert.deepEqual(available.data.numbers.map(n=>n.phoneId),['10001','10002']);
+      const msg=event({metadata:{phone_number_id:'10002'},messages:[{id:'wamid.second',from:'51900000001',
+        timestamp:String(Math.floor(now()/1000)),type:'text',text:{body:'Hola al segundo número'}}]});
+      assert.equal(await postHook(msg),200);
+      const scoped=await api(owner,'/inbox-overview?phoneId=10002');
+      assert.equal(scoped.status,200);
+      assert.equal(scoped.data.conversations.length,1);
+      assert.equal(scoped.data.conversations[0].last_message,'Hola al segundo número');
+      assert.notEqual(scoped.data.conversations[0].id,contact.id);
     });
     await t.test('membership revocation invalidates active sessions; expired sessions rejected',async()=>{
       assert.equal((await api(owner,'/members/'+agentId,'DELETE',{})).status,200);assert.equal((await api(agent,'/contacts')).status,401);

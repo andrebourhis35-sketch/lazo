@@ -128,14 +128,14 @@ export function flowSales(store,wa) {
     const claimed=store.run("UPDATE flow_runs SET due=NULL WHERE id=? AND state='payment_wait' AND due<=?",run.id,now());
     if(!claimed.changes||!active||!order||order.confirmed_at||order.proof_id)return;
     const contact=store.contact(run.company_id,run.contact_id);
-    if(contact.automation_paused||contact.last_inbound<=now()-windowMs||!wa.credentials(run.company_id)?.testRecipient)return;
+    if(contact.automation_paused||contact.last_inbound<=now()-windowMs||!wa.credentials(run.company_id,contact.phone_id)?.testRecipient)return;
     await send(run,active.actor_id,'payment-reminder','Tu pedido '+order.plan+' sigue pendiente de pago ('+format(order)+'). Si ya abonaste, envíanos tu comprobante.');
   }
   async function resend(company,contact,id,requestId,actor) {
     requireThat(typeof requestId==='string'&&/^[a-f0-9-]{36}$/.test(requestId),'Solicitud de reenvío no válida.');
     const order=store.get('SELECT * FROM flow_orders WHERE company_id=? AND contact_id=? AND id=?',company,contact,id);
     requireThat(order?.delivery_id&&(order.confirmed_at||order.mode==='postpaid'),'Primero completa la entrega original.',409);
-    requireThat(order.run_id.startsWith('manual:')||wa.credentials(company)?.testRecipient,'La entrega por flujo usa la cuenta de prueba.');
+    requireThat(order.run_id.startsWith('manual:')||wa.credentials(company,store.contact(company,contact).phone_id)?.testRecipient,'La entrega por flujo usa la cuenta de prueba.');
     store.limit('sale-resend:'+id,4,3600000);
     const messageId=await send({company_id:company,contact_id:contact,id:order.run_id},actor,'resend:'+requestId,'Acceso a tu compra:\n'+order.link);
     store.run('UPDATE flow_orders SET delivery_id=? WHERE id=?',messageId,order.id);

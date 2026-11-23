@@ -173,9 +173,9 @@ export function createServer(config,{store=openStore(config.database),fetchImpl=
       }
       if(method==='GET'&&route==='/flow-workspaces'){
         admin(s);
-        const workspaces=store.all(`SELECT c.id,c.name,w.phone_id AS phoneId,
+        const workspaces=store.all(`SELECT c.id,c.name,(SELECT w.phone_id FROM connections w WHERE w.company_id=c.id ORDER BY rowid LIMIT 1) AS phoneId,
           (SELECT COUNT(*) FROM flows f WHERE f.company_id=c.id) AS flowCount
-          FROM memberships m JOIN companies c ON c.id=m.company_id LEFT JOIN connections w ON w.company_id=c.id
+          FROM memberships m JOIN companies c ON c.id=m.company_id
           WHERE m.user_id=? AND m.role IN ('owner','admin') ORDER BY c.name,c.id`,s.user_id);
         return response(res,200,{workspaces});
       }
@@ -248,16 +248,16 @@ export function createServer(config,{store=openStore(config.database),fetchImpl=
         return response(res,200,{ok:true});
       }
       if(method==='GET'&&route==='/inbox-overview') {
-        const url=new URL(req.url,config.origin),company=url.searchParams.get('company')||null;
-        const sources=store.all(`SELECT c.id,c.name,w.phone_id FROM memberships m JOIN companies c ON c.id=m.company_id
-          JOIN connections w ON w.company_id=c.id WHERE m.user_id=? ORDER BY c.name,c.id`,s.user_id);
-        requireThat(!company||sources.some(source=>source.id===company),'Número no disponible.',403);
-        const conversations=store.all(`SELECT c.id,c.company_id,c.name,c.unread,c.updated,company.name AS source,
+        const url=new URL(req.url,config.origin),company=url.searchParams.get('company')||null,phoneId=url.searchParams.get('phoneId')||null;
+        const sources=store.all(`SELECT c.id,c.name,w.phone_id,w.display_number FROM memberships m JOIN companies c ON c.id=m.company_id
+          JOIN connections w ON w.company_id=c.id WHERE m.user_id=? ORDER BY c.name,c.id,w.rowid`,s.user_id);
+        requireThat(sources.some(source=>(!company||source.id===company)&&(!phoneId||source.phone_id===phoneId))||(!company&&!phoneId),'Número no disponible.',403);
+        const conversations=store.all(`SELECT c.id,c.company_id,c.name,c.unread,c.updated,company.name AS source,w.phone_id,w.display_number,
           (SELECT body FROM messages m WHERE m.company_id=c.company_id AND m.contact_id=c.id ORDER BY m.created DESC,m.id DESC LIMIT 1) AS last_message
           FROM contacts c JOIN memberships access ON access.company_id=c.company_id AND access.user_id=?
-          JOIN companies company ON company.id=c.company_id JOIN connections w ON w.company_id=c.company_id
-          WHERE (? IS NULL OR c.company_id=?) AND EXISTS(SELECT 1 FROM messages m WHERE m.company_id=c.company_id AND m.contact_id=c.id)
-          ORDER BY c.updated DESC,c.id LIMIT 100`,s.user_id,company,company);
+          JOIN companies company ON company.id=c.company_id JOIN connections w ON w.company_id=c.company_id AND w.phone_id=c.phone_id
+          WHERE (? IS NULL OR c.company_id=?) AND (? IS NULL OR c.phone_id=?) AND EXISTS(SELECT 1 FROM messages m WHERE m.company_id=c.company_id AND m.contact_id=c.id)
+          ORDER BY c.updated DESC,c.id LIMIT 100`,s.user_id,company,company,phoneId,phoneId);
         return response(res,200,{sources,conversations});
       }
       if(method==='GET'&&route==='/contacts')return response(res,200,{contacts:store.all(`SELECT c.*,(SELECT body FROM messages m WHERE m.company_id=c.company_id AND m.contact_id=c.id ORDER BY m.created DESC LIMIT 1) AS last_message FROM contacts c WHERE company_id=? ORDER BY updated DESC LIMIT 1000`,s.company_id)});
@@ -353,10 +353,20 @@ export function createServer(config,{store=openStore(config.database),fetchImpl=
       if(route==='/whatsapp/signup/start'&&method==='POST') {admin(s);store.limit('signup:'+s.company_id,10,60000);return response(res,200,await authorizedJson(req,s,()=>signup.start(s)));}
       if(route==='/whatsapp/signup/exchange'&&method==='POST') {admin(s);return response(res,200,await authorizedJson(req,s,data=>signup.exchange(s,data,()=>assertSession(s))));}
       if(route==='/whatsapp/signup/complete'&&method==='POST') {admin(s);return response(res,200,await authorizedJson(req,s,data=>signup.complete(s,data,()=>assertSession(s))));}
-      if(route==='/whatsapp'&&method==='GET') {admin(s);return response(res,200,wa.safe(s.company_id));}
+      if(route==='/whatsapp/numbers'&&method==='GET'){
+        const numbers=wa.numbers(s.company_id);
+        const legacy=numbers.find(number=>!number.number);
+        if(legacy){
+          await wa.flowNumber(s.company_id,legacy.phoneId);
+          assertSession(s);
+        }
+        return response(res,200,{numbers:wa.numbers(s.company_id)});
+      }
+      const phoneId=new URL(req.url,config.origin).searchParams.get('phoneId')||undefined;
+      if(route==='/whatsapp'&&method==='GET') {admin(s);return response(res,200,{...(phoneId==='new'?{configured:false}:wa.safe(s.company_id,phoneId)),numbers:wa.numbers(s.company_id)});}
       if(route==='/whatsapp'&&method==='PUT') {admin(s);store.limit('connect:'+s.company_id,10,60000);return response(res,200,await authorizedJson(req,s,data=>wa.connect(s.company_id,data,s.user_id,()=>assertSession(s))));}
-      if(route==='/whatsapp/subscribe'&&method==='POST') {admin(s);return response(res,200,await wa.subscribe(s.company_id,s.user_id));}
-      if(route==='/templates'&&method==='GET')return response(res,200,{templates:await wa.templates(s.company_id)});
+      if(route==='/whatsapp/subscribe'&&method==='POST') {admin(s);return response(res,200,await wa.subscribe(s.company_id,s.user_id,phoneId));}
+      if(route==='/templates'&&method==='GET')return response(res,200,{templates:await wa.templates(s.company_id,phoneId)});
       throw new HttpError(404,'Ruta no encontrada.');
     } catch(error) {
       if(error instanceof HttpError)return response(res,error.status,{error:error.message});

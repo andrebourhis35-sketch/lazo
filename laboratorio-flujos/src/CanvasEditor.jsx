@@ -10,6 +10,7 @@ import { Section } from '@astryxdesign/core/Section';
 import { Heading, Text } from '@astryxdesign/core/Text';
 import { TextInput } from '@astryxdesign/core/TextInput';
 import { TextArea } from '@astryxdesign/core/TextArea';
+import { MultiSelector } from '@astryxdesign/core/MultiSelector';
 import { Selector } from '@astryxdesign/core/Selector';
 import { Drawer, DrawerHeader } from '@astryxdesign/core/Drawer';
 import { ReactFlow, ReactFlowProvider, Background, BackgroundVariant, Controls, MiniMap, Panel, BaseEdge, EdgeLabelRenderer, getSmoothStepPath, Handle, Position, MarkerType, useNodesState, useEdgesState, useReactFlow, useUpdateNodeInternals } from '@xyflow/react';
@@ -243,10 +244,12 @@ function RunHistory({runs,onFocus}) {
   </VStack>);
 }
 
-function FlowLibrary({info,flows,loading,busy,onWorkspace,onOpen,onNew,onDemo,status,number,mode,changeMode}) {
+const numberLabel=number=>number.number||'ID Meta …'+number.phoneId.slice(-6);
+function FlowLibrary({info,flows,loading,busy,onWorkspace,onOpen,onNew,onDemo,status,mode,changeMode}) {
   const [query,setQuery]=useState('');
+  const [line,setLine]=useState('all');
   const selected=info?.workspaces.find(space=>space.id===info.identity.company.id);
-  const visible=flows.filter(doc=>doc.graph.name.toLocaleLowerCase('es').includes(query.trim().toLocaleLowerCase('es')));
+  const visible=flows.filter(doc=>doc.graph.name.toLocaleLowerCase('es').includes(query.trim().toLocaleLowerCase('es'))&&(line==='all'||doc.phoneIds.includes(line)||doc.activePhoneIds.includes(line)));
   return <Layout height="fill" header={<LayoutHeader hasDivider padding={3}>
     <HStack gap={3} hAlign="between" vAlign="center" wrap="wrap">
       <HStack gap={2} vAlign="center"><img src="./marca.svg" alt="LAZO" style={styles.brand}/><Heading level={2}>Flujos</Heading></HStack>
@@ -257,22 +260,26 @@ function FlowLibrary({info,flows,loading,busy,onWorkspace,onOpen,onNew,onDemo,st
     <LayoutContent padding={4}><VStack gap={4} width="100%" style={{maxWidth:'68rem',marginInline:'auto'}}>
       {info&&<>
         <HStack gap={3} wrap="wrap" hAlign="between" vAlign="end">
-          <Selector label="Número de WhatsApp o espacio" value={selected?.id} width="min(100%, 23rem)"
+          <Selector label="Espacio de trabajo" value={selected?.id} width="min(100%, 23rem)"
             isDisabled={busy} hasSearch={info.workspaces.length>8} presentation="adaptive"
-            options={info.workspaces.map(space=>({value:space.id,label:space.name+' · '+(space.id===selected?.id&&number?.number?number.number:space.phoneId?'ID Meta …'+space.phoneId.slice(-6):'Sin número conectado')}))}
+            options={info.workspaces.map(space=>({value:space.id,label:space.name}))}
             onChange={onWorkspace} />
           <Button label="Nuevo flujo" icon={<Icon icon={Plus} size="sm" />} variant="primary" isDisabled={busy} onClick={onNew}/>
         </HStack>
-        {selected?.phoneId&&!number?.canActivate&&number&&<Text color="secondary" size="sm">Puedes preparar borradores en este espacio. La activación está disponible para cuentas de prueba verificadas.</Text>}
-        {!selected?.phoneId&&<Text color="secondary" size="sm">Vincula el número desde Conexiones del CRM para usar WhatsApp en este espacio.</Text>}
-        <TextInput label="Buscar un flujo" type="search" value={query} onChange={setQuery} hasClear />
+        {!info.numbers.length&&<Text color="secondary" size="sm">Vincula WhatsApp desde Conexiones del CRM.</Text>}
+        <HStack gap={3} wrap="wrap">
+          <TextInput label="Buscar un flujo" type="search" value={query} onChange={setQuery} hasClear />
+          {!!info.numbers.length&&<Selector label="Filtrar por número" value={line} onChange={setLine} presentation="adaptive"
+            options={[{value:'all',label:'Todos los números'},...info.numbers.map(n=>({value:n.phoneId,label:numberLabel(n)}))]} />}
+        </HStack>
         <VStack gap={2} aria-label="Flujos guardados">
           {visible.map(doc=><HStack key={doc.id} gap={3} padding={3} hAlign="between" vAlign="center" wrap="wrap" style={styles.note}>
             <VStack gap={1}><Text weight="semibold">{doc.graph.name}</Text>
-              <Text size="sm" color="secondary">{doc.active?'Activo':doc.publishedRevision?'Pausado':'Borrador'} · {doc.graph.nodes.length} bloques</Text></VStack>
+              <Text size="sm" color="secondary">{doc.active?'Activo':doc.publishedRevision?'Pausado':'Borrador'} · {doc.graph.nodes.length} bloques</Text>
+              <Text size="sm" color="secondary">{info.numbers.filter(n=>(doc.active?doc.activePhoneIds:doc.phoneIds).includes(n.phoneId)).map(numberLabel).join(' · ')||'Sin números asignados'}</Text></VStack>
             <Button label={'Editar '+doc.graph.name} size="sm" isDisabled={busy} onClick={()=>onOpen(doc)}/>
           </HStack>)}
-          {!visible.length&&<Text color="secondary">{flows.length?'No encontramos un flujo con ese nombre.':'Este espacio todavía no tiene flujos guardados.'}</Text>}
+          {!visible.length&&<Text color="secondary">{flows.length?'No hay flujos con esos filtros.':'Este espacio todavía no tiene flujos guardados.'}</Text>}
         </VStack>
       </>}
       {!info&&!loading&&<Button label="Abrir simulador" onClick={onDemo} />}
@@ -291,7 +298,7 @@ function Editor() {
   const [status, setStatus] = useState(initial.current.issue || (initial.current.restored ? 'Borrador recuperado de este navegador.' : 'Ejemplo listo para explorar.'));
   const [mode, setMode] = useState(readWorkspaceTheme);
   const [library,setLibrary]=useState(true);
-  const [number,setNumber]=useState(null);
+  const [phoneIds,setPhoneIds]=useState([]);
   const [panel, setPanel] = useState('');
   const [snapshot, setSnapshot] = useState(null);
   const [path, setPath] = useState([]);
@@ -315,7 +322,7 @@ function Editor() {
   const mutate = () => { editEpoch.current++; setDirty(true); setPath([]); };
   const onNodesChange = useCallback(changes => { const events = changes.toArray(); applyNodes(changes); setSelectedId(previous => { const picked = events.find(change => change.type === 'select' && change.selected); return picked ? picked.id : events.some(change => change.type === 'select' && !change.selected && change.id === previous) ? null : previous; }); if (events.some(change => ['position', 'remove', 'add'].includes(change.type))) { editEpoch.current++; setDirty(true); setPath([]); } }, [applyNodes]);
   const onEdgesChange = useCallback(changes => { const events = changes.toArray(); applyEdges(changes); if (events.some(change => change.type !== 'select')) { editEpoch.current++; setDirty(true); setPath([]); } }, [applyEdges]);
-  function showDocument(doc) { const next=parseDraft(JSON.stringify(doc.graph));setNodes(next.nodes);setEdges(next.edges);setName(next.name);setServerDoc(doc);setDirty(false);setPath([]);setSelectedId(next.nodes[1]?.id||null);editEpoch.current++; }
+  function showDocument(doc) { const next=parseDraft(JSON.stringify(doc.graph));setNodes(next.nodes);setEdges(next.edges);setName(next.name);setServerDoc(doc);setPhoneIds(doc.phoneIds??(serverInfo?.numbers.length===1?[serverInfo.numbers[0].phoneId]:[]));setDirty(false);setPath([]);setSelectedId(next.nodes[1]?.id||null);editEpoch.current++; }
   useEffect(() => {
     let cancelled=false;
     connectFlowsServer().then(info=>{
@@ -324,13 +331,6 @@ function Editor() {
     }).catch(error=>{if(!cancelled)setStatus(error.message);}).finally(()=>{if(!cancelled)setServerLoading(false);});
     return ()=>{cancelled=true;};
   }, []);
-  useEffect(()=>{
-    let cancelled=false;
-    if(serverInfo?.workspaces.some(space=>space.id===serverInfo.identity.company.id&&space.phoneId)){
-      serverInfo.request('/flow-number').then(result=>{if(!cancelled)setNumber(result);}).catch(()=>{});
-    }
-    return ()=>{cancelled=true;};
-  },[serverInfo]);
   useEffect(()=>{
     const sync=event=>{if(event.type==='pageshow'||event.key===themeKey)setMode(readWorkspaceTheme());};
     window.addEventListener('storage',sync);
@@ -342,7 +342,7 @@ function Editor() {
     setServerBusy(true);
     try{
       await serverInfo.request('/companies/switch','POST',{companyId});
-      setServerInfo(null);setSavedFlows([]);setServerDoc(null);setNumber(null);
+      setServerInfo(null);setSavedFlows([]);setServerDoc(null);setPhoneIds([]);
       const info=await connectFlowsServer();
       setServerInfo(info);setSavedFlows(info.flows);setStatus('');
     }catch(error){serverFailure(error);}
@@ -353,13 +353,13 @@ function Editor() {
     if(serverBusy)return;
     if(!serverInfo)return saveLocal();
     setServerBusy(true);const epoch=editEpoch.current;
-    try {const graph=parseDraft(JSON.stringify(flow));const result=await serverInfo.request(serverDoc?'/flows/'+serverDoc.id:'/flows',serverDoc?'PUT':'POST',{graph,revision:serverDoc?.revision});setServerDoc(result);setSavedFlows(current=>[result,...current.filter(item=>item.id!==result.id)]);setDirty(editEpoch.current!==epoch);setStatus(`Borrador guardado en ${serverInfo.identity.company.name}. ${result.active?'La versión activa sigue funcionando.':'Todavía no está activo.'}`);}catch(error){serverFailure(error);}finally{setServerBusy(false);}
+    try {const graph=parseDraft(JSON.stringify(flow));const result=await serverInfo.request(serverDoc?'/flows/'+serverDoc.id:'/flows',serverDoc?'PUT':'POST',{graph,phoneIds,revision:serverDoc?.revision});setServerDoc(result);setSavedFlows(current=>[result,...current.filter(item=>item.id!==result.id)]);setDirty(editEpoch.current!==epoch);setStatus(`Borrador guardado en ${serverInfo.identity.company.name}. ${result.active?'La versión activa sigue funcionando.':'Todavía no está activo.'}`);}catch(error){serverFailure(error);}finally{setServerBusy(false);}
   }
   async function activation(action) {
     if(!serverInfo||!serverDoc||serverBusy)return;
     if(action==='activate'&&dirty)return setStatus('Guarda los cambios antes de activar la nueva versión.');
     setServerBusy(true);
-    try{const result=await serverInfo.request('/flows/'+serverDoc.id+'/'+action,'POST',{revision:serverDoc.revision});setServerDoc(result);setSavedFlows(current=>[result,...current.filter(item=>item.id!==result.id)]);setStatus(action==='pause'?'Flujo pausado. No iniciará nuevas ejecuciones.':'Flujo activo para los nuevos mensajes de la cuenta de prueba.');}catch(error){serverFailure(error);}finally{setServerBusy(false);}
+    try{const result=await serverInfo.request('/flows/'+serverDoc.id+'/'+action,'POST',{revision:serverDoc.revision});setServerDoc(result);setSavedFlows(current=>[result,...current.filter(item=>item.id!==result.id)]);setStatus(action==='pause'?'Flujo pausado. No iniciará nuevas ejecuciones.':'Flujo activo para los nuevos mensajes de los números de prueba seleccionados.');}catch(error){serverFailure(error);}finally{setServerBusy(false);}
   }
   async function openSaved() {
     if(dirty){setStatus('Guarda los cambios actuales antes de volver a tus flujos.');return;}
@@ -433,9 +433,9 @@ function Editor() {
     </VStack>
   </Drawer>;
   if(library)return <Theme theme={lazoTheme} mode={mode}><VStack style={styles.app} gap={0}>
-    <FlowLibrary info={serverInfo} flows={savedFlows} loading={serverLoading} busy={serverBusy}
+    <FlowLibrary key={serverInfo?.identity.company.id} info={serverInfo} flows={savedFlows} loading={serverLoading} busy={serverBusy}
       onWorkspace={switchWorkspace} onNew={()=>setPanel('templates')} onDemo={()=>setLibrary(false)}
-      onOpen={doc=>{showDocument(doc);setLibrary(false);setStatus('');}} status={status} number={number} mode={mode} changeMode={changeMode}/>
+      onOpen={doc=>{showDocument(doc);setLibrary(false);setStatus('');}} status={status} mode={mode} changeMode={changeMode}/>
     {templates}
   </VStack></Theme>;
   return <Theme theme={lazoTheme} mode={mode}><VStack style={styles.app} gap={0}>
@@ -458,10 +458,14 @@ function Editor() {
           </HStack>
           {serverInfo&&<HStack gap={2} wrap="wrap" vAlign="center">
             <Button label="Nuevo flujo" size="sm" onClick={()=>setPanel('templates')} isDisabled={serverBusy||dirty} />
-            <Button label="Activar versión guardada" size="sm" onClick={()=>activation('activate')} isDisabled={serverBusy||!serverDoc||dirty||!number?.canActivate||(serverDoc.active&&serverDoc.publishedRevision===serverDoc.revision)} />
+            <Button label="Activar versión guardada" size="sm" onClick={()=>activation('activate')} isDisabled={serverBusy||!serverDoc||dirty||!serverDoc.phoneIds.length||serverDoc.phoneIds.some(id=>!serverInfo.numbers.find(n=>n.phoneId===id)?.canActivate)||(serverDoc.active&&serverDoc.publishedRevision===serverDoc.revision)} />
             {serverDoc?.active&&<Button label="Pausar flujo" size="sm" onClick={()=>activation('pause')} isDisabled={serverBusy} />}
             <Button label="Historial de ejecuciones" size="sm" onClick={openHistory} isDisabled={serverBusy||!serverDoc} />
-            <Text size="sm" color="secondary">{serverInfo.identity.company.name}{number?.number?' · '+number.number:''}{number?.canActivate?' · Cuenta de prueba':''}</Text>
+            <MultiSelector label="Números de WhatsApp del flujo" isLabelHidden size="sm" width="min(100%, 15rem)" presentation="adaptive"
+              value={phoneIds} onChange={ids=>{setPhoneIds(ids);mutate();}} isDisabled={serverBusy||!serverInfo.numbers.length}
+              hasSearch={serverInfo.numbers.length>8} placeholder="Asignar números" triggerDisplay="labels"
+              options={serverInfo.numbers.map(n=>({value:n.phoneId,label:numberLabel(n)}))} />
+            <Text size="sm" color="secondary">{serverInfo.identity.company.name}</Text>
           </HStack>}
         </VStack>
       </LayoutHeader>} footer={<LayoutFooter hasDivider padding={2}>

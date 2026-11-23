@@ -34,10 +34,9 @@ export function metaAssets(event){
   if(data?.type!=='WA_EMBEDDED_SIGNUP')return null;
   return data;
 }
-export function mountMetaSignup(root,{api,isCurrent,onSaved,notice,connection}){
-  root.innerHTML='<h2>Conecta tu WhatsApp con Meta</h2><p class="muted">Inicia sesión en Meta, elige tu negocio y autoriza la cuenta y el número que quieras usar en LAZO. Tus credenciales se gestionan automáticamente.</p><button class="send" id="meta-connect" type="button" disabled>Conectar con Meta</button><p class="muted" id="meta-state" role="status" aria-live="polite">Comprobando disponibilidad…</p><form id="meta-pin-form" hidden><label>PIN de verificación de dos pasos<input name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="new-password" required></label><p class="muted">Tu número necesita registrarse en Cloud API. Elige un PIN de seis dígitos y guárdalo en tu gestor de contraseñas. No lo envíes por chat.</p><button class="send" type="submit">Registrar este número y conectar</button></form><p class="muted">La disponibilidad de cuentas depende de los permisos y requisitos de Meta. El proceso no cambia el número que ya tiene este espacio ni habilita envíos comerciales por sí solo.</p>';
+export function mountMetaSignup(root,{api,isCurrent,onSaved,notice}){
+  root.innerHTML='<h2>Agregar un número con Meta</h2><p class="muted">Inicia sesión en Meta, elige tu negocio y autoriza la cuenta y el número que quieras usar en LAZO. Tus credenciales se gestionan automáticamente.</p><button class="send" id="meta-connect" type="button" disabled>Conectar con Meta</button><p class="muted" id="meta-state" role="status" aria-live="polite">Comprobando disponibilidad…</p><form id="meta-pin-form" hidden><label>PIN de verificación de dos pasos<input name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="new-password" required></label><p class="muted">Tu número necesita registrarse en Cloud API. Elige un PIN de seis dígitos y guárdalo en tu gestor de contraseñas. No lo envíes por chat.</p><button class="send" type="submit">Registrar este número y conectar</button></form><p class="muted">La disponibilidad de cuentas depende de los permisos y requisitos de Meta. Los números que ya están vinculados conservan sus conversaciones y sus flujos.</p>';
   const button=root.querySelector('#meta-connect'),status=root.querySelector('#meta-state'),pinForm=root.querySelector('#meta-pin-form');
-  if(connection?.configured){const hint=document.createElement('p');hint.className='muted';hint.textContent='Este espacio ya tiene una conexión. Para añadir otro número, usa «Crear espacio para otra API» al final de esta página y conecta desde ese espacio nuevo.';button.before(hint);}
   let ticket,FB,assets,generation=0,authorized=false,completing=false,active=false,cleanup=()=>{};
   function fail(message){generation++;cleanup();active=false;completing=false;pinForm.inert=false;button.disabled=false;button.textContent='Volver a conectar con Meta';status.textContent=message;pinForm.hidden=true;}
   async function prepare(){
@@ -62,7 +61,7 @@ export function mountMetaSignup(root,{api,isCurrent,onSaved,notice,connection}){
       if(!live())return;
       cleanup();
       if(result.needsPin){pinForm.hidden=false;status.textContent='Meta autorizó la cuenta. Falta registrar el número con tu PIN.';return;}
-      active=false;pinForm.reset();notice('Meta autorizó la cuenta y confirmó la suscripción. Comprueba ahora un mensaje entrante real.');await onSaved();
+      active=false;pinForm.reset();notice('Meta autorizó la cuenta y confirmó la suscripción. Comprueba ahora un mensaje entrante real.');await onSaved(result.connection?.phoneId);
     }catch(error){if(live())fail(error.message);}finally{if(expected===generation){completing=false;pinForm.inert=false;}}
   }
   pinForm.onsubmit=event=>{event.preventDefault();void complete(new FormData(pinForm).get('pin'));};

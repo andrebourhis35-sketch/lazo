@@ -2,6 +2,9 @@ import { DatabaseSync } from 'node:sqlite';
 import { randomUUID } from 'node:crypto';
 import { now, token, digest, requireThat, text, phone, stages } from './core.js';
 
+const contactsSchema = `CREATE TABLE IF NOT EXISTS contacts(id TEXT PRIMARY KEY,company_id TEXT NOT NULL REFERENCES companies(id),name TEXT NOT NULL,phone TEXT NOT NULL,email TEXT NOT NULL DEFAULT '',location TEXT NOT NULL DEFAULT '',stage TEXT NOT NULL DEFAULT 'Nuevo contacto',owner_id TEXT REFERENCES users(id),note TEXT NOT NULL DEFAULT '',resolved INTEGER NOT NULL DEFAULT 0,unread INTEGER NOT NULL DEFAULT 0,last_inbound INTEGER NOT NULL DEFAULT 0,created INTEGER NOT NULL,updated INTEGER NOT NULL,tags TEXT NOT NULL DEFAULT '[]',automation_paused INTEGER NOT NULL DEFAULT 0,phone_id TEXT NOT NULL DEFAULT '',UNIQUE(company_id,phone,phone_id));`;
+const connectionsSchema = `CREATE TABLE IF NOT EXISTS connections(company_id TEXT NOT NULL REFERENCES companies(id),phone_id TEXT PRIMARY KEY,waba_id TEXT NOT NULL,config TEXT NOT NULL,checked INTEGER NOT NULL DEFAULT 0,webhook_at INTEGER NOT NULL DEFAULT 0,verified INTEGER NOT NULL DEFAULT 0,display_number TEXT NOT NULL DEFAULT '');`;
+
 export function openStore(filename) {
   const db = new DatabaseSync(filename);
   db.exec(`PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;
@@ -12,7 +15,7 @@ export function openStore(filename) {
     CREATE TABLE IF NOT EXISTS memberships(company_id TEXT NOT NULL REFERENCES companies(id),user_id TEXT NOT NULL REFERENCES users(id),role TEXT NOT NULL CHECK(role IN ('owner','admin','agent')),PRIMARY KEY(company_id,user_id));
     CREATE TABLE IF NOT EXISTS sessions(hash TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),company_id TEXT NOT NULL REFERENCES companies(id),csrf TEXT NOT NULL,expires INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS invites(hash TEXT PRIMARY KEY,company_id TEXT NOT NULL REFERENCES companies(id),email TEXT NOT NULL,role TEXT NOT NULL CHECK(role IN ('admin','agent')),expires INTEGER NOT NULL,used INTEGER NOT NULL DEFAULT 0);
-    CREATE TABLE IF NOT EXISTS contacts(id TEXT PRIMARY KEY,company_id TEXT NOT NULL REFERENCES companies(id),name TEXT NOT NULL,phone TEXT NOT NULL,email TEXT NOT NULL DEFAULT '',location TEXT NOT NULL DEFAULT '',stage TEXT NOT NULL DEFAULT 'Nuevo contacto',owner_id TEXT REFERENCES users(id),note TEXT NOT NULL DEFAULT '',resolved INTEGER NOT NULL DEFAULT 0,unread INTEGER NOT NULL DEFAULT 0,last_inbound INTEGER NOT NULL DEFAULT 0,created INTEGER NOT NULL,updated INTEGER NOT NULL,UNIQUE(company_id,phone));
+    ${contactsSchema}
     CREATE INDEX IF NOT EXISTS contacts_company ON contacts(company_id,updated DESC);
     CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY,company_id TEXT NOT NULL REFERENCES companies(id),contact_id TEXT NOT NULL REFERENCES contacts(id),direction TEXT NOT NULL,body TEXT NOT NULL,type TEXT NOT NULL,status TEXT NOT NULL,wa_id TEXT UNIQUE,client_id TEXT,error_code TEXT,created INTEGER NOT NULL,updated INTEGER NOT NULL,UNIQUE(company_id,client_id));
     CREATE INDEX IF NOT EXISTS messages_contact ON messages(company_id,contact_id,created);
@@ -20,7 +23,7 @@ export function openStore(filename) {
       message_id TEXT PRIMARY KEY REFERENCES messages(id) ON DELETE CASCADE,
       company_id TEXT NOT NULL REFERENCES companies(id), transcript TEXT NOT NULL
     );
-    CREATE TABLE IF NOT EXISTS connections(company_id TEXT PRIMARY KEY REFERENCES companies(id),phone_id TEXT UNIQUE NOT NULL,waba_id TEXT NOT NULL,config TEXT NOT NULL,checked INTEGER NOT NULL DEFAULT 0,webhook_at INTEGER NOT NULL DEFAULT 0,verified INTEGER NOT NULL DEFAULT 0);
+    ${connectionsSchema}
     CREATE TABLE IF NOT EXISTS status_events(wa_id TEXT PRIMARY KEY,company_id TEXT NOT NULL,status TEXT NOT NULL,error_code TEXT,updated INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS limits(key TEXT PRIMARY KEY,count INTEGER NOT NULL,expires INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY,company_id TEXT,actor_id TEXT,event TEXT NOT NULL,created INTEGER NOT NULL);
@@ -38,7 +41,6 @@ export function openStore(filename) {
   `);
   db.exec(`
     CREATE TABLE IF NOT EXISTS flows(id TEXT PRIMARY KEY,company_id TEXT NOT NULL REFERENCES companies(id),draft TEXT NOT NULL,revision INTEGER NOT NULL DEFAULT 1,published TEXT,published_revision INTEGER,activation INTEGER NOT NULL DEFAULT 0,active INTEGER NOT NULL DEFAULT 0,actor_id TEXT,created INTEGER NOT NULL,updated INTEGER NOT NULL);
-    CREATE UNIQUE INDEX IF NOT EXISTS flows_one_active ON flows(company_id) WHERE active=1;
     CREATE TABLE IF NOT EXISTS flow_runs(id TEXT PRIMARY KEY,company_id TEXT NOT NULL,flow_id TEXT NOT NULL,contact_id TEXT NOT NULL,message_id TEXT NOT NULL,revision INTEGER NOT NULL,activation INTEGER NOT NULL,snapshot TEXT NOT NULL,state TEXT NOT NULL,step TEXT,reason TEXT NOT NULL DEFAULT '',created INTEGER NOT NULL,updated INTEGER NOT NULL,UNIQUE(flow_id,message_id));
     CREATE TABLE IF NOT EXISTS flow_orders(
       id TEXT PRIMARY KEY,company_id TEXT NOT NULL REFERENCES companies(id),contact_id TEXT NOT NULL REFERENCES contacts(id),run_id TEXT NOT NULL UNIQUE,
@@ -75,6 +77,44 @@ export function openStore(filename) {
     if(!all('PRAGMA table_info(contacts)').some(c=>c.name==='automation_paused'))db.exec('ALTER TABLE contacts ADD COLUMN automation_paused INTEGER NOT NULL DEFAULT 0');
     for(const company of all('SELECT id FROM companies'))ensureWorkspace(company.id);
   });
+  // Rebuild the two tables whose original uniqueness rules allowed only one channel.
+  // Keep IDs stable so messages, orders and scheduled flows retain their references.
+  const legacyConnections = !all('PRAGMA table_info(connections)').some(c=>c.name==='display_number');
+  const legacyContacts = !all('PRAGMA table_info(contacts)').some(c=>c.name==='phone_id');
+  db.exec('PRAGMA foreign_keys=OFF');
+  try {
+    tx(()=>{
+      if(legacyConnections) {
+        db.exec(connectionsSchema.replace('connections(', 'connections_new('));
+        db.exec(`INSERT INTO connections_new(company_id,phone_id,waba_id,config,checked,webhook_at,verified)
+          SELECT company_id,phone_id,waba_id,config,checked,webhook_at,verified FROM connections;
+          DROP TABLE connections; ALTER TABLE connections_new RENAME TO connections;`);
+      }
+      if(legacyContacts) {
+        const columns='id,company_id,name,phone,email,location,stage,owner_id,note,resolved,unread,last_inbound,created,updated,tags,automation_paused';
+        db.exec(contactsSchema.replace('contacts(', 'contacts_new('));
+        db.exec(`INSERT INTO contacts_new(${columns},phone_id) SELECT ${columns},
+          COALESCE((SELECT phone_id FROM connections WHERE connections.company_id=contacts.company_id),'') FROM contacts;
+          DROP TABLE contacts; ALTER TABLE contacts_new RENAME TO contacts;`);
+      }
+      db.exec(`CREATE INDEX IF NOT EXISTS contacts_company ON contacts(company_id,updated DESC);
+        CREATE INDEX IF NOT EXISTS connections_company ON connections(company_id);
+        DROP INDEX IF EXISTS flows_one_active;`);
+      if(!all('PRAGMA table_info(flows)').some(c=>c.name==='draft_numbers')) {
+        db.exec(`ALTER TABLE flows ADD COLUMN draft_numbers TEXT NOT NULL DEFAULT '[]';
+          ALTER TABLE flows ADD COLUMN published_numbers TEXT NOT NULL DEFAULT '[]';
+          UPDATE flows SET draft_numbers=(SELECT json_group_array(phone_id) FROM connections WHERE company_id=flows.company_id),
+            published_numbers=CASE WHEN published IS NULL THEN '[]' ELSE
+              (SELECT json_group_array(phone_id) FROM connections WHERE company_id=flows.company_id) END;`);
+      }
+      if(!all('PRAGMA table_info(media_assets)').some(c=>c.name==='phone_id'))db.exec("ALTER TABLE media_assets ADD COLUMN phone_id TEXT NOT NULL DEFAULT ''");
+      if(!all('PRAGMA table_info(status_events)').some(c=>c.name==='phone_id'))db.exec("ALTER TABLE status_events ADD COLUMN phone_id TEXT NOT NULL DEFAULT ''");
+      if(legacyConnections||legacyContacts)requireThat(!get('PRAGMA foreign_key_check'),'La migración de números encontró referencias inválidas.',500);
+    });
+  } finally {db.exec('PRAGMA foreign_keys=ON');}
+  function numbers(company) {
+    return all('SELECT phone_id,display_number FROM connections WHERE company_id=? ORDER BY rowid',company);
+  }
   function ensureWorkspace(company) {
     if(get('SELECT 1 FROM workspace_settings WHERE company_id=?',company))return;
     run('INSERT INTO workspace_settings VALUES(?,?)',company,now());
@@ -110,10 +150,13 @@ export function openStore(filename) {
     const name=text(data.name,80,true), number=phone(data.phone),mail=text(data.email||'',254),location=text(data.location||'',100);
     if (mail) requireThat(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail), 'Revisa el correo.');
     ownerValid(company,data.ownerId);
-    requireThat(!get('SELECT 1 FROM contacts WHERE company_id=? AND phone=?',company,number), 'Ese teléfono ya está en tus contactos.',409);
+    const available=numbers(company);
+    const phoneId=data.phoneId??(available.length===1?available[0].phone_id:'');
+    requireThat(available.some(row=>row.phone_id===phoneId)||(!available.length&&phoneId===''),'Elige un número vinculado a este espacio.');
+    requireThat(!get('SELECT 1 FROM contacts WHERE company_id=? AND phone=? AND phone_id=?',company,number,phoneId),'Ese contacto ya existe para este número.',409);
     const id=randomUUID();
     const first=get('SELECT name FROM pipeline_stages WHERE company_id=? AND is_won=0 ORDER BY position,id LIMIT 1',company);
-    run('INSERT INTO contacts(id,company_id,name,phone,email,location,stage,owner_id,created,updated) VALUES(?,?,?,?,?,?,?,?,?,?)',id,company,name,number,mail,location,first.name,data.ownerId||actor,now(),now());
+    run('INSERT INTO contacts(id,company_id,name,phone,email,location,stage,owner_id,created,updated,phone_id) VALUES(?,?,?,?,?,?,?,?,?,?,?)',id,company,name,number,mail,location,first.name,data.ownerId||actor,now(),now(),phoneId);
     audit(company,actor,'contact.created');
     return contact(company,id);
   }
@@ -173,5 +216,5 @@ export function openStore(filename) {
     run('DELETE FROM mail_jobs WHERE created<?',now()-7*86400000);
     run('DELETE FROM sessions WHERE expires<?',now());
   }
-  return { db,run,get,all,tx,audit,limit,contact,addContact,updateContact,session,member,purge,ensureWorkspace,assertCredential,close:()=>db.close() };
+  return { db,run,get,all,tx,audit,limit,numbers,contact,addContact,updateContact,session,member,purge,ensureWorkspace,assertCredential,close:()=>db.close() };
 }

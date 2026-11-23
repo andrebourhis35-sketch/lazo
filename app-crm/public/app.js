@@ -1,4 +1,4 @@
-import { mountConnections } from './connections-ui.js?v=20261119-signup-time';
+import { mountConnections } from './connections-ui.js?v=20261123-multinumero';
 import { mountManagement, replyPicker, renderStatistics } from './work-ui.js?v=20261117';
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -19,8 +19,11 @@ let resetToken=fragment.get('reset')||'';
 if(location.hash)history.replaceState(null,'',location.pathname+location.search);
 const drafts=new Map(),sendKeys=new Map();let polling=false,noticeTimer,workspaceEpoch=0;
 const fileDrafts=new Map(),mediaUrls=new Map(),sendsInFlight=new Map();let chatGeneration=0;
-let inboxFilters={status:'all',owner:'',tag:''};
-function clearWorkspaceView(){fileDrafts.clear();for(const url of mediaUrls.values())URL.revokeObjectURL(url);mediaUrls.clear();inboxFilters={status:'all',owner:'',tag:''};document.querySelectorAll('dialog').forEach(d=>d.close());}
+let inboxFilters={status:'all',owner:'',tag:'',phoneId:''};
+let workspaceNumbers=[];
+const numberLabel=number=>number.number||'ID Meta …'+number.phoneId.slice(-6);
+const conversationNumber=id=>{const number=workspaceNumbers.find(number=>number.phoneId===id);return number?numberLabel(number):'';};
+function clearWorkspaceView(){fileDrafts.clear();for(const url of mediaUrls.values())URL.revokeObjectURL(url);mediaUrls.clear();inboxFilters={status:'all',owner:'',tag:'',phoneId:''};document.querySelectorAll('dialog').forEach(d=>d.close());}
 function contactTags(c){try{return JSON.parse(c.tags||'[]');}catch{return [];}}
 function setPipeline(list){pipelineStages=list;stages=list.map(s=>s.name);}
 function requestHeaders(){return {'X-Lazo-Client':'1',...(csrf?{'X-CSRF-Token':csrf}:{}),...(session?{'X-Lazo-Company':session.company.id,'X-Lazo-User':session.user.id}:{})};}
@@ -78,7 +81,7 @@ function passwordScreen(mode) {
   });
 }
 async function loadSession(){session=await api('/session');csrf=session.csrf;}
-async function startWorkspace(preferredContact=null){clearWorkspaceView();workspaceEpoch++;await loadSession();if(inviteToken){await api('/invitations/accept',{method:'POST',body:{token:inviteToken}});inviteToken='';await loadSession();}const epoch=workspaceEpoch;const loaded=await Promise.all([api('/contacts').then(d=>d.contacts),api('/members').then(d=>d.members),api('/pipeline').then(d=>d.stages),api('/quick-replies').then(d=>d.replies)]);if(epoch!==workspaceEpoch)return;[contacts,members,pipelineStages,quickReplies]=loaded;if(preferredContact&&!contacts.some(contact=>contact.id===preferredContact)){
+async function startWorkspace(preferredContact=null){clearWorkspaceView();workspaceEpoch++;await loadSession();if(inviteToken){await api('/invitations/accept',{method:'POST',body:{token:inviteToken}});inviteToken='';await loadSession();}const epoch=workspaceEpoch;const loaded=await Promise.all([api('/contacts').then(d=>d.contacts),api('/members').then(d=>d.members),api('/pipeline').then(d=>d.stages),api('/quick-replies').then(d=>d.replies),api('/whatsapp/numbers').then(d=>d.numbers)]);if(epoch!==workspaceEpoch)return;[contacts,members,pipelineStages,quickReplies,workspaceNumbers]=loaded;if(preferredContact&&!contacts.some(contact=>contact.id===preferredContact)){
   const {contact}=await api('/contacts/'+preferredContact);
   if(epoch!==workspaceEpoch)return;
   contacts.push(contact);
@@ -134,7 +137,7 @@ function renderCRM(){
 }
 function contactRows(term){const found=contacts.filter(c=>`${c.name} ${c.phone} ${c.email}`.toLowerCase().includes(term.trim().toLowerCase()));$('contact-rows').innerHTML=found.map(c=>`<tr><td><div class="contact-identity"><span class="avatar">${esc(initials(c.name))}</span><div><strong>${esc(c.name)}</strong><small>${esc(c.email||'Sin correo')}</small></div></div></td><td>${esc(c.phone)}</td><td>${esc(ownerName(c.owner_id))}</td><td><span class="table-stage">${esc(c.stage)}</span></td><td><button class="open-chat" data-chat="${c.id}" aria-label="Ver conversación de ${esc(c.name)}">Ver conversación ↗</button></td></tr>`).join('')||'<tr><td colspan="5" class="empty">No hay contactos con esa búsqueda.</td></tr>';}
 function newContact(){
-  const dialog=document.createElement('dialog');dialog.innerHTML=`<form><div class="section-heading"><h2>Nuevo contacto</h2><button type="button" class="icon close" aria-label="Cerrar">×</button></div><label>Nombre<input name="name" maxlength="80" required></label><label>Teléfono internacional<input name="phone" inputmode="tel" placeholder="51…" required></label><label>Correo (opcional)<input name="email" type="email" maxlength="254"></label><label>Ciudad (opcional)<input name="location" maxlength="100"></label><label>Responsable<select name="ownerId">${options(members,session.user.id)}</select></label><div class="dialog-actions"><button class="send" type="submit">Crear contacto</button></div></form>`;document.body.append(dialog);dialog.querySelector('.close').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove());bind(dialog.querySelector('form'),async data=>{const c=await api('/contacts',{method:'POST',body:data});contacts.unshift(c);dialog.close();await openChat(c.id);notice('Contacto guardado en tu empresa.');});dialog.showModal();
+  const dialog=document.createElement('dialog');dialog.innerHTML=`<form><div class="section-heading"><h2>Nuevo contacto</h2><button type="button" class="icon close" aria-label="Cerrar">×</button></div><label>Nombre<input name="name" maxlength="80" required></label><label>Teléfono internacional<input name="phone" inputmode="tel" placeholder="51…" required></label><label>Correo (opcional)<input name="email" type="email" maxlength="254"></label><label>Ciudad (opcional)<input name="location" maxlength="100"></label>${workspaceNumbers.length>1?`<label>Número de atención<select name="phoneId" required>${options([{id:'',name:'Elige un número'},...workspaceNumbers.map(n=>({id:n.phoneId,name:numberLabel(n)}))],inboxFilters.phoneId)}</select></label>`:''}<label>Responsable<select name="ownerId">${options(members,session.user.id)}</select></label><div class="dialog-actions"><button class="send" type="submit">Crear contacto</button></div></form>`;document.body.append(dialog);dialog.querySelector('.close').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove());bind(dialog.querySelector('form'),async data=>{const c=await api('/contacts',{method:'POST',body:data});contacts.unshift(c);dialog.close();await openChat(c.id);notice('Contacto guardado en tu empresa.');});dialog.showModal();
 }
 async function updateContact(id,data){const result=await api('/contacts/'+id,{method:'PATCH',body:data});contacts=contacts.map(c=>c.id===id?{...c,...result}:c);return result;}
 async function openChat(id,orderId){
@@ -156,14 +159,14 @@ async function openChat(id,orderId){
 let overviewSource='';
 async function inboxOverview() {
   const epoch=workspaceEpoch, sourceId=overviewSource;
-  const query=sourceId?'?company='+encodeURIComponent(sourceId):'';
+  const query=sourceId?'?phoneId='+encodeURIComponent(sourceId):'';
   const {sources,conversations}=await api('/inbox-overview'+query);
   if(view!=='overview'||epoch!==workspaceEpoch||sourceId!==overviewSource)return;
   if(!$('overview-list')){
     $('view').innerHTML=`<section class="overview-inbox" aria-label="Conversaciones de tus números conectados">
       <header class="overview-toolbar">
         <p>Consulta los chats de todos tus números de WhatsApp. Al abrir uno, responderás desde su número de origen.</p>
-        <label for="overview-source">Filtrar por conexión</label>
+        <label for="overview-source">Filtrar por número</label>
         <select id="overview-source"></select>
       </header>
       <div id="overview-list"></div>
@@ -177,9 +180,8 @@ async function inboxOverview() {
   const sourceOptions=options([
     {id:'',name:'Todos los números'},
     ...sources.map(source=>({
-      id:source.id,
-      name:sources.some(other=>other.id!==source.id&&other.name===source.name)
-        ?source.name+' · ID '+source.phone_id.slice(-6):source.name,
+      id:source.phone_id,
+      name:source.name+' · '+numberLabel({phoneId:source.phone_id,number:source.display_number}),
     })),
   ],'');
   if(select.dataset.options!==sourceOptions){
@@ -189,7 +191,7 @@ async function inboxOverview() {
   if(select.value!==sourceId)select.value=sourceId;
   const rows=conversations.map(c=>`<button class="overview-chat" type="button" data-contact="${esc(c.id)}" aria-label="Abrir conversación de ${esc(c.name)} en ${esc(c.source)}">
     <span class="avatar" aria-hidden="true">${esc(initials(c.name))}</span>
-    <span class="overview-chat-content"><strong>${esc(c.name)}</strong><span class="overview-chat-source">${esc(c.source)}</span>
+    <span class="overview-chat-content"><strong>${esc(c.name)}</strong><span class="overview-chat-source">${esc(c.source+' · '+numberLabel({phoneId:c.phone_id,number:c.display_number}))}</span>
       <span class="overview-preview">${esc(c.last_message||'Sin vista previa')}</span>
     </span>
     ${c.unread?`<span class="unread-badge" aria-label="${c.unread} sin leer">${c.unread}</span>`:''}
@@ -216,10 +218,19 @@ async function inboxOverview() {
 async function inbox(){
   $('view').onclick=null;$('view').onchange=null;
   const tags=[...new Set(contacts.flatMap(contactTags).concat(inboxFilters.tag?[inboxFilters.tag]:[]))].sort((a,b)=>a.localeCompare(b,'es'));
-  $('view').innerHTML=`<section class="inbox"><aside class="list-panel" id="inbox-list"><div class="list-title"><h2>Bandeja <span id="count"></span></h2><button class="icon" id="new-chat" aria-label="Nuevo contacto">+</button></div><label class="search"><span>⌕</span><input id="search" placeholder="Buscar chat" aria-label="Buscar una conversación"></label><details class="filter-disclosure"><summary id="inbox-filter-summary">Filtros</summary><div class="inbox-filters"><label>Estado<select id="filter-status"><option value="all">Todas</option><option value="pending">Pendientes</option><option value="resolved">Resueltas</option><option value="unread">Sin leer</option></select></label><label>Responsable<select id="filter-owner"><option value="">Todo el equipo</option><option value="mine">Asignadas a mí</option><option value="unassigned">Sin asignar</option>${members.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join('')}</select></label><label>Etiqueta<select id="filter-tag"><option value="">Todas las etiquetas</option>${tags.map(tag=>`<option value="${esc(tag)}">${esc(tag)}</option>`).join('')}</select></label><button id="clear-filters" type="button" class="filter-clear">Limpiar filtros</button></div></details><div id="conversations" class="conversations"></div></aside><section class="chat-panel" id="chat-panel"></section><aside class="details" id="details"></aside></section>`;
+  $('view').innerHTML=`<section class="inbox"><aside class="list-panel" id="inbox-list"><div class="list-title"><h2>Bandeja <span id="count"></span></h2><button class="icon" id="new-chat" aria-label="Nuevo contacto">+</button></div><label class="search"><span>⌕</span><input id="search" placeholder="Buscar chat" aria-label="Buscar una conversación"></label>${workspaceNumbers.length>1?`<label class="inbox-number">Número de WhatsApp<select id="filter-number">${options([{id:'',name:'Todos los números'},...workspaceNumbers.map(n=>({id:n.phoneId,name:numberLabel(n)}))],inboxFilters.phoneId)}</select></label>`:''}<details class="filter-disclosure"><summary id="inbox-filter-summary">Filtros</summary><div class="inbox-filters"><label>Estado<select id="filter-status"><option value="all">Todas</option><option value="pending">Pendientes</option><option value="resolved">Resueltas</option><option value="unread">Sin leer</option></select></label><label>Responsable<select id="filter-owner"><option value="">Todo el equipo</option><option value="mine">Asignadas a mí</option><option value="unassigned">Sin asignar</option>${members.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join('')}</select></label><label>Etiqueta<select id="filter-tag"><option value="">Todas las etiquetas</option>${tags.map(tag=>`<option value="${esc(tag)}">${esc(tag)}</option>`).join('')}</select></label><button id="clear-filters" type="button" class="filter-clear">Limpiar filtros</button></div></details><div id="conversations" class="conversations"></div></aside><section class="chat-panel" id="chat-panel"></section><aside class="details" id="details"></aside></section>`;
   $('new-chat').onclick=newContact;$('search').oninput=renderList;
+  if($('filter-number'))$('filter-number').onchange=event=>{
+    inboxFilters.phoneId=event.target.value;
+    if(active&&inboxFilters.phoneId&&contacts.find(c=>c.id===active)?.phone_id!==inboxFilters.phoneId){
+      drafts.set(active,$('message')?.value||'');
+      active=null;
+      void renderChat();
+    }
+    renderList();
+  };
   for(const [id,key] of [['filter-status','status'],['filter-owner','owner'],['filter-tag','tag']]){$(id).value=inboxFilters[key];$(id).onchange=e=>{inboxFilters[key]=e.target.value;renderList();};}
-  $('clear-filters').onclick=()=>{inboxFilters={status:'all',owner:'',tag:''};$('search').value='';for(const id of ['filter-status','filter-owner','filter-tag'])$(id).value=id==='filter-status'?'all':'';renderList();};
+  $('clear-filters').onclick=()=>{inboxFilters={status:'all',owner:'',tag:'',phoneId:''};if($('filter-number'))$('filter-number').value='';$('search').value='';for(const id of ['filter-status','filter-owner','filter-tag'])$(id).value=id==='filter-status'?'all':'';renderList();};
   renderList();await renderChat();
 }
 function renderList(){
@@ -231,12 +242,12 @@ function renderList(){
     const match=(c.name+' '+c.phone+' '+(c.last_message||'')+' '+contactTags(c).join(' ')).toLowerCase().includes(term);
     const status=inboxFilters.status;
     const owner=inboxFilters.owner;
-    return match&&(status==='all'||status==='pending'&&!c.resolved||status==='resolved'&&c.resolved||status==='unread'&&c.unread>0)&&
+    return (!inboxFilters.phoneId||c.phone_id===inboxFilters.phoneId)&&match&&(status==='all'||status==='pending'&&!c.resolved||status==='resolved'&&c.resolved||status==='unread'&&c.unread>0)&&
       (!owner||owner==='mine'&&c.owner_id===session.user.id||owner==='unassigned'&&!c.owner_id||c.owner_id===owner)&&
       (!inboxFilters.tag||contactTags(c).includes(inboxFilters.tag));
   });
   $('count').textContent=found.length;
-  $('conversations').innerHTML=found.map(c=>`<button class="conversation ${active===c.id?'selected':''}" data-id="${c.id}" aria-label="Conversación de ${esc(c.name)}"><span class="avatar">${esc(initials(c.name))}</span><span class="summary"><strong>${esc(c.name)}</strong><p>${esc(c.last_message||'Sin mensajes')}</p><small>${c.resolved?'Resuelta':esc(c.stage)} · ${esc(ownerName(c.owner_id))}</small><span class="contact-tags">${contactTags(c).slice(0,3).map(tag=>`<span>${esc(tag)}</span>`).join('')}</span></span>${c.unread?`<span class="unread-badge">${c.unread}</span>`:''}</button>`).join('')||'<p class="empty">No hay conversaciones con estos filtros.</p>';
+  $('conversations').innerHTML=found.map(c=>`<button class="conversation ${active===c.id?'selected':''}" data-id="${c.id}" aria-label="Conversación de ${esc(c.name)}"><span class="avatar">${esc(initials(c.name))}</span><span class="summary"><strong>${esc(c.name)}</strong><p>${esc(c.last_message||'Sin mensajes')}</p>${workspaceNumbers.length>1&&c.phone_id?`<small>${esc(conversationNumber(c.phone_id))}</small>`:''}<small>${c.resolved?'Resuelta':esc(c.stage)} · ${esc(ownerName(c.owner_id))}</small><span class="contact-tags">${contactTags(c).slice(0,3).map(tag=>`<span>${esc(tag)}</span>`).join('')}</span></span>${c.unread?`<span class="unread-badge">${c.unread}</span>`:''}</button>`).join('')||'<p class="empty">No hay conversaciones con estos filtros.</p>';
   $('conversations').onclick=e=>{const b=e.target.closest('[data-id]');if(b){if(active)drafts.set(active,$('message')?.value||'');active=b.dataset.id;renderList();renderChat().then(()=>document.querySelector('.app').classList.add('chat-open')).catch(e=>notice(e.message,true));}};
 }
 async function renderChat(){
@@ -253,7 +264,7 @@ async function renderChat(){
   setPipeline(pipeline.stages);
   await api('/contacts/'+c.id+'/read',{method:'POST',body:{}});if(!current())return;
   messages=loaded.messages;c.unread=0;renderList();
-  $('chat-panel').innerHTML=`<header class="chat-header"><button id="back" class="icon mobile-only" aria-label="Volver a conversaciones">←</button><span class="avatar">${esc(initials(c.name))}</span><div class="chat-person"><h2>${esc(c.name)}</h2><span>WhatsApp · ${esc(c.phone)}</span></div><div class="chat-actions"><span class="stage" id="chat-stage">${esc(c.stage)}</span><button id="resolve" class="secondary">${c.resolved?'Reabrir':'Resolver'}</button><button id="toggle-inbox" class="secondary" aria-controls="inbox-list" aria-expanded="true">Bandeja</button><button id="show-details" class="secondary" aria-controls="details" aria-expanded="false">Ficha</button></div></header><div class="messages" id="messages" role="log" aria-label="Mensajes"></div><div class="composer-area"><form id="send-form" data-type="text"><label class="reply-label" id="message-label" for="message">Tu respuesta</label><textarea id="message" name="text" maxlength="4000" rows="2" placeholder="Escribe aquí para responder al contacto…"></textarea><div class="send-options"><label><span class="sr-only">Tipo de mensaje</span><select name="type" id="send-type"><option value="text">Texto o archivo</option><option value="template">Plantilla aprobada</option></select></label><label id="template-label" hidden>Plantilla<select id="template" name="template"></select></label><button type="button" id="quick-reply" class="secondary">Respuestas rápidas</button></div><div id="parameters"></div><div id="file-composer"><input id="attachment-file" type="file" accept="image/jpeg,image/png,application/pdf" hidden><div class="attachment-controls"><button type="button" id="attach-file" class="secondary" title="JPG/PNG hasta 5 MB o PDF hasta 10 MB">Adjuntar imagen o PDF</button><span class="muted">JPG/PNG: 5 MB · PDF: 10 MB</span></div><div id="selected-file" class="selected-file" hidden><span></span><button type="button" class="icon" aria-label="Quitar archivo">×</button></div></div><div class="composer-bottom"><span>Texto y archivos: hasta 24 h desde el último mensaje del contacto.</span><button class="send" type="submit">Enviar</button></div></form><p class="status">Texto y archivos: hasta 24 h · Últimos 100 mensajes · Estados de Meta.</p></div>`;
+  $('chat-panel').innerHTML=`<header class="chat-header"><button id="back" class="icon mobile-only" aria-label="Volver a conversaciones">←</button><span class="avatar">${esc(initials(c.name))}</span><div class="chat-person"><h2>${esc(c.name)}</h2><span>WhatsApp · ${esc(c.phone)}${c.phone_id&&workspaceNumbers.length>1?` · Atiende ${esc(conversationNumber(c.phone_id))}`:''}</span></div><div class="chat-actions"><span class="stage" id="chat-stage">${esc(c.stage)}</span><button id="resolve" class="secondary">${c.resolved?'Reabrir':'Resolver'}</button><button id="toggle-inbox" class="secondary" aria-controls="inbox-list" aria-expanded="true">Bandeja</button><button id="show-details" class="secondary" aria-controls="details" aria-expanded="false">Ficha</button></div></header><div class="messages" id="messages" role="log" aria-label="Mensajes"></div><div class="composer-area"><form id="send-form" data-type="text"><label class="reply-label" id="message-label" for="message">Tu respuesta</label><textarea id="message" name="text" maxlength="4000" rows="2" placeholder="Escribe aquí para responder al contacto…"></textarea><div class="send-options"><label><span class="sr-only">Tipo de mensaje</span><select name="type" id="send-type"><option value="text">Texto o archivo</option><option value="template">Plantilla aprobada</option></select></label><label id="template-label" hidden>Plantilla<select id="template" name="template"></select></label><button type="button" id="quick-reply" class="secondary">Respuestas rápidas</button></div><div id="parameters"></div><div id="file-composer"><input id="attachment-file" type="file" accept="image/jpeg,image/png,application/pdf" hidden><div class="attachment-controls"><button type="button" id="attach-file" class="secondary" title="JPG/PNG hasta 5 MB o PDF hasta 10 MB">Adjuntar imagen o PDF</button><span class="muted">JPG/PNG: 5 MB · PDF: 10 MB</span></div><div id="selected-file" class="selected-file" hidden><span></span><button type="button" class="icon" aria-label="Quitar archivo">×</button></div></div><div class="composer-bottom"><span>Texto y archivos: hasta 24 h desde el último mensaje del contacto.</span><button class="send" type="submit">Enviar</button></div></form><p class="status">Texto y archivos: hasta 24 h · Últimos 100 mensajes · Estados de Meta.</p></div>`;
   $('details').innerHTML=`<div class="details-heading"><h2>Información del cliente</h2><button type="button" class="secondary" id="close-details" aria-label="Cerrar ficha del cliente">×</button></div><div class="profile"><span class="avatar">${esc(initials(c.name))}</span><h3>${esc(c.name)}</h3><span class="profile-label">${esc(c.phone)}</span></div><section class="detail-section"><h3>Datos del contacto</h3><p>${esc(c.email||'Sin correo')}</p><p>${esc(c.location||'Sin ubicación')}</p></section><form id="details-form"><label>Etapa del embudo<select name="stage" aria-label="Etapa del embudo">${options(stages,c.stage)}</select></label><label>Responsable<select name="ownerId"><option value="" ${!c.owner_id?'selected':''}>Sin asignar</option>${options(members,c.owner_id)}</select></label><label>Etiquetas<input name="tags" maxlength="247" placeholder="Interesado, Mayorista" value="${esc(contactTags(c).join(', '))}"><small>Hasta 8 etiquetas, separadas por comas.</small></label><label>Nota interna<textarea name="note" maxlength="4000" rows="4">${esc(c.note)}</textarea></label><button class="secondary" type="submit">Guardar cambios</button></form><section class="detail-section" id="contact-automation"><button class="secondary" id="show-automation">Historial del flujo</button><div id="automation-history"></div></section><section class="detail-section"><button class="secondary" id="show-orders">Pedidos y abonos</button><div id="contact-orders"></div></section>`;
   async function loadAutomation() {
     const data=await api('/contacts/'+c.id+'/automation');
@@ -438,7 +449,7 @@ async function renderChat(){
   $('quick-reply').onclick=async()=>{try{const data=await api('/quick-replies');if(!current())return;quickReplies=data.replies;replyPicker(quickReplies,body=>{if(!current())return;const box=$('message');if(box.value.length+body.length>box.maxLength){notice('El mensaje supera el tamaño permitido. Acorta tu borrador antes de insertar esta respuesta.',true);return;}box.setRangeText(body,box.selectionStart,box.selectionEnd,'end');drafts.set(c.id,box.value);box.focus();});}catch(e){notice(e.message,true);}};
   function syncComposer(){if(!sceneCurrent()||!$('send-form'))return;const busy=sendsInFlight.has(sendingKey);$('send-form').inert=busy;const button=$('send-form').querySelector('[type="submit"]');button.disabled=busy;button.textContent=busy?'Enviando…':'Enviar';}
   syncComposer();renderMessages(true);
-  $('send-type').onchange=async()=>{const isTemplate=$('send-type').value==='template';$('send-form').dataset.type=isTemplate?'template':'text';$('template-label').hidden=!isTemplate;$('message').hidden=isTemplate;$('message-label').hidden=isTemplate;$('file-composer').hidden=isTemplate;$('quick-reply').hidden=isTemplate;$('parameters').innerHTML='';if(isTemplate){try{const data=await api('/templates');if(!current())return;templates=data.templates;$('template').innerHTML=templates.map((t,i)=>`<option value="${i}">${esc(t.name)} · ${esc(t.language)}</option>`).join('');templateFields();}catch(e){notice(e.message,true);}}};
+  $('send-type').onchange=async()=>{const isTemplate=$('send-type').value==='template';$('send-form').dataset.type=isTemplate?'template':'text';$('template-label').hidden=!isTemplate;$('message').hidden=isTemplate;$('message-label').hidden=isTemplate;$('file-composer').hidden=isTemplate;$('quick-reply').hidden=isTemplate;$('parameters').innerHTML='';if(isTemplate){try{const data=await api('/templates'+(c.phone_id?'?phoneId='+encodeURIComponent(c.phone_id):''));if(!current())return;templates=data.templates;$('template').innerHTML=templates.map((t,i)=>`<option value="${i}">${esc(t.name)} · ${esc(t.language)}</option>`).join('');templateFields();}catch(e){notice(e.message,true);}}};
   $('template').onchange=templateFields;
   bind($('send-form'),async(data,form)=>{
     if(!current())return;
@@ -520,18 +531,14 @@ function renderMessages(scroll=false){
   if(scroll||atBottom)box.scrollTop=box.scrollHeight;
 }
 let connectionGeneration=0;
-async function connectionsView(){
+async function connectionsView(phoneId){
   const generation=++connectionGeneration,epoch=workspaceEpoch,company=session.company.id;
   const current=()=>generation===connectionGeneration&&epoch===workspaceEpoch&&session?.company.id===company&&view==='connections';
   $('view').onclick=null;$('view').onchange=null;$('view').innerHTML='<p class="empty">Cargando conexiones…</p>';
-  const connection=await api('/whatsapp');if(!current())return;
+  const connection=await api('/whatsapp'+(phoneId?'?phoneId='+encodeURIComponent(phoneId):''));if(!current())return;
+  if(connection.numbers)workspaceNumbers=connection.numbers;
   const scopedApi=(path,options)=>{if(!current())throw new Error('El espacio cambió. Vuelve a abrir Conexiones.');return api(path,options);};
-  mountConnections($('view'),{connection,api:scopedApi,notice,isCurrent:current,onSaved:connectionsView,canCreate:session.user.role==='owner',
-    onCreateCompany:async name=>{
-      const created=await scopedApi('/companies',{method:'POST',body:{name}});if(!current())return;
-      await scopedApi('/companies/switch',{method:'POST',body:{companyId:created.id}});
-      if(!current())return;active=null;await startWorkspace();notice('Espacio creado. Conecta aquí la otra API; la conexión anterior se conserva en su empresa.');
-    }});
+  mountConnections($('view'),{connection,api:scopedApi,notice,isCurrent:current,onSaved:connectionsView,onSelect:connectionsView});
 }
 async function settings(){
   $('view').onclick=null;$('view').onchange=null;

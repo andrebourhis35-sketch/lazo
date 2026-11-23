@@ -5,7 +5,6 @@ import {digest,HttpError,now,requireThat,text,token,vault} from './core.js';
 // Neither authorization codes nor business tokens are returned to the browser.
 export function embeddedSignup(store,config,wa,fetchImpl=fetch){
   const provider=config.metaSignup||{},attempts=new Map(),phoneLocks=new Set(),secrets=vault(config.masterKey);
-  const snapshot=company=>store.get('SELECT config FROM connections WHERE company_id=?',company)?.config||null;
   const ready=()=>/^\d{5,50}$/.test(provider.appId||'')&&/^\d{5,50}$/.test(provider.configId||'')&&
     /^v\d+\.\d+$/.test(provider.graphVersion||'')&&Boolean(provider.appSecret)&&wa.providerWebhookReady(provider.appSecret);
   function settings(){
@@ -18,7 +17,7 @@ export function embeddedSignup(store,config,wa,fetchImpl=fetch){
     requireThat(attempts.size<100,'Hay demasiadas conexiones en curso. Inténtalo más tarde.',429);
     const attempt=token(),expiresAt=now()+30*60*1000;
     attempts.set(digest(attempt),{company:s.company_id,user:s.user_id,session:s.hash,
-      expires:expiresAt,phase:'new',busy:false,snapshot:snapshot(s.company_id)});
+      expires:expiresAt,phase:'new',busy:false});
     return {...settings(),attempt,expiresAt};
   }
   function context(s,value,ensureSession){
@@ -27,7 +26,7 @@ export function embeddedSignup(store,config,wa,fetchImpl=fetch){
       'La autorización caducó o pertenece a otro espacio. Vuelve a conectar con Meta.',409);
     const ensure=()=>{
       ensureSession();
-      requireThat(attempts.get(key)===item&&item.expires>now()&&snapshot(item.company)===item.snapshot,
+      requireThat(attempts.get(key)===item&&item.expires>now(),
         'La conexión cambió durante la autorización. Recarga Conexiones.',409);
     };
     ensure();return {key,item,ensure};
@@ -68,14 +67,18 @@ export function embeddedSignup(store,config,wa,fetchImpl=fetch){
     requireThat(item.phase==='authorized'&&!item.busy,'Vuelve a autorizar la conexión con Meta.',409);
     const phoneId=text(data.phoneId,50,true),wabaId=text(data.wabaId,50,true);
     requireThat(/^\d+$/.test(phoneId)&&/^\d+$/.test(wabaId),'Meta no devolvió un número y una cuenta válidos.');
-    const old=wa.safe(item.company);
-    requireThat(!old.configured||(old.phoneId===phoneId&&old.wabaId===wabaId),'Este espacio ya tiene otro número. Crea un espacio separado para conservar su historial.',409);
     requireThat(!item.phoneId||(item.phoneId===phoneId&&item.wabaId===wabaId),'El número cambió durante el alta. Vuelve a conectar con Meta.',409);
     const {accessToken}=secrets.open(item.secret,key);
     requireThat(!phoneLocks.has(phoneId),'Hay otra conexión de este número en curso. Espera antes de reintentar.',409);
     phoneLocks.add(phoneId);item.busy=true;
-    const ensureAssets=()=>{ensure();const owner=store.get('SELECT company_id FROM connections WHERE phone_id=?',phoneId);
-      requireThat(!owner||owner.company_id===item.company,'Ese número ya está conectado a otro espacio de LAZO.',409);};
+    const existing=()=>store.get('SELECT company_id,config FROM connections WHERE phone_id=?',phoneId);
+    const original=existing()?.config;
+    const ensureAssets=()=>{
+      ensure();
+      const current=existing();
+      requireThat(!current||current.company_id===item.company,'Ese número ya está conectado a otro espacio de LAZO.',409);
+      requireThat(current?.config===original,'Este número cambió durante la autorización. Recarga Conexiones.',409);
+    };
     try{
       ensureAssets();
       const phones=await request(`${wabaId}/phone_numbers`,{accessToken,query:{fields:'id',limit:'100'}});ensureAssets();
@@ -95,11 +98,9 @@ export function embeddedSignup(store,config,wa,fetchImpl=fetch){
         requireThat(registered.success===true,'Meta no confirmó el registro del número.',502);item.phase='authorized';
       }
       requireThat(wa.providerWebhookReady(provider.appSecret),'Falta verificar el webhook de LAZO en Meta.',409);
-      ensure();
-      await wa.connect(item.company,{phoneId,wabaId,accessToken,appSecret:provider.appSecret,graphVersion:provider.graphVersion},item.user,ensure,true);
-      item.snapshot=snapshot(item.company);ensure();
-      await wa.subscribe(item.company,item.user);ensure();
-      attempts.delete(key);return {connected:true,connection:wa.safe(item.company)};
+      ensureAssets();
+      await wa.connect(item.company,{phoneId,wabaId,accessToken,appSecret:provider.appSecret,graphVersion:provider.graphVersion},item.user,ensureAssets,true);
+      attempts.delete(key);return {connected:true,connection:wa.safe(item.company,phoneId)};
     }catch(error){if(item.phase==='registering')attempts.delete(key);throw error;}finally{item.busy=false;phoneLocks.delete(phoneId);}
   }
   return {settings,start,exchange,complete};

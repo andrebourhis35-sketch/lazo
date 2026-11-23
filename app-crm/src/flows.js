@@ -12,7 +12,7 @@ export function automationFlows(store, wa, ai) {
   const saleKinds=new Set(['plan','charge','confirm','deliver']);
   let task=null, stopping=false;
   const get = (company,id) => { const row=store.get('SELECT * FROM flows WHERE company_id=? AND id=?',company,id);requireThat(row,'Flujo no encontrado.',404);return row; };
-  const safe = row => ({id:row.id,revision:row.revision,publishedRevision:row.published_revision,active:Boolean(row.active),updated:row.updated,graph:JSON.parse(row.draft)});
+  const safe = row => ({id:row.id,revision:row.revision,publishedRevision:row.published_revision,active:Boolean(row.active),updated:row.updated,graph:JSON.parse(row.draft),phoneIds:JSON.parse(row.draft_numbers),activePhoneIds:row.active?JSON.parse(row.published_numbers):[]});
   const list = company => store.all('SELECT * FROM flows WHERE company_id=? ORDER BY created,id',company).map(safe);
   const trace = (run,label,detail,messageId=null) => store.run('INSERT INTO flow_steps(run_id,label,detail,message_id,created) VALUES(?,?,?,?,?)',run.id,label,detail,messageId,now());
   const cancelReminder = (company,contact,reason) => store.run("UPDATE flow_runs SET state='cancelled',reason=?,updated=? WHERE company_id=? AND contact_id=? AND due IS NOT NULL AND state IN ('scheduled','pending','running')",reason,now(),company,contact);
@@ -37,12 +37,17 @@ export function automationFlows(store, wa, ai) {
   }
   function save(company,id,data,actor) {
     const draft=JSON.stringify(graph(data.graph)),time=now();
-    if(id) {
-      const old=get(company,id);requireThat(Number.isInteger(data.revision)&&old.revision===data.revision,'Otra pestaña modificó este flujo. Vuelve a abrirlo antes de guardar.',409);
-      store.run('UPDATE flows SET draft=?,revision=revision+1,updated=? WHERE company_id=? AND id=?',draft,time,company,id);
+    const old=id?get(company,id):null;
+    const numbers=store.numbers(company).map(row=>row.phone_id);
+    const phoneIds=data.phoneIds??(old?JSON.parse(old.draft_numbers):numbers.length===1?numbers:[]);
+    requireThat(Array.isArray(phoneIds)&&phoneIds.every(phoneId=>numbers.includes(phoneId)),'Elige números vinculados a este espacio.');
+    const draftNumbers=JSON.stringify([...new Set(phoneIds)].sort());
+    if(old) {
+      requireThat(Number.isInteger(data.revision)&&old.revision===data.revision,'Otra pestaña modificó este flujo. Vuelve a abrirlo antes de guardar.',409);
+      store.run('UPDATE flows SET draft=?,draft_numbers=?,revision=revision+1,updated=? WHERE company_id=? AND id=?',draft,draftNumbers,time,company,id);
     } else {
       requireThat(list(company).length<30,'Puedes guardar hasta treinta flujos por empresa.');id=randomUUID();
-      store.run('INSERT INTO flows(id,company_id,draft,created,updated) VALUES(?,?,?,?,?)',id,company,draft,time,time);
+      store.run('INSERT INTO flows(id,company_id,draft,draft_numbers,created,updated) VALUES(?,?,?,?,?,?)',id,company,draft,draftNumbers,time,time);
     }
     store.audit(company,actor,'flow.saved');return safe(get(company,id));
   }
@@ -71,11 +76,18 @@ export function automationFlows(store, wa, ai) {
       if(node.data.kind==='tag')requireThat(node.data.value.trim().length<=30&&!/[,\x00-\x1f]/.test(node.data.value),'La etiqueta admite hasta treinta caracteres, sin comas ni saltos.');
       if(['assign','handoff'].includes(node.data.kind))requireThat(store.get('SELECT 1 FROM memberships WHERE company_id=? AND user_id=?',company,node.data.value),'Selecciona un asesor de esta empresa.');
     }
-    const connection=wa.credentials(company);requireThat(connection?.testRecipient&&connection.appSecret&&connection.verified,'Esta fase requiere la conexión y el webhook de la cuenta de prueba.');
-    requireThat(!store.get('SELECT 1 FROM flows WHERE company_id=? AND active=1 AND id<>?',company,id),'Pausa el otro flujo activo de esta empresa antes de activar este.',409);
+    const numbers=JSON.parse(row.draft_numbers);
+    requireThat(numbers.length,'Elige al menos un número y guarda el flujo.');
+    for(const phoneId of numbers){
+      const connection=wa.credentials(company,phoneId);
+      requireThat(connection?.testRecipient&&connection.appSecret&&connection.verified,'Esta fase requiere números de prueba con webhook verificado.');
+    }
     if(row.active&&row.published_revision===row.revision&&row.actor_id===actor)return safe(row);
     store.tx(()=>{
-      store.run('UPDATE flows SET published=draft,published_revision=revision,activation=activation+1,active=1,actor_id=?,updated=? WHERE company_id=? AND id=?',actor,now(),company,id);
+      requireThat(!store.get(`SELECT 1 FROM flows f, json_each(f.published_numbers) n
+        WHERE f.company_id=? AND f.active=1 AND f.id<>? AND n.value IN (SELECT value FROM json_each(?))`,
+        company,id,row.draft_numbers),'Pausa el otro flujo activo que usa uno de estos números.',409);
+      store.run('UPDATE flows SET published=draft,published_numbers=draft_numbers,published_revision=revision,activation=activation+1,active=1,actor_id=?,updated=? WHERE company_id=? AND id=?',actor,now(),company,id);
       store.run("UPDATE flow_runs SET state='cancelled',reason='Nueva versión activada',updated=? WHERE flow_id=? AND state IN ('pending','waiting','scheduled','delayed','agent_wait','payment_wait')",now(),id);
       store.audit(company,actor,'flow.activated');
     });return safe(get(company,id));
@@ -86,7 +98,8 @@ export function automationFlows(store, wa, ai) {
   function enqueue(message) {
     if(message.created<now()-5*60000)return;
     const cancelled=cancelReminder(message.company_id,message.contact_id,'El contacto respondió.');
-    if(store.contact(message.company_id,message.contact_id).automation_paused)return;
+    const contact=store.contact(message.company_id,message.contact_id);
+    if(contact.automation_paused)return;
     if(message.type==='text'&&/\b(stop|baja|cancelar)\b/.test(normalize(message.body))) {
       store.run("UPDATE flow_runs SET state='cancelled',reason='El contacto pidió detener la automatización.',due=NULL,updated=? WHERE company_id=? AND contact_id=? AND state IN ('pending','running','waiting','scheduled','delayed','agent_wait','payment_wait')",now(),message.company_id,message.contact_id);
       return;
@@ -116,7 +129,8 @@ export function automationFlows(store, wa, ai) {
       return;
     }
     if(Number(cancelled.changes))return;
-    const row=store.get('SELECT * FROM flows WHERE company_id=? AND active=1',message.company_id);if(!row)return;
+    const row=store.get(`SELECT f.* FROM flows f, json_each(f.published_numbers) n
+      WHERE f.company_id=? AND f.active=1 AND n.value=?`,message.company_id,contact.phone_id);if(!row)return;
     const draft=JSON.parse(row.published),start=draft.nodes.find(n=>n.data.kind==='trigger');
     if(!value.includes(normalize(start.data.value)))return;
     if(store.get("SELECT 1 FROM flow_runs WHERE company_id=? AND contact_id=? AND (created>? OR (state IN ('waiting','agent_wait','delayed') AND updated>?))",message.company_id,message.contact_id,now()-60000,now()-buttonLifetime))return;
@@ -145,8 +159,8 @@ export function automationFlows(store, wa, ai) {
       const draft=JSON.parse(run.snapshot);
       const menus=JSON.parse(run.menus);
       let node=draft.nodes.find(n=>run.step?n.id===run.step:n.data.kind==='trigger');
-      requireThat(wa.credentials(run.company_id)?.testRecipient,'La automatización requiere una cuenta de prueba.');
       const initialContact=store.contact(run.company_id,run.contact_id);
+      requireThat(initialContact.phone_id&&wa.credentials(run.company_id,initialContact.phone_id)?.testRecipient,'La automatización requiere una cuenta de prueba.');
       requireThat(!initialContact.automation_paused,'El equipo está atendiendo esta conversación.');
       const plannedTags=new Set([...JSON.parse(initialContact.tags||'[]'),...draft.nodes.filter(n=>n.data.kind==='tag').map(n=>n.data.value)].map(tagKey));
       requireThat(plannedTags.size<=8,'El contacto no tiene espacio para las etiquetas del flujo.');

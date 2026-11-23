@@ -75,9 +75,9 @@ test('another company number and a connection changed during authorization are p
     await assert.rejects(f.signup.complete(f.s,{attempt,phoneId:'22222',wabaId:'44444',pin:'123456'},f.ensure),{status:409});
     assert.equal(f.calls.some(c=>c.method==='POST'),false);assert.equal(f.wa.safe('a').configured,false);
     f.store.run('DELETE FROM connections WHERE company_id=?','b');
-    f.state.afterPhone=()=>f.wa.saveRaw('a',{phoneId:'99999',wabaId:'88888',accessToken:'new',appSecret:'other',graphVersion:'v27.0',verifyToken:'v'},0);
+    f.state.afterPhone=()=>f.wa.saveRaw('a',{phoneId:'22222',wabaId:'44444',accessToken:'new',appSecret:'other',graphVersion:'v27.0',verifyToken:'v'},0);
     await assert.rejects(f.signup.complete(f.s,{attempt,phoneId:'22222',wabaId:'44444'},f.ensure),{status:409});
-    assert.equal(f.wa.safe('a').phoneId,'99999');assert.equal(f.calls.some(c=>c.method==='POST'),false);
+    assert.equal(f.wa.safe('a').phoneId,'22222');assert.equal(f.calls.some(c=>c.method==='POST'),false);
   }finally{f.store.close();}
 });
 test('a CLOUD_API number still pending requires a PIN; ambiguous registration cannot be retried',async()=>{

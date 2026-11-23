@@ -1,5 +1,11 @@
 # Coordinación Codex y Claude
 
+### Varios números en un espacio (23 de noviembre de 2026)
+
+- Codex, rama codex/whatsapp-multinumero. Reserva de conexiones Cloud API, enrutamiento y filtro de bandeja, bindings del editor y migración de SQLite. Las conversaciones anteriores conservan su número y los flujos activos conservan su asignación. El nuevo selector guarda la asignación en el borrador y la aplica al activar.
+- QA con dos números ficticios en un mismo espacio. El filtro mostró solo el chat de Panamá y el encabezado confirmó su línea de atención. Una asignación Perú + Panamá persistió tras recargar el editor.
+
+
 ### Biblioteca de flujos y tema compartido (23 de noviembre de 2026)
 
 - Reserva: tema del CRM, editor y API de espacios de Flujos; rama codex/biblioteca-flujos. Tema claro u oscuro compartido en el navegador. Biblioteca con búsqueda, estado y selector del número o espacio. Cada flujo se guarda en su espacio; se mantiene la activación para cuentas de prueba verificadas.
