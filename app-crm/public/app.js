@@ -95,7 +95,7 @@ function shell(){
 async function showView(next){if(next==='connections'&&session.user.role==='agent')next='conversations';view=next;document.querySelector('.app').dataset.view=view;document.querySelectorAll('.sidebar nav [data-view]').forEach(b=>{b.classList.toggle('active',b.dataset.view===view);b.setAttribute('aria-current',b.dataset.view===view?'page':'false');});$('view-title').textContent=labels[view];document.title=`lazo · ${labels[view]}`;if(view==='conversations')await inbox();else if(view==='overview')await inboxOverview();else if(view==='settings')await settings();else if(view==='connections')await connectionsView();else if(view==='statistics')await statisticsView();else if(view==='sales')await salesView();else renderCRM();}
 async function statisticsView(){const epoch=workspaceEpoch,company=session.company.id;$('view').onclick=null;$('view').onchange=null;$('view').innerHTML='<p class="empty">Cargando estadísticas…</p>';const data=await api('/statistics?days='+statsDays);if(epoch!==workspaceEpoch||session?.company.id!==company||view!=='statistics')return;renderStatistics($('view'),data,days=>{statsDays=days;statisticsView().catch(e=>notice(e.message,true));});}
 let salesMode='summary',salesEpoch=0;
-const salesFilters={days:'30',currency:'',country:''};
+const salesFilters={days:'30',currency:'',country:'',queue:''};
 
 async function salesView() {
   if(salesMode==='pipeline'){renderCRM();return;}
@@ -103,10 +103,10 @@ async function salesView() {
   if(!root.querySelector('.sales-toolbar')){
     root.onclick=null;root.onchange=null;root.innerHTML='<p class="empty">Cargando ventas…</p>';
   }
-  const {days,currency,country}=salesFilters;
-  const [data,{renderSales}]=await Promise.all([
-    api('/sales-dashboard?'+new URLSearchParams({days,currency,country})),
-    import('./sales-ui.js?v=20261123-fluido'),
+  const {days,currency,country,queue}=salesFilters;
+  const [data,{renderSales,openSalesCatalog}]=await Promise.all([
+    api('/sales-dashboard?'+new URLSearchParams({days,currency,country,queue})),
+    import('./sales-ui.js?v=20261123-catalogo'),
   ]);
   if(view!=='sales'||epoch!==workspaceEpoch||request!==salesEpoch||salesMode!=='summary')return;
   const focused=document.activeElement?.dataset.filter;
@@ -116,9 +116,10 @@ async function salesView() {
       if(key==='country')salesFilters.countryLabel=label;
       salesView().catch(error=>notice(error.message,true));
     },
-    onChat:id=>openChat(id).catch(error=>notice(error.message,true)),
+    onChat:(id,orderId)=>openChat(id,orderId).catch(error=>notice(error.message,true)),
     onPipeline:()=>{salesMode='pipeline';renderCRM();},
     onNewContact:newContact,
+    onCatalog:session.user.role==='agent'?null:()=>openSalesCatalog(api).catch(error=>notice(error.message,true)),
   });
   if(focused)root.querySelector('[data-filter="'+focused+'"]')?.focus();
 }
@@ -136,14 +137,22 @@ function newContact(){
   const dialog=document.createElement('dialog');dialog.innerHTML=`<form><div class="section-heading"><h2>Nuevo contacto</h2><button type="button" class="icon close" aria-label="Cerrar">×</button></div><label>Nombre<input name="name" maxlength="80" required></label><label>Teléfono internacional<input name="phone" inputmode="tel" placeholder="51…" required></label><label>Correo (opcional)<input name="email" type="email" maxlength="254"></label><label>Ciudad (opcional)<input name="location" maxlength="100"></label><label>Responsable<select name="ownerId">${options(members,session.user.id)}</select></label><div class="dialog-actions"><button class="send" type="submit">Crear contacto</button></div></form>`;document.body.append(dialog);dialog.querySelector('.close').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove());bind(dialog.querySelector('form'),async data=>{const c=await api('/contacts',{method:'POST',body:data});contacts.unshift(c);dialog.close();await openChat(c.id);notice('Contacto guardado en tu empresa.');});dialog.showModal();
 }
 async function updateContact(id,data){const result=await api('/contacts/'+id,{method:'PATCH',body:data});contacts=contacts.map(c=>c.id===id?{...c,...result}:c);return result;}
-async function openChat(id){
+async function openChat(id,orderId){
   if(!contacts.some(contact=>contact.id===id)){
     const epoch=workspaceEpoch;
     const {contact}=await api('/contacts/'+encodeURIComponent(id));
     if(epoch!==workspaceEpoch)return;
     if(!contacts.some(item=>item.id===id))contacts.push(contact);
   }
-  active=id;await showView('conversations');document.querySelector('.app').classList.add('chat-open');}
+  active=id;
+  await showView('conversations');
+  if(view!=='conversations'||active!==id)return;
+  document.querySelector('.app').classList.add('chat-open');
+  if(orderId){
+    const button=$('open-contact-orders');
+    if(button){button.dataset.orderFocus=orderId;button.click();}
+  }
+}
 let overviewSource='';
 async function inboxOverview() {
   const epoch=workspaceEpoch, sourceId=overviewSource;
@@ -258,17 +267,26 @@ async function renderChat(){
       }catch(error){notice(error.message,true);if(current())event.target.disabled=false;}
     };
   }
-  async function loadOrders() {
+  async function loadOrders(focusId) {
     const {orders}=await api('/contacts/'+c.id+'/orders');
     if(!current())return;
     const list=$('contact-orders');
     list.innerHTML=orders.map(order=>{
       const amount=(order.cents/100).toFixed(2);
       const status=order.confirmed_at?'Abono verificado':order.proof_id?'Archivo recibido · Falta verificar':'Pendiente de abono';
-      return `<details><summary>${esc(order.plan)} · ${esc(order.currency)} ${amount}</summary>
+      return `<details class="chat-order" ${focusId===order.id?'open':''} data-order-card="${esc(order.id)}"><summary><strong>${esc(order.plan)}</strong> · ${esc(order.currency)} ${amount}</summary>
+        <p>${esc(order.product)} · ${order.mode==='postpaid'?'Contra entrega':'Pago anticipado'}</p>
         <p>${status}${order.delivery_id?' · Acceso '+esc(statusNames[order.delivery_status]||'registrado'):''}</p>
-        ${order.proof_id?`<button type="button" class="secondary" data-proof="${esc(order.proof_id)}">Descargar archivo recibido</button>`:''}
+        <ol class="order-timeline">
+          ${[[order.charged_at,'Oferta e instrucciones enviadas'],[order.proof_created,'Comprobante recibido'],[order.confirmed_at,'Abono confirmado'],[order.delivery_created,'Último intento de entrega']]
+          .filter(([timestamp])=>timestamp).sort(([a],[b])=>a-b).map(([timestamp,label])=>`<li>${label} · ${new Date(timestamp).toLocaleString('es-PE')}</li>`).join('')}
+        </ol>
+        ${order.flow_reason?`<p>${esc(order.flow_reason)}</p>`:''}
+        ${order.next_action?`<p>Próxima acción: ${new Date(order.next_action).toLocaleString('es-PE')}</p>`:''}
+        ${order.proof_id?`<button type="button" class="secondary" data-proof="${esc(order.proof_id)}">Ver comprobante</button>`:''}
+        ${order.proof_type==='image'&&!order.confirmed_at&&session.user.role!=='agent'?`<button type="button" class="secondary" data-scan="${esc(order.id)}">Leer imagen con IA</button><p role="status" data-receipt></p>`:''}
         ${order.delivery_id&&session.user.role!=='agent'?`<button type="button" class="secondary" data-resend-order="${esc(order.id)}">Reenviar acceso</button>`:''}
+        ${order.manual&&order.charged_at&&(order.confirmed_at||order.mode==='postpaid')&&!order.delivery_id&&session.user.role!=='agent'?`<button type="button" class="send" data-deliver-order="${esc(order.id)}">Enviar acceso</button>`:''}
         ${order.confirmed_at?`<p>Referencia: ${esc(order.reference)}</p>`:order.charged_at&&session.user.role!=='agent'?`<form data-order="${esc(order.id)}"><p>Confirma solo después de ver el abono en tu cuenta.</p><label>Importe abonado<input name="amount" required inputmode="decimal" maxlength="12"></label><label>Referencia de operación<input name="reference" required maxlength="64"></label><button class="secondary" type="submit">Registrar abono verificado</button></form>`:''}
       </details>`;
     }).join('')||'<p>Aún no hay pedidos en esta conversación.</p>';
@@ -277,12 +295,37 @@ async function renderChat(){
         const blob=await api('/messages/'+button.dataset.proof+'/attachment',{binary:true});
         if(!current())return;
         const url=URL.createObjectURL(blob);
-        const link=document.createElement('a');
+        const dialog=document.createElement('dialog');
+        dialog.className='sales-proof-dialog';
+        dialog.innerHTML='<h2>Comprobante recibido</h2><p>Importe del pedido: '+esc(button.closest('details').querySelector('summary').textContent)+'</p><a class="secondary" download>Descargar archivo</a><button type="button" class="secondary">Cerrar</button>';
+        const link=dialog.querySelector('a');
         link.href=url;
-        link.download='archivo-recibido'+({'application/pdf':'.pdf','image/png':'.png','image/jpeg':'.jpg'}[blob.type]||'');
-        link.click();
-        setTimeout(()=>URL.revokeObjectURL(url),1000);
+        link.download='comprobante'+({'application/pdf':'.pdf','image/png':'.png','image/jpeg':'.jpg'}[blob.type]||'');
+        if(blob.type.startsWith('image/')){
+          const image=document.createElement('img');
+          image.src=url;image.alt='Imagen del comprobante recibido';
+          link.before(image);
+        }
+        dialog.querySelector('button').onclick=()=>dialog.close();
+        dialog.addEventListener('close',()=>{URL.revokeObjectURL(url);dialog.remove();},{once:true});
+        document.body.append(dialog);
+        dialog.showModal();
       }catch(error){notice(error.message,true);}
+    });
+    list.querySelectorAll('[data-scan]').forEach(button=>button.onclick=async()=>{
+      button.disabled=true;
+      const summary=button.closest('details').querySelector('[data-receipt]');
+      summary.textContent='Leyendo el importe y la referencia de la imagen…';
+      try{
+        const {receipt}=await api('/contacts/'+c.id+'/orders',{method:'POST',body:{action:'read-proof',orderId:button.dataset.scan}});
+        if(!current())return;
+        const order=orders.find(item=>item.id===button.dataset.scan);
+        const amount=receipt.amount?Number(receipt.amount.replace(',','.')):NaN;
+        const matches=Number.isFinite(amount)&&Math.round(amount*100)===order.cents&&receipt.currency===order.currency;
+        const comparison=Number.isFinite(amount)&&receipt.currency?(matches?'Coincide con el pedido.':'Difiere del pedido.'):'Faltan datos para comparar.';
+        summary.textContent=`Lectura de IA: ${receipt.currency||''} ${receipt.amount||'importe no legible'} · ${receipt.reference||'sin referencia legible'}. ${comparison} Verifica el abono en tu cuenta.`;
+      }catch(error){summary.textContent=error.message;}
+      finally{button.disabled=false;}
     });
     list.querySelectorAll('[data-resend-order]').forEach(button=>{
       const requestId=crypto.randomUUID();
@@ -296,13 +339,58 @@ async function renderChat(){
         } catch(error){notice(error.message,true);button.disabled=false;}
       };
     });
+    list.querySelectorAll('[data-deliver-order]').forEach(button=>button.onclick=async()=>{
+      button.disabled=true;
+      try{
+        const orderId=button.dataset.deliverOrder;
+        await api('/contacts/'+c.id+'/orders',{method:'POST',body:{action:'deliver',orderId}});
+        if(!current())return;
+        notice('Acceso enviado a WhatsApp.');
+        await loadOrders(orderId);
+      }catch(error){notice(error.message,true);button.disabled=false;}
+    });
     list.querySelectorAll('[data-order]').forEach(form=>bind(form,async fields=>{
       if(!current())return;
       const result=await api('/contacts/'+c.id+'/orders',{method:'POST',body:{...fields,orderId:form.dataset.order}});
       if(!current())return;
-      notice(result.resumed?'Abono registrado. El flujo continuará.':'Abono registrado. Revisa el estado del flujo.');
-      await loadOrders();
+      notice(result.manual?'Abono registrado. Ya puedes enviar el acceso.':result.resumed?'Abono registrado. El flujo continuará.':'Abono registrado. Revisa el estado del flujo.');
+      await loadOrders(form.dataset.order);
     }));
+  }
+  if(session.user.role!=='agent'){
+    const offerButton=document.createElement('button');
+    offerButton.type='button';
+    offerButton.className='secondary';
+    offerButton.textContent='Enviar oferta';
+    $('show-orders').after(offerButton);
+    offerButton.onclick=async()=>{
+      offerButton.disabled=true;
+      try{
+        const {offers}=await api('/sales-catalog');
+        if(!current())return;
+        const available=offers.filter(offer=>offer.instructions);
+        if(!available.length){notice('Crea una oferta con instrucciones en Ventas → Catálogo.');return;}
+        const dialog=document.createElement('dialog');
+        dialog.innerHTML=`<h2>Enviar oferta a ${esc(c.name)}</h2><form><label>Oferta del catálogo
+          <select name="offerId">${options(available.map(offer=>({id:offer.id,name:`${offer.name} · ${offer.plan} · ${offer.market} · ${offer.currency} ${(offer.cents/100).toFixed(2)}`})),available[0].id)}</select></label>
+          <footer class="dialog-actions"><button type="button" class="secondary">Cancelar</button><button type="submit" class="send">Enviar por WhatsApp</button></footer></form>`;
+        document.body.append(dialog);
+        dialog.addEventListener('close',()=>dialog.remove(),{once:true});
+        dialog.querySelector('button[type="button"]').onclick=()=>dialog.close();
+        let selected='',requestId;
+        bind(dialog.querySelector('form'),async({offerId})=>{
+          if(!current())return;
+          if(offerId!==selected){selected=offerId;requestId=crypto.randomUUID();}
+          await api('/contacts/'+c.id+'/orders',{method:'POST',body:{action:'offer',offerId,requestId}});
+          dialog.close();
+          if(!current())return;
+          notice('Oferta enviada a WhatsApp.');
+          await loadOrders();
+        });
+        dialog.showModal();
+      }catch(error){notice(error.message,true);}
+      finally{offerButton.disabled=false;}
+    };
   }
   $('show-orders').onclick=()=>loadOrders().catch(error=>notice(error.message,true));
   $('show-automation').onclick=()=>loadAutomation().catch(error=>notice(error.message,true));
@@ -327,6 +415,18 @@ async function renderChat(){
   };
   $('back').onclick=()=>{conversationLayout.classList.remove('show-details');document.querySelector('.app').classList.remove('chat-open');};
   detailButton.onclick=()=>setDetails(!conversationLayout.classList.contains('show-details'));
+  const ordersButton=document.createElement('button');
+  ordersButton.type='button';ordersButton.id='open-contact-orders';ordersButton.className='secondary';ordersButton.textContent='Pedidos';
+  ordersButton.setAttribute('aria-controls','details');
+  detailButton.after(ordersButton);
+  ordersButton.onclick=()=>{
+    setDetails(true);
+    const focus=ordersButton.dataset.orderFocus;
+    delete ordersButton.dataset.orderFocus;
+    void loadOrders(focus).then(()=>{
+      if(current())($('contact-orders').querySelector('details[open]')||$('show-orders')).scrollIntoView({block:'nearest'});
+    }).catch(error=>notice(error.message,true));
+  };
   closeDetails.onclick=()=>setDetails(false);
   conversationLayout.onkeydown=event=>{
     if(event.key==='Escape'&&conversationLayout.classList.contains('show-details')){event.preventDefault();setDetails(false);}

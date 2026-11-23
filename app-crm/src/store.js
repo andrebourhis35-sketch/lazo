@@ -43,6 +43,13 @@ export function openStore(filename) {
       UNIQUE(company_id,currency,reference)
     );
     CREATE INDEX IF NOT EXISTS flow_orders_contact ON flow_orders(company_id,contact_id,created);
+    CREATE TABLE IF NOT EXISTS sales_catalog(
+      id TEXT PRIMARY KEY,company_id TEXT NOT NULL REFERENCES companies(id),
+      product TEXT NOT NULL,name TEXT NOT NULL,plan TEXT NOT NULL,market TEXT NOT NULL,
+      currency TEXT NOT NULL,cents INTEGER NOT NULL,bonuses TEXT NOT NULL,link TEXT NOT NULL,
+      instructions TEXT NOT NULL,mode TEXT NOT NULL,archived INTEGER NOT NULL DEFAULT 0,updated INTEGER NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS sales_catalog_variant ON sales_catalog(company_id,product,plan,market,currency) WHERE archived=0;
     CREATE TABLE IF NOT EXISTS flow_ai_settings(company_id TEXT PRIMARY KEY REFERENCES companies(id),secret TEXT NOT NULL,enabled INTEGER NOT NULL DEFAULT 0);
     CREATE TABLE IF NOT EXISTS flow_steps(id INTEGER PRIMARY KEY,run_id TEXT NOT NULL REFERENCES flow_runs(id) ON DELETE CASCADE,label TEXT NOT NULL,detail TEXT NOT NULL,message_id TEXT,created INTEGER NOT NULL);
     CREATE INDEX IF NOT EXISTS flow_steps_run ON flow_steps(run_id,id);
@@ -59,6 +66,8 @@ export function openStore(filename) {
     if(!runColumns.has('due'))db.exec('ALTER TABLE flow_runs ADD COLUMN due INTEGER');
     if(!runColumns.has('visits'))db.exec('ALTER TABLE flow_runs ADD COLUMN visits INTEGER NOT NULL DEFAULT 0');
     if(!runColumns.has('menus'))db.exec("ALTER TABLE flow_runs ADD COLUMN menus TEXT NOT NULL DEFAULT '[]'");
+    const orderColumns=new Set(all('PRAGMA table_info(flow_orders)').map(c=>c.name));
+    if(!orderColumns.has('offer_text'))db.exec("ALTER TABLE flow_orders ADD COLUMN offer_text TEXT NOT NULL DEFAULT ''");
     if(!all('PRAGMA table_info(contacts)').some(c=>c.name==='automation_paused'))db.exec('ALTER TABLE contacts ADD COLUMN automation_paused INTEGER NOT NULL DEFAULT 0');
     for(const company of all('SELECT id FROM companies'))ensureWorkspace(company.id);
   });

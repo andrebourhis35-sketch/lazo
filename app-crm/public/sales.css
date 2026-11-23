@@ -1,4 +1,19 @@
 /* Sales dashboard styles are scoped to the sales view. */
+.sales-catalog-dialog{width:min(42rem,calc(100% - 2rem));max-height:90dvh;overflow:auto}
+.sales-catalog-list{display:grid;gap:.375rem;margin-block:1rem;max-height:12rem;overflow:auto}
+.sales-catalog-list button{display:flex;justify-content:space-between;flex-wrap:wrap;gap:.375rem;text-align:start}
+.sales-catalog-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,12rem),1fr));gap:0 .75rem}
+.sales-catalog-dialog label :is(select,textarea){display:block;width:100%;margin-top:.4rem}
+.sales-catalog-dialog [data-error]:empty{display:none}
+.sales-catalog-dialog [data-error]{color:#9f2b2b}
+.sales-proof-dialog img{display:block;max-width:100%;max-height:60dvh;object-fit:contain;margin-block:.75rem}
+.sales-proof-dialog button{margin-inline-start:.75rem}
+.chat-order{border-top:1px solid var(--line);padding:.65rem 0}
+.chat-order summary{cursor:pointer}
+.chat-order .order-timeline{padding-inline-start:1.2em;font-size:.82em;line-height:1.6}
+.chat-order .order-timeline:empty{display:none}
+.app[data-view="sales"] .sales-queue{display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:.75rem}
+.app[data-view="sales"] .sales-queue button[aria-pressed="true"]{outline:2px solid var(--sales-highlight);outline-offset:-2px}
 .app[data-view="sales"]{
   --sales-panel:#fff;
   --sales-line:#d5e0ee;

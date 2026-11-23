@@ -13,6 +13,59 @@ function welcome(owner){
   nodes[0].data.value='hola';nodes[1].data.value='Hola {{nombre}}, bienvenida a LAZO.';nodes[2].data.value='Interesado';nodes[3].data.value=owner;
   return {version:1,name:'Bienvenida',nodes,edges:nodes.slice(0,-1).map((n,i)=>({id:'e'+i,source:n.id,target:nodes[i+1].id,sourceHandle:'next'}))};
 }
+
+test('catalog offers are scoped, preserve the order price and deliver only after manual confirmation',async()=>{
+  const f=await fixture();
+  try{
+    const offer={product:'ebook-prueba',name:'Ebook de prueba',plan:'Premium',market:'Perú',
+      price:'20.00',currency:'PEN',bonuses:'Incluye dos bonos',instructions:'Paga por el canal de prueba.',
+      link:'https://example.test/entrega',mode:'prepaid'};
+    const created=await f.api('/sales-catalog','POST',offer);
+    assert.equal(created.status,201);
+    const id=created.body.offers[0].id;
+    assert.equal((await f.api('/sales-catalog','POST',offer)).status,409);
+    assert.equal((await f.api('/sales-catalog','POST',{...offer,market:'Ecuador',currency:'USD'})).status,201);
+    f.receive('Información');
+    const contact=f.store.get('SELECT id FROM contacts').id;
+    const path='/contacts/'+contact+'/orders';
+    const send={action:'offer',offerId:id,requestId:randomUUID()};
+    assert.equal((await f.api(path,'POST',send)).status,200);
+    assert.equal((await f.api(path,'POST',send)).status,200);
+    assert.equal(f.sent.length,1);
+    assert.match(f.sent[0].text.body,/dos bonos/);
+    assert.doesNotMatch(f.sent[0].text.body,/example.test/);
+    const order=(await f.api(path)).body.orders[0];
+    assert.equal((await f.api('/sales-catalog/'+id,'PUT',{...offer,price:'25.00'})).status,200);
+    assert.equal((await f.api(path,'POST',{action:'deliver',orderId:order.id})).status,409);
+    assert.equal((await f.api(path,'POST',{orderId:order.id,amount:'25.00',reference:'TEST-123'})).status,400);
+    assert.equal((await f.api('/sales-dashboard?queue=collect')).body.queues.collect,1);
+    const proof=randomUUID(),stamp=Date.now();
+    const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl1sAAAAASUVORK5CYII=','base64');
+    const mediaId=f.wa.media.saveUpload(f.company,{bytes:png,mime:'image/png',filename:'prueba.png'});
+    f.store.run(`INSERT INTO messages(id,company_id,contact_id,direction,body,type,status,created,updated,attachment_id)
+      VALUES(?,?,?,'in','Comprobante','image','received',?,?,?)`,proof,f.company,contact,stamp,stamp,mediaId);
+    assert.equal(f.flows.sales.enqueue({id:proof,company_id:f.company,contact_id:contact,attachmentId:mediaId,type:'image',created:stamp}),true);
+    assert.equal((await f.api('/sales-dashboard?queue=review')).body.recent[0].id,order.id);
+    assert.equal((await f.api(path,'POST',{action:'read-proof',orderId:order.id})).status,409);
+    assert.equal((await f.api('/flow-ai','POST',{enabled:true,apiKey:'sk-receipt-synthetic-only'})).status,200);
+    f.aiOutcomes.push({amount:'21.00',currency:'PEN',reference:'TEST-123'});
+    const read=await f.api(path,'POST',{action:'read-proof',orderId:order.id});
+    assert.equal(read.body.receipt.amount,'21.00');
+    assert.equal(f.aiInputs[0].store,false);
+    assert.equal((await f.api(path)).body.orders[0].confirmed_at,null);
+    assert.equal((await f.api(path,'POST',{orderId:order.id,amount:'20.00',reference:'TEST-123'})).body.manual,true);
+    assert.equal((await f.api('/sales-dashboard?queue=deliver')).body.recent[0].id,order.id);
+    assert.equal((await f.api(path,'POST',{action:'deliver',orderId:order.id})).status,200);
+    assert.equal((await f.api(path,'POST',{action:'deliver',orderId:order.id})).status,200);
+    assert.equal(f.sent.length,2);
+    assert.match(f.sent[1].text.body,/example\.test\/entrega/);
+    assert.equal((await f.api('/sales-catalog/'+id,'DELETE',{})).status,200);
+    assert.equal((await f.api(path)).body.orders[0].cents,2000);
+    f.store.run("UPDATE memberships SET role='agent' WHERE company_id=?",f.company);
+    assert.equal((await f.api('/sales-catalog')).status,403);
+    assert.equal((await f.api(path,'POST',send)).status,403);
+  }finally{await f.close();}
+});
 async function fixture(database=':memory:'){
   let calls=0,mode='ok',hold=null;
   const sent=[],aiInputs=[],aiOutcomes=[];

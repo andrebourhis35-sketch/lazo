@@ -18,14 +18,17 @@ export function salesDashboard(store, company, query) {
   const period=query.get('days')||'30';
   const currency=query.get('currency')||'';
   const country=query.get('country')||'';
+  const queue=query.get('queue')||'';
   requireThat(['7','30','90','all'].includes(period),'Período no válido.');
   requireThat(['','PEN','USD','EUR'].includes(currency),'Moneda no válida.');
   requireThat(!country||names.has(country),'País no válido.');
+  requireThat(['','collect','review','deliver'].includes(queue),'Estado de pedido no válido.');
   const cutoff=period==='all'?0:now()-Number(period)*86400000;
 
   const orders=`SELECT o.id,o.contact_id,c.name AS contact,o.plan,o.product,o.currency,o.cents,o.created,
-    o.charged_at,o.confirmed_at,o.proof_id,o.delivery_id,${countryExpr} AS country
+    o.charged_at,o.confirmed_at,o.proof_id,o.delivery_id,o.mode,m.status AS delivery_status,${countryExpr} AS country
     FROM flow_orders o JOIN contacts c ON c.id=o.contact_id AND c.company_id=o.company_id
+    LEFT JOIN messages m ON m.id=o.delivery_id AND m.company_id=o.company_id
     WHERE o.company_id=? AND o.created>=? AND (?='' OR o.currency=?)`;
   const args=[company,cutoff,currency,currency];
   const currencies=store.all(`SELECT currency,COUNT(*) AS orders,
@@ -34,14 +37,19 @@ export function salesDashboard(store, company, query) {
     COUNT(confirmed_at) AS confirmed_orders,
     SUM(CASE WHEN charged_at IS NOT NULL AND confirmed_at IS NULL THEN 1 ELSE 0 END) AS pending_orders,
     SUM(CASE WHEN confirmed_at IS NULL AND proof_id IS NOT NULL THEN 1 ELSE 0 END) AS review_orders,
-    COUNT(delivery_id) AS access_sent
+    COUNT(CASE WHEN delivery_id IS NOT NULL AND (delivery_status IS NULL OR delivery_status IN ('accepted','sent','delivered','read')) THEN 1 END) AS access_sent
     FROM (${orders}) WHERE (?='' OR country=?) GROUP BY currency ORDER BY currency`,...args,country,country);
   const markets=store.all(`SELECT country,COUNT(*) AS orders,COUNT(confirmed_at) AS confirmed
     FROM (${orders}) GROUP BY country ORDER BY orders DESC,country`,...args)
     .map(row=>({...row,name:names.get(row.country)}));
-  const recent=store.all(`SELECT id,contact_id,contact,plan,product,currency,cents,created,country,confirmed_at,
+  const filters={collect:"charged_at IS NOT NULL AND confirmed_at IS NULL AND proof_id IS NULL AND (mode='prepaid' OR delivery_id IS NOT NULL)",
+    review:'confirmed_at IS NULL AND proof_id IS NOT NULL',
+    deliver:"(confirmed_at IS NOT NULL OR (mode='postpaid' AND charged_at IS NOT NULL)) AND (delivery_id IS NULL OR delivery_status IN ('failed','unknown'))"};
+  const queues=store.get(`SELECT ${Object.entries(filters).map(([key,condition])=>`COUNT(CASE WHEN ${condition} THEN 1 END) AS ${key}`).join(',')}
+    FROM (${orders}) WHERE (?='' OR country=?)`,...args,country,country);
+  const recent=store.all(`SELECT id,contact_id,contact,plan,product,currency,cents,created,country,confirmed_at,delivery_status,
     proof_id IS NOT NULL AS has_proof,charged_at IS NOT NULL AS charged,delivery_id IS NOT NULL AS access_sent
-    FROM (${orders}) WHERE (?='' OR country=?) ORDER BY created DESC,id DESC LIMIT 40`,...args,country,country)
+    FROM (${orders}) WHERE (?='' OR country=?) AND (${filters[queue]||'1'}) ORDER BY created DESC,id DESC LIMIT 40`,...args,country,country)
     .map(row=>({...row,countryName:names.get(row.country)}));
-  return {currencies,markets,recent};
+  return {currencies,markets,recent,queues};
 }

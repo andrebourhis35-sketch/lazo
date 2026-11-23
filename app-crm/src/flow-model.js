@@ -271,6 +271,11 @@ export function parseDraft(raw) {
     if (kind === 'plan') {
       if (!sale || typeof sale.product!=='string' || sale.product.length>50 || typeof sale.price!=='string' || sale.price.length>12 || !['PEN','USD','EUR'].includes(sale.currency) || typeof sale.link!=='string' || sale.link.length>1500 || !['prepaid','postpaid'].includes(sale.mode) || typeof sale.previousPlan!=='string' || sale.previousPlan.length>100) throw new Error('El plan de venta tiene un formato incompatible.');
       cleanSale={product:sale.product,price:sale.price,currency:sale.currency,link:sale.link,mode:sale.mode,previousPlan:sale.previousPlan};
+      for(const [key,limit] of [['name',100],['bonuses',900]]){
+        if(sale[key]===undefined)continue;
+        if(typeof sale[key]!=='string'||sale[key].length>limit)throw new Error('La oferta del catálogo tiene un formato incompatible.');
+        cleanSale[key]=sale[key];
+      }
     }
     ids.add(node.id);
     return { id: node.id, type: 'lazo', position: { x: node.position.x, y: node.position.y }, data: { kind, label, value, ...(kind === 'buttons' ? { choices } : {}), ...(cleanSale ? {sale:cleanSale} : {}) } };
@@ -286,13 +291,16 @@ export function parseDraft(raw) {
 
 export function simulateFlow(flow, { aiOutcome = 'answered', paymentConfirmed = true, name = 'Lucía', incoming = 'Hola', answer = 'Quiero el catálogo' } = {}) {
   const errors = validateFlow(flow);
-  if (errors.length) return { errors, steps: [], tags: [], assigned: '', minutes: 0 };
+  if (errors.length) {
+    const stoppedAt=flow.nodes.find(node=>errors[0].includes('«'+node.data.label+'»'))?.id;
+    return { errors, stoppedAt, steps: [], tags: [], assigned: '', minutes: 0 };
+  }
   const steps = [], tags = new Set(); let assigned = '', minutes = 0, plan = null;
   const answers = String(answer).split('\n').map(item => item.trim()).filter(Boolean);
   const menus = [];
   let answerIndex = 0;
   let current = flow.nodes.find(node => node.data.kind === 'trigger');
-  if (current.data.value.trim() && !normalize(incoming).includes(normalize(current.data.value))) return { errors: ['El mensaje de prueba no coincide con la palabra clave de Inicio.'], steps, tags: [], assigned, minutes };
+  if (current.data.value.trim() && !normalize(incoming).includes(normalize(current.data.value))) return { errors: ['El mensaje de prueba no coincide con la palabra clave de Inicio.'], stoppedAt:current.id, steps, tags: [], assigned, minutes };
   for (let count = 0; current && count < 90; count++) {
     const { kind, label, value } = current.data;
     let detail = '', output = 'next';
