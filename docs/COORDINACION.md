@@ -4,6 +4,8 @@
 
 - Codex, rama codex/chat-historial-amplio. La ficha se abre bajo demanda. La bandeja se puede ocultar en escritorio. Historial con texto mayor, cabecera unificada y compositor más bajo. Conserva Órbita y la edición del contacto.
 
+- Publicado history-08c8f03 tras respaldo cifrado y 85 pruebas del CRM aprobadas. HTTPS verificó cuatro huellas. QA en navegador con datos ficticios: a 1280 × 720 el historial mide 382 px de alto y 814 px de ancho, 1042 al ocultar la bandeja. Mensajes de 16 px. Ficha flotante, plantilla y móvil de 390 × 844 comprobados. PR #65.
+
 ### Lienzo de flujos a ancho completo (23 de noviembre de 2026)
 
 - Codex, rama codex/lienzo-amplio. Se retiran las columnas fijas del editor. Biblioteca y propiedades quedan en paneles bajo demanda. Se compacta la barra y se ajusta el flujo al abrir el lienzo. Solo se publica el sitio estático de flujos.
