@@ -1,4 +1,4 @@
-import { mountSalesGlobe } from './sales-globe.js?v=20261123';
+import { mountSalesGlobe } from './sales-globe.js?v=20261123-fluido';
 
 const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const amount=(cents,currency)=>new Intl.NumberFormat('es-PE',{style:'currency',currency,currencyDisplay:'code'}).format(cents/100);
@@ -46,10 +46,9 @@ export function renderSales(root,data,filters,{onFilter,onChat,onPipeline,onNewC
             <button type="button" class="secondary" data-globe-right aria-label="Girar el globo a la derecha">→</button>
           </div>
         </div>
-        <p class="sales-globe-help" id="globe-help">Arrastra o usa las flechas para girar el globo.</p>
-        ${data.markets.length?`<ul class="sales-country-list">${data.markets.map(row=>`<li><button type="button" class="secondary" data-country="${esc(row.country)}" aria-pressed="${filters.country===row.country}"><span>${esc(row.name)}</span><strong>${row.orders}</strong></button></li>`).join('')}</ul>`:'<p class="sales-muted">El mapa se resaltará cuando haya pedidos.</p>'}
+        <p class="sales-globe-help" id="globe-help">Arrastra el globo para explorar.</p>
+        ${data.markets.length?`<ul class="sales-country-list">${data.markets.map(row=>`<li><button type="button" class="secondary" data-country="${esc(row.country)}" aria-pressed="${filters.country===row.country}"><span>${esc(row.name)}</span><strong>${row.orders}</strong></button></li>`).join('')}</ul>`:''}
       </section>
-    </div>
     <section class="sales-card sales-orders">
       <h2>Pedidos recientes</h2>
       ${data.recent.length?`<div class="table-scroll"><table>
@@ -60,7 +59,8 @@ export function renderSales(root,data,filters,{onFilter,onChat,onPipeline,onNewC
           <td>${row.confirmed_at?'Confirmado':row.has_proof?'Por verificar':row.charged?'Pendiente':'Sin cobrar'}</td>
           <td>${row.access_sent?'Enviado':'Pendiente'}</td><td>${date.format(row.created)}</td>
         </tr>`).join('')}</tbody></table></div>`:'<p class="sales-muted">Los pedidos de tus flujos de venta aparecerán aquí.</p>'}
-    </section>`;
+    </section>
+    </div>`;
   mountSalesGlobe(root.querySelector('.sales-globe-stage'),data.markets,filters.country);
   root.onchange=event=>{
     const key=event.target.dataset.filter;
