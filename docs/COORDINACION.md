@@ -5,6 +5,8 @@
 - Reserva: CRM, motor de pedidos y editor de flujos; rama codex/operacion-ventas. Catálogo por empresa con variantes por mercado, chat con oferta y ficha de pedido, bandeja por cobro/verificación/entrega, lectura de comprobantes por IA y diagnóstico de flujos.
 - QA en navegador con una empresa de prueba: alta de oferta, filtro Por verificar, apertura del pedido exacto desde Ventas, oferta copiada en el editor y bloque Inicio marcado cuando la simulación no coincide. Prueba aislada de importes congelados, duplicados, permisos, lectura de imagen y entrega manual sin contactar proveedores reales.
 
+- Publicado ops-50b8f7a tras respaldo privado. La migración preservó la huella de todas las filas anteriores y SQLite pasó integridad; 87 pruebas en OVH y 11 del editor aprobadas, diagnóstico Astryx sin fallos. HTTPS confirmó las huellas de ambas aplicaciones y el catálogo protegido por sesión. PR #71. No se enviaron mensajes ni comprobantes reales durante QA.
+
 ### Globo de ventas con giro fluido (23 de noviembre de 2026)
 
 - Codex, rama codex/globo-fluido. Reserva del globo, panel de ventas y versiones de sus recursos. Se amplía el planeta y se reduce el ancho de su panel; giro automático, arrastre con inercia y enfoque fijo al filtrar un país.
