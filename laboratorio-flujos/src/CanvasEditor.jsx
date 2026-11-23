@@ -11,7 +11,7 @@ import { Heading, Text } from '@astryxdesign/core/Text';
 import { TextInput } from '@astryxdesign/core/TextInput';
 import { TextArea } from '@astryxdesign/core/TextArea';
 import { Drawer, DrawerHeader } from '@astryxdesign/core/Drawer';
-import { ReactFlow, ReactFlowProvider, Background, BackgroundVariant, Controls, MiniMap, Panel, Handle, Position, MarkerType, useNodesState, useEdgesState, useReactFlow } from '@xyflow/react';
+import { ReactFlow, ReactFlowProvider, Background, BackgroundVariant, Controls, MiniMap, Panel, Handle, Position, MarkerType, useNodesState, useEdgesState, useReactFlow, useUpdateNodeInternals } from '@xyflow/react';
 import { ArrowLeft, Check, CheckCheck, ChevronRight, CircleCheck, Clock3, Copy, GitBranch, Layers2, Lightbulb, Maximize2, MessageCircle, Moon, MousePointer2, MoveRight, Pause, Play, Plus, RotateCcw, Save, Search, Settings2, ShieldCheck, Sun, Tag, Trash2, UserRound, Workflow, Zap } from 'lucide-react';
 import { lazoTheme } from './theme.js';
 import { connectFlowsServer } from './server-client.mjs';
@@ -60,7 +60,12 @@ function Pill({ children, icon: Glyph = ShieldCheck }) {
   return <HStack gap={1.5} vAlign="center" style={styles.status}><Icon icon={Glyph} size="xsm" color="inherit" /><Text size="sm" color="inherit" weight="semibold">{children}</Text></HStack>;
 }
 
-const FlowNode = memo(function FlowNode({ data, selected }) {
+const FlowNode = memo(function FlowNode({ id, data, selected }) {
+  const updateNodeInternals = useUpdateNodeInternals();
+  const choiceCount = data.choices?.length;
+  useEffect(() => {
+    if (choiceCount) updateNodeInternals(id);
+  }, [id, choiceCount, updateNodeInternals]);
   const Glyph = ICONS[data.kind];
   return <VStack padding={4} gap={3} style={{ ...styles.node, ...(selected ? styles.nodeSelected : {}), ...(data.running ? styles.nodeRun : {}) }}>
     {data.kind !== 'trigger' && <Handle type="target" position={Position.Left} style={styles.handle} />}
@@ -74,7 +79,7 @@ const FlowNode = memo(function FlowNode({ data, selected }) {
       <Text style={{ ...styles.outputLabel, top: '40%' }}>SÍ</Text><Handle type="source" id="yes" position={Position.Right} style={{ ...styles.handle, top: '42%', background: 'var(--lazo-mint)' }} />
       <Text style={{ ...styles.outputLabel, top: '78%', color: 'var(--color-text-secondary)' }}>NO</Text><Handle type="source" id="no" position={Position.Right} style={{ ...styles.handle, top: '80%', background: 'var(--color-text-secondary)' }} />
     </> : data.kind === 'buttons' ? data.choices.map((choice,index) => {
-      const top = index === 0 ? '40%' : '78%';
+      const top = (35 + index * (49 / (choiceCount - 1))) + '%';
       return <Fragment key={index}><Text style={{ ...styles.outputLabel, top }}>{index + 1}</Text><Handle type="source" id={'option-' + (index + 1)} position={Position.Right} style={{ ...styles.handle, top }} aria-label={choice || 'Botón ' + (index + 1)} /></Fragment>;
     }) : data.kind !== 'end' && <Handle type="source" id="next" position={Position.Right} style={styles.handle} />}
   </VStack>;
@@ -98,7 +103,7 @@ function Palette({ onAdd, count }) {
   </VStack>;
 }
 
-function Inspector({ node, onUpdate, onDuplicate, onDelete, members }) {
+function Inspector({ node, onUpdate, onDuplicate, onDelete, members, thirdButtonConnected }) {
   if (!node) return <VStack padding={4} gap={4}><Icon icon={MousePointer2} color="accent" size="lg" /><Heading level={4}>Cada bloque tiene una función</Heading><Text color="secondary">Selecciona uno en el lienzo para editar sus propiedades.</Text></VStack>;
   const { kind, label, value } = node.data;
   const field = { trigger: 'Palabra clave', condition: 'La respuesta contiene', wait: 'Tiempo en minutos', tag: 'Nombre de la etiqueta', assign: 'Equipo o asesor' }[kind];
@@ -110,7 +115,11 @@ function Inspector({ node, onUpdate, onDuplicate, onDelete, members }) {
     {kind === 'buttons' && <VStack gap={3}>
       <TextArea label="Mensaje de bienvenida" rows={4} value={value} maxLength={1024} onChange={next => onUpdate({ value: next.slice(0, 1024) })} />
       {node.data.choices.map((choice,index) => <TextInput key={index} label={'Botón ' + (index + 1)} value={choice} onChange={next => onUpdate({ choices: node.data.choices.map((item,i) => i === index ? next.slice(0,20) : item) })} />)}
-      <Text size="sm" color="secondary">Conecta las dos salidas numeradas. El flujo esperará hasta 24 horas a que el contacto toque un botón.</Text>
+      {node.data.choices.length === 2
+        ? <Button label="Añadir tercer botón" variant="secondary" onClick={() => onUpdate({ choices: [...node.data.choices, ''] })} />
+        : <Button label="Quitar tercer botón" variant="secondary" isDisabled={thirdButtonConnected} onClick={() => onUpdate({ choices: node.data.choices.slice(0, 2) })} />}
+      {thirdButtonConnected && <Text size="sm" color="secondary">Para quitar el tercer botón, desconecta primero su salida.</Text>}
+      <Text size="sm" color="secondary">Conecta cada salida numerada. El flujo esperará hasta 24 horas a que el contacto toque un botón.</Text>
     </VStack>}
     {kind === 'condition' && <VStack padding={3} gap={3} style={styles.note}><Pill icon={GitBranch}>Dos caminos posibles</Pill><Text size="sm" color="secondary">Sí: el texto contiene la expresión indicada. No: continúa por la otra salida.</Text></VStack>}
     {kind === 'end' && <Text color="secondary" size="sm">El recorrido termina aquí. Este bloque no necesita una salida.</Text>}
@@ -216,7 +225,7 @@ function Editor() {
   const renderedNodes = useMemo(() => nodes.map(node => ({ ...node, selected: node.id === selectedId, data: { ...node.data, assigneeLabel:serverInfo?.members.find(member=>member.id===node.data.value)?.name, running: path.some(step => step.id === node.id) } })), [nodes, selectedId, path,serverInfo]);
   const renderedEdges = useMemo(() => { const visited = new Set(traversedEdgeIds(path, edges)); return edges.map(edge => ({ ...edge, animated: motion, markerEnd: { type: MarkerType.ArrowClosed }, style: { stroke: visited.has(edge.id) ? 'var(--lazo-mint)' : 'var(--color-border-emphasized)' } })); }, [edges, motion, path]);
   const palette = <Palette onAdd={add} count={nodes.length} />;
-  const inspector = <Inspector node={selected} onUpdate={update} onDuplicate={duplicate} onDelete={remove} members={serverInfo?.members} />;
+  const inspector = <Inspector node={selected} onUpdate={update} onDuplicate={duplicate} onDelete={remove} members={serverInfo?.members} thirdButtonConnected={edges.some(edge => edge.source === selectedId && edge.sourceHandle === 'option-3')} />;
   const selectNode = (_, node) => { setSelectedId(node.id); if (compact) setPanel('inspector'); };
 
   return <Theme theme={lazoTheme} mode={mode}><VStack style={styles.app} gap={0}>

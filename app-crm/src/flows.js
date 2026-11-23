@@ -54,7 +54,7 @@ export function automationFlows(store, wa) {
   function enqueue(message) {
     if(message.created<now()-5*60000)return;
     if(message.type==='interactive') {
-      const match=/^lazo:([a-f0-9-]{36}):(option-[12])$/.exec(message.buttonId||'');
+      const match=/^lazo:([a-f0-9-]{36}):(option-[123])$/.exec(message.buttonId||'');
       if(!match||!message.contextId)return;
       const [,id,option]=match;
       const run=store.get("SELECT * FROM flow_runs WHERE id=? AND company_id=? AND contact_id=? AND state='waiting' AND updated>?",id,message.company_id,message.contact_id,now()-buttonLifetime);
@@ -103,7 +103,7 @@ export function automationFlows(store, wa) {
           requireThat(['accepted','sent','delivered','read'].includes(result.status),'El envío no quedó confirmado. Revisa la conversación antes de repetir.',409);
         }
         if(node.data.kind==='buttons') {
-          const buttons=outputsFor('buttons').map((output,index)=>({id:'lazo:'+run.id+':'+output,title:node.data.choices[index].trim()}));
+          const buttons=outputsFor(node.data).map((output,index)=>({id:'lazo:'+run.id+':'+output,title:node.data.choices[index].trim()}));
           const result=await wa.send(run.company_id,run.contact_id,{
             type:'interactive',text:node.data.value.replaceAll('{{nombre}}',contact.name),buttons,clientId:sendKey(run,node.id),
           },owner.actor_id,{flow:true});
