@@ -136,7 +136,15 @@ export function createServer(config,{store=openStore(config.database),fetchImpl=
         return response(res,200,{ok:true},'application/json; charset=utf-8',{'Set-Cookie':cookie(session.secret)});
       }
       requireThat(s,'Inicia sesión para continuar.',401);
-      if(method==='GET'&&route==='/session')return response(res,200,{...auth.identity(s),emailEnabled:mail.available,companies:store.all('SELECT c.id,c.name,m.role FROM companies c JOIN memberships m ON m.company_id=c.id WHERE m.user_id=?',s.user_id)});
+      if(method==='GET'&&route==='/session')return response(res,200,{...auth.identity(s),chatTextSize:store.get('SELECT chat_text_size FROM user_preferences WHERE user_id=?',s.user_id)?.chat_text_size||'normal',emailEnabled:mail.available,companies:store.all('SELECT c.id,c.name,m.role FROM companies c JOIN memberships m ON m.company_id=c.id WHERE m.user_id=?',s.user_id)});
+      if(method==='PATCH'&&route==='/preferences/chat-text') {
+        return response(res,200,await authorizedJson(req,s,data=>{
+          const size=data.size;
+          requireThat(['small','normal','large','extra'].includes(size),'Elige un tamaño de texto válido.');
+          store.run('INSERT INTO user_preferences(user_id,chat_text_size) VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET chat_text_size=excluded.chat_text_size',s.user_id,size);
+          return {chatTextSize:size};
+        }));
+      }
       if(method==='POST'&&route==='/logout') {store.run('DELETE FROM sessions WHERE hash=?',s.hash);return response(res,200,{ok:true},'application/json; charset=utf-8',{'Set-Cookie':cookie('',true)});}
       if(method==='POST'&&route==='/companies')return response(res,201,await authorizedJson(req,s,data=>auth.newCompany(s,data)));
       if(method==='POST'&&route==='/companies/switch') {

@@ -1,3 +1,13 @@
+/* Personal reading size, shared by the conversation and the settings sample. */
+.app[data-chat-text="small"], #chat-text-preview[data-chat-text="small"]{--lazo-chat-text-size:14px}
+.app[data-chat-text="normal"], #chat-text-preview[data-chat-text="normal"]{--lazo-chat-text-size:15px}
+.app[data-chat-text="large"], #chat-text-preview[data-chat-text="large"]{--lazo-chat-text-size:16px}
+.app[data-chat-text="extra"], #chat-text-preview[data-chat-text="extra"]{--lazo-chat-text-size:18px}
+#chat-text-preview{
+  width:fit-content;max-width:100%;padding:8px 12px;border-radius:9px;
+  background:#192c49;color:#f5f7fb;font-size:var(--lazo-chat-text-size,15px);line-height:1.5;
+}
+
 /* Conversation-only density: preserve the rest of Órbita and its motion. */
 .visual-preview .app[data-view="conversations"]{
   height:calc(100dvh - 42px);min-height:0;
@@ -50,7 +60,7 @@
 .visual-preview .app[data-view="conversations"] .messages{min-height:0;padding:14px 18px;gap:10px;overscroll-behavior:contain}
 .visual-preview .app[data-view="conversations"] .message{max-width:min(88%,48rem)}
 .visual-preview .app[data-view="conversations"] .message .bubble{
-  padding:8px 12px;font-size:16px;line-height:1.5;overflow-wrap:anywhere;
+  padding:8px 12px;font-size:var(--lazo-chat-text-size,15px);line-height:1.5;overflow-wrap:anywhere;
 }
 .visual-preview .app[data-view="conversations"] .message time{font-size:11px}
 .visual-preview .app[data-view="conversations"] .composer-area{
