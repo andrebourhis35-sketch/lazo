@@ -11,14 +11,14 @@ import { Heading, Text } from '@astryxdesign/core/Text';
 import { TextInput } from '@astryxdesign/core/TextInput';
 import { TextArea } from '@astryxdesign/core/TextArea';
 import { Drawer, DrawerHeader } from '@astryxdesign/core/Drawer';
-import { ReactFlow, ReactFlowProvider, Background, BackgroundVariant, Controls, MiniMap, Panel, Handle, Position, MarkerType, useNodesState, useEdgesState, useReactFlow, useUpdateNodeInternals } from '@xyflow/react';
-import { ArrowLeft, Check, CheckCheck, ChevronRight, CircleCheck, Clock3, Copy, GitBranch, Layers2, Lightbulb, Maximize2, MessageCircle, Moon, MousePointer2, MoveRight, Pause, Play, Plus, RotateCcw, Save, Search, Settings2, ShieldCheck, Sun, Tag, Trash2, UserRound, Workflow, Zap } from 'lucide-react';
+import { ReactFlow, ReactFlowProvider, Background, BackgroundVariant, Controls, MiniMap, Panel, BaseEdge, EdgeLabelRenderer, getSmoothStepPath, Handle, Position, MarkerType, useNodesState, useEdgesState, useReactFlow, useUpdateNodeInternals } from '@xyflow/react';
+import { ArrowLeft, CircleDollarSign, PackageCheck, ShoppingBag, Check, CheckCheck, ChevronRight, CircleCheck, Clock3, Copy, GitBranch, Layers2, Lightbulb, Maximize2, MessageCircle, Moon, MousePointer2, MoveRight, Pause, Play, Plus, RotateCcw, Save, Search, Settings2, ShieldCheck, Sun, Tag, Trash2, UserRound, Workflow, Zap } from 'lucide-react';
 import { lazoTheme } from './theme.js';
 import { connectFlowsServer } from './server-client.mjs';
-import { BLOCKS, DRAFT_KEY, chainedWelcomeFlow, connectNodes, connectionProblem, createNode, exampleFlow, parseDraft, simulateFlow, summarizeNode, traversedEdgeIds, validateFlow } from './flow-model.mjs';
+import { BLOCKS, DRAFT_KEY, chainedWelcomeFlow, connectNodes, connectionProblem, createNode, digitalSaleFlow, exampleFlow, outputsFor, parseDraft, simulateFlow, summarizeNode, traversedEdgeIds, validateFlow } from './flow-model.mjs';
 
-const ICONS = { trigger: Zap, message: MessageCircle, ai: Lightbulb, buttons: GitBranch, condition: GitBranch, wait: Clock3, reminder: Clock3, handoff: UserRound, back: ArrowLeft, tag: Tag, assign: UserRound, end: CircleCheck };
-const COLORS = { trigger: 'var(--lazo-mint)', message: 'var(--lazo-sky)', ai: 'var(--lazo-mint)', buttons: 'var(--lazo-sky)', condition: 'var(--color-accent)', wait: 'var(--lazo-mint)', reminder: 'var(--lazo-mint)', handoff: 'var(--lazo-sky)', back: 'var(--lazo-sky)', tag: 'var(--lazo-sky)', assign: 'var(--lazo-mint)', end: 'var(--color-text-secondary)' };
+const ICONS = { trigger: Zap, message: MessageCircle, plan: ShoppingBag, charge: CircleDollarSign, confirm: ShieldCheck, deliver: PackageCheck, ai: Lightbulb, buttons: GitBranch, condition: GitBranch, wait: Clock3, reminder: Clock3, handoff: UserRound, back: ArrowLeft, tag: Tag, assign: UserRound, end: CircleCheck };
+const COLORS = { trigger: 'var(--lazo-mint)', message: 'var(--lazo-sky)', plan: 'var(--lazo-mint)', charge: 'var(--lazo-mint)', confirm: 'var(--lazo-sky)', deliver: 'var(--lazo-sky)', ai: 'var(--lazo-mint)', buttons: 'var(--lazo-sky)', condition: 'var(--color-accent)', wait: 'var(--lazo-mint)', reminder: 'var(--lazo-mint)', handoff: 'var(--lazo-sky)', back: 'var(--lazo-sky)', tag: 'var(--lazo-sky)', assign: 'var(--lazo-mint)', end: 'var(--color-text-secondary)' };
 const stroke = 'var(--lazo-stroke) solid var(--color-border)';
 const styles = {
   app: { height: '100dvh', minHeight: '30rem', overflow: 'hidden', background: 'var(--color-background-surface)', color: 'var(--color-text-primary)' },
@@ -91,13 +91,27 @@ const FlowNode = memo(function FlowNode({ id, data, selected }) {
 });
 const nodeTypes = { lazo: FlowNode };
 
-function Palette({ onAdd, count }) {
+function InsertEdge({id,data,markerEnd,style,...geometry}) {
+  const [path,x,y]=getSmoothStepPath(geometry);
+  return <>
+    <BaseEdge id={id} path={path} markerEnd={markerEnd} style={style} />
+    <EdgeLabelRenderer>
+      <IconButton label="Insertar bloque en esta conexión" size="sm" icon={<Icon icon={Plus} size="xsm" />}
+        className="nodrag nopan" style={{position:'absolute',left:0,top:0,transform:'translate(-50%, -50%) translate('+x+'px,'+y+'px)',pointerEvents:'all'}}
+        onClick={event=>{event.stopPropagation();data.insert(id);}} />
+    </EdgeLabelRenderer>
+  </>;
+}
+const edgeTypes={insertable:InsertEdge};
+const canInsert=kind=>kind!=='trigger'&&outputsFor({kind,choices:[]})[0]==='next';
+
+function Palette({ onAdd, count, inserting = false }) {
   const [query, setQuery] = useState('');
   return <VStack gap={5} padding={2}>
-    <VStack gap={2}><Heading level={4}>Construye tu flujo</Heading><Text color="secondary" size="sm">Elige un bloque y conéctalo.</Text></VStack>
+    <VStack gap={2}><Heading level={4}>{inserting?'Insertar bloque':'Agregar bloque'}</Heading><Text color="secondary" size="sm">{inserting?'La conexión se ajustará automáticamente.':'Elige un bloque y conéctalo.'}</Text></VStack>
     <TextInput label="Buscar bloques" isLabelHidden type="search" startIcon={Search} value={query} onChange={setQuery} placeholder="Buscar un bloque…" hasClear />
-    {['Entrada', 'Conversación', 'Lógica', 'Acciones'].map(group => {
-      const blocks = Object.entries(BLOCKS).filter(([kind, item]) => item.group === group && (item.name + item.description).toLocaleLowerCase('es').includes(query.toLocaleLowerCase('es')));
+    {['Venta','Pago','Entrega','Entrada','Conversación','Lógica','Acciones'].map(group => {
+      const blocks = Object.entries(BLOCKS).filter(([kind, item]) => item.group === group && (!inserting||canInsert(kind)) && (item.name + item.description).toLocaleLowerCase('es').includes(query.toLocaleLowerCase('es')));
       if (!blocks.length) return null;
       return <VStack key={group} gap={2}><Text style={styles.eyebrow}>{group}</Text>{blocks.map(([kind, item]) => <Button key={kind} variant="ghost" width="100%" style={{ height: 'auto', minHeight: '4rem', padding: 'var(--spacing-2)' }} label={`Añadir ${item.name}`} isDisabled={count >= 80} onClick={() => onAdd(kind)}>
         <HStack gap={3} vAlign="center" width="100%" style={{ textAlign: 'start' }}><HStack hAlign="center" vAlign="center" style={{ ...styles.iconWell, width: '2.1rem', height: '2.1rem', color: COLORS[kind] }}><Icon icon={ICONS[kind]} size="sm" color="inherit" /></HStack><VStack gap={1} style={{ flex: 1, minWidth: 0 }}><Text size="sm" weight="semibold">{item.name}</Text><Text size="sm" color="secondary" style={{ fontSize: '.75rem', fontWeight: 400, whiteSpace: 'normal', lineHeight: 1.5 }}>{item.description}</Text></VStack><Icon icon={Plus} size="xsm" color="secondary" /></HStack>
@@ -117,6 +131,17 @@ function Inspector({ node, onUpdate, onDuplicate, onDelete, members, thirdButton
     <TextInput label="Nombre del bloque" value={label} onChange={next => onUpdate({ label: next.slice(0, 90) })} />
     {kind === 'message' ? <VStack gap={3}><TextArea label="Contenido del mensaje" value={value} onChange={next => onUpdate({ value: next.slice(0, 2000) })} rows={6} maxLength={2000} description="Personaliza el texto con el nombre del contacto." /><Button label="Insertar nombre del contacto" variant="secondary" size="sm" onClick={() => onUpdate({ value: (value + ' {{nombre}}').slice(0, 2000) })}>{'{{nombre}}'}</Button></VStack> : ['assign','handoff'].includes(kind) && members ? <VStack gap={2}><Text weight="semibold">Responsable de la empresa</Text>{members.map(member => <Button key={member.id} label={member.name} variant={value === member.id ? 'primary' : 'secondary'} onClick={() => onUpdate({ value: member.id })} />)}</VStack> : field && <TextInput label={field} value={value} inputMode={['wait','reminder'].includes(kind) ? 'numeric' : 'text'} onChange={next => onUpdate({ value: next.slice(0, kind === 'wait' ? 5 : 100) })} description={kind === 'trigger' ? 'La activación real requiere una palabra clave.' : kind === 'condition' ? 'La comparación ignora mayúsculas y tildes.' : kind === 'wait' ? 'Para envíos reales, usa de 1 a 1380 minutos dentro de la ventana de WhatsApp. En el simulador, el reloj avanza al instante.' : undefined} />}
     {kind === 'message' && <VStack gap={3}><Text style={styles.eyebrow}>Así lo verá el contacto</Text><VStack gap={2} style={styles.bubble}><Text as="p" size="sm" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>{value.replaceAll('{{nombre}}', 'Lucía') || 'Tu mensaje aparecerá aquí.'}</Text><HStack hAlign="end" gap={1} vAlign="center"><Text size="sm" color="secondary">Vista previa</Text><Icon icon={CheckCheck} size="xsm" color="accent" /></HStack></VStack></VStack>}
+    {kind === 'plan' && <VStack gap={3}>
+      <TextInput label="Código de producto" value={node.data.sale.product} onChange={next=>onUpdate({sale:{...node.data.sale,product:next.slice(0,50)}})} description="Usa el mismo código en los planes del mismo infoproducto. Ejemplo: recetas-rapidas." />
+      <TextInput label="Nombre del plan" value={value} onChange={next=>onUpdate({value:next.slice(0,100)})} />
+      <TextInput label="Importe" value={node.data.sale.price} inputMode="decimal" onChange={next=>onUpdate({sale:{...node.data.sale,price:next.slice(0,12)}})} />
+      <HStack gap={2} wrap="wrap">{['PEN','USD','EUR'].map(currency=><Button key={currency} label={currency} variant={node.data.sale.currency===currency?'primary':'secondary'} onClick={()=>onUpdate({sale:{...node.data.sale,currency}})} />)}</HStack>
+      <TextInput label="Enlace HTTPS de entrega" value={node.data.sale.link} onChange={next=>onUpdate({sale:{...node.data.sale,link:next.slice(0,1500)}})} />
+      <HStack gap={2} wrap="wrap">{[['prepaid','Pago anticipado'],['postpaid','Contra entrega']].map(([mode,title])=><Button key={mode} label={title} variant={node.data.sale.mode===mode?'primary':'secondary'} onClick={()=>onUpdate({sale:{...node.data.sale,mode}})} />)}</HStack>
+      <TextInput label="Plan previo requerido (opcional)" value={node.data.sale.previousPlan} onChange={next=>onUpdate({sale:{...node.data.sale,previousPlan:next.slice(0,100)}})} description="Para vender una mejora, configura aquí el nombre exacto del plan anterior y cobra solo la diferencia." />
+    </VStack>}
+    {['charge','deliver'].includes(kind) && <TextArea label={kind==='charge'?'Instrucciones para pagar':'Texto de entrega'} value={value} rows={5} maxLength={2000} onChange={next=>onUpdate({value:next.slice(0,2000)})} description={kind==='charge'?'LAZO añade el importe y la moneda del plan.':'LAZO añade el enlace configurado en el plan.'} />}
+    {kind==='confirm' && <TextInput label="Recordatorio de pago en minutos (opcional)" value={value} inputMode="numeric" onChange={next=>onUpdate({value:next.slice(0,4)})} description="Un recordatorio mientras no haya comprobante ni abono confirmado. Verifica el abono desde el chat." />}
     {kind === 'ai' && <VStack gap={3}>
       <TextArea label="Información del negocio" value={value} rows={7} maxLength={2000} onChange={next => onUpdate({ value: next.slice(0,2000) })} description="Incluye horarios, precios y respuestas frecuentes. Conecta la salida Asesor a Traspasar a asesor." />
       <Text size="sm" color="secondary">Habilita la IA en Ajustes de LAZO. La simulación no llama a OpenAI.</Text>
@@ -146,9 +171,10 @@ function Simulation({ flow, onPath }) {
   const menus = flow.nodes.filter(node => node.data.kind === 'buttons');
   const choices = menus[0]?.data.choices;
   const [answer, setAnswer] = useState(choices ? '' : 'Quiero ver el catálogo');
+  const [paymentConfirmed,setPaymentConfirmed]=useState(true);
   const [aiOutcome,setAiOutcome] = useState('answered');
   const [result, setResult] = useState(null);
-  const run = (selection = answer) => { const next = simulateFlow(flow, { name, incoming, answer: selection, aiOutcome }); setResult(next); onPath(next.steps); };
+  const run = (selection = answer) => { const next = simulateFlow(flow, { name, incoming, answer: selection, aiOutcome, paymentConfirmed }); setResult(next); onPath(next.steps); };
   const play = () => { if (choices) { setAnswer(''); run(''); } else run(); };
   return <VStack padding={4} gap={5}>
     <VStack padding={3} gap={2} style={styles.note}><Pill>Prueba local con datos ficticios</Pill><Text size="sm" color="secondary">No usa tu WhatsApp ni envía mensajes. Las esperas se adelantan y las acciones se muestran en este recorrido.</Text></VStack>
@@ -158,6 +184,10 @@ function Simulation({ flow, onPath }) {
     {flow.nodes.some(node => node.data.kind === 'ai') && <HStack gap={2} wrap="wrap">
       <Button label="Simular respuesta de IA" variant={aiOutcome==='answered'?'primary':'secondary'} onClick={()=>setAiOutcome('answered')} />
       <Button label="Simular traspaso a asesor" variant={aiOutcome==='handoff'?'primary':'secondary'} onClick={()=>setAiOutcome('handoff')} />
+    </HStack>}
+    {flow.nodes.some(node=>node.data.kind==='confirm') && <HStack gap={2} wrap="wrap">
+      <Button label="Simular abono confirmado" variant={paymentConfirmed?'primary':'secondary'} onClick={()=>setPaymentConfirmed(true)} />
+      <Button label="Simular abono pendiente" variant={!paymentConfirmed?'primary':'secondary'} onClick={()=>setPaymentConfirmed(false)} />
     </HStack>}
     <Button label={result ? 'Reiniciar simulación' : 'Iniciar simulación'} variant="primary" icon={<Icon icon={result ? RotateCcw : Play} size="sm" />} onClick={play} />
     {result?.waiting && <VStack gap={2}>
@@ -169,7 +199,7 @@ function Simulation({ flow, onPath }) {
       }} />)}</HStack>
     </VStack>}
     {result?.errors.length > 0 && <VStack gap={2} role="alert"><Heading level={4}>Revisa el flujo</Heading>{result.errors.map(error => <Text as="p" size="sm" key={error}>{error}</Text>)}</VStack>}
-    {result && !result.errors.length && <VStack gap={4} aria-live="polite"><HStack vAlign="center" hAlign="between"><Heading level={4}>{result.waiting ? 'Esperando una opción' : 'Recorrido completado'}</Heading><Pill icon={Check}>{result.steps.length} pasos</Pill></HStack><VStack gap={5} style={styles.timeline}>{result.steps.map((step, index) => <VStack gap={2} key={step.id}><HStack gap={2} vAlign="center"><Icon icon={ICONS[step.kind]} size="sm" color="accent" /><Text weight="semibold" size="sm">{step.label}</Text><Text size="sm" color="secondary">+{step.minutes} min</Text></HStack><Text as="p" size="sm" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }} color={step.kind === 'message' ? 'primary' : 'secondary'}>{step.detail}</Text></VStack>)}</VStack>{result.tags.length > 0 && <Text size="sm">Etiquetas: {result.tags.join(', ')}</Text>}{result.assigned && <Text size="sm">Responsable: {result.assigned}</Text>}</VStack>}
+    {result && !result.errors.length && <VStack gap={4} aria-live="polite"><HStack vAlign="center" hAlign="between"><Heading level={4}>{result.waiting ? 'Esperando una opción' : result.paymentPending ? 'Esperando abono' : 'Recorrido completado'}</Heading><Pill icon={Check}>{result.steps.length} pasos</Pill></HStack><VStack gap={5} style={styles.timeline}>{result.steps.map((step, index) => <VStack gap={2} key={step.id}><HStack gap={2} vAlign="center"><Icon icon={ICONS[step.kind]} size="sm" color="accent" /><Text weight="semibold" size="sm">{step.label}</Text><Text size="sm" color="secondary">+{step.minutes} min</Text></HStack><Text as="p" size="sm" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }} color={step.kind === 'message' ? 'primary' : 'secondary'}>{step.detail}</Text></VStack>)}</VStack>{result.tags.length > 0 && <Text size="sm">Etiquetas: {result.tags.join(', ')}</Text>}{result.assigned && <Text size="sm">Responsable: {result.assigned}</Text>}</VStack>}
   </VStack>;
 }
 
@@ -230,17 +260,30 @@ function Editor() {
   }
   async function openSaved() {if(!serverInfo||serverBusy)return;setServerBusy(true);try{const result=await serverInfo.request('/flows');setSavedFlows(result.flows);setPanel('saved');}catch(error){serverFailure(error);}finally{setServerBusy(false);}}
   async function openHistory() {if(!serverInfo||!serverDoc||serverBusy)return;setServerBusy(true);try{const result=await serverInfo.request('/flows/'+serverDoc.id+'/runs');setRunHistory(result.runs);setPanel('history');}catch(error){serverFailure(error);}finally{setServerBusy(false);}}
-  function newServerFlow() {if(dirty||serverBusy)return setStatus('Guarda el borrador actual antes de crear otro.');const graph=chainedWelcomeFlow();showDocument({graph});setServerDoc(null);setDirty(true);setPanel('');setStatus('Nueva bienvenida preparada. Guarda y revisa el texto antes de activarla.');}
+  function newServerFlow(graph=chainedWelcomeFlow()) {if(dirty||serverBusy)return setStatus('Guarda el borrador actual antes de crear otro.');showDocument({graph});setServerDoc(null);setDirty(true);setPanel('');setStatus('Plantilla preparada. Completa los datos y guarda el borrador.');}
   useEffect(() => { const warn = event => { if (dirty) { event.preventDefault(); event.returnValue = ''; } }; window.addEventListener('beforeunload', warn); return () => window.removeEventListener('beforeunload', warn); }, [dirty]);
   useEffect(() => { if (!compact && ['palette', 'inspector'].includes(panel)) setPanel(''); }, [compact, panel]);
   const update = patch => { setNodes(current => current.map(node => node.id === selectedId ? { ...node, data: { ...node.data, ...patch } } : node)); mutate(); };
+  const [insertion,setInsertion]=useState(null);
+  const openInsert=useCallback(id=>{setInsertion(id);setPanel('insert');},[]);
   const add = kind => {
     if (nodes.length >= 80) return setStatus('El laboratorio admite hasta 80 bloques.');
     if (kind === 'trigger' && nodes.some(node => node.data.kind === 'trigger')) return setStatus('Ya hay un Inicio. Selecciónalo para cambiar su palabra clave.');
     const position = api.screenToFlowPosition({ x: window.innerWidth * (compact ? .45 : .52), y: window.innerHeight * .46 });
     const node = createNode(kind, crypto.randomUUID(), position);
+    if(panel==='insert') {
+      const edge=edges.find(item=>item.id===insertion);
+      if(!edge||!canInsert(kind))return setStatus('Elige un bloque con una entrada y una salida.');
+      const source=nodes.find(item=>item.id===edge.source),target=nodes.find(item=>item.id===edge.target);
+      if(!source||!target)return;
+      node.position={x:(source.position.x+target.position.x)/2,y:(source.position.y+target.position.y)/2+160};
+      const next=[...nodes,node];
+      const first=connectNodes({source:source.id,target:node.id,sourceHandle:edge.sourceHandle},next,edges.filter(item=>item.id!==edge.id));
+      setEdges(connectNodes({source:node.id,target:target.id},next,first));
+      setInsertion(null);
+    }
     setNodes(current => [...current.map(item => ({ ...item, selected: false })), { ...node, selected: true }]);
-    setSelectedId(node.id); mutate(); setPanel(compact ? 'inspector' : ''); setStatus(`${BLOCKS[kind].name} añadido. Conecta sus puntos para incluirlo en el recorrido.`);
+    setSelectedId(node.id); mutate(); setPanel(compact ? 'inspector' : ''); setStatus(panel==='insert'?'Bloque insertado y conectado.':`${BLOCKS[kind].name} añadido. Conecta sus puntos para incluirlo en el recorrido.`);
   };
   const duplicate = () => { if (!selected || nodes.length >= 80) return; if (selected.data.kind === 'trigger') return setStatus('El flujo admite un solo Inicio.'); const node = { ...selected, id: crypto.randomUUID(), position: { x: selected.position.x + 35, y: selected.position.y + 150 }, data: { ...selected.data, label: `${selected.data.label.slice(0, 80)} (copia)` }, selected: true }; setNodes(current => [...current.map(item => ({ ...item, selected: false })), node]); setSelectedId(node.id); mutate(); setStatus('Bloque duplicado. Conéctalo para usarlo.'); };
   const remove = () => { if (!selected) return; setNodes(current => current.filter(node => node.id !== selectedId)); setEdges(current => current.filter(edge => edge.source !== selectedId && edge.target !== selectedId)); setSelectedId(null); mutate(); setStatus('Bloque eliminado del borrador.'); };
@@ -250,7 +293,7 @@ function Editor() {
   const showSimulation = () => { try { setSnapshot(parseDraft(JSON.stringify(flow))); setPath([]); setPanel('simulation'); } catch { setStatus('No se puede simular este borrador. Reduce su tamaño o mueve los bloques más cerca del inicio.'); } };
   const changeMode = () => { const next = mode === 'dark' ? 'light' : 'dark'; setMode(next); try { localStorage.setItem('lazo.lab.theme', next); } catch { /* La apariencia de esta sesión sigue funcionando. */ } };
   const renderedNodes = useMemo(() => nodes.map(node => ({ ...node, selected: node.id === selectedId, data: { ...node.data, assigneeLabel:serverInfo?.members.find(member=>member.id===node.data.value)?.name, running: path.some(step => step.id === node.id) } })), [nodes, selectedId, path,serverInfo]);
-  const renderedEdges = useMemo(() => { const visited = new Set(traversedEdgeIds(path, edges)); return edges.map(edge => ({ ...edge, animated: motion, markerEnd: { type: MarkerType.ArrowClosed }, style: { stroke: visited.has(edge.id) ? 'var(--lazo-mint)' : 'var(--color-border-emphasized)' } })); }, [edges, motion, path]);
+  const renderedEdges = useMemo(() => { const visited = new Set(traversedEdgeIds(path, edges)); return edges.map(edge => ({ ...edge, type:'insertable', data:{insert:openInsert}, animated: motion, markerEnd: { type: MarkerType.ArrowClosed }, style: { stroke: visited.has(edge.id) ? 'var(--lazo-mint)' : 'var(--color-border-emphasized)' } })); }, [edges, motion, path,openInsert]);
   const palette = <Palette onAdd={add} count={nodes.length} />;
   const inspector = <Inspector node={selected} onUpdate={update} onDuplicate={duplicate} onDelete={remove} members={serverInfo?.members} thirdButtonConnected={edges.some(edge => edge.source === selectedId && edge.sourceHandle === 'option-3')} />;
   const selectNode = (_, node) => { setSelectedId(node.id); if (compact) setPanel('inspector'); };
@@ -265,11 +308,11 @@ function Editor() {
       <VStack style={styles.main} gap={0}><Layout height="fill" padding={0} header={<LayoutHeader hasDivider padding={0}><VStack paddingInline={mobile ? 3 : 5} paddingBlock={4} gap={4}>
         <HStack gap={2} vAlign="center"><Text style={styles.eyebrow}>Automatizaciones</Text><Icon icon={ChevronRight} color="secondary" size="xsm" /><Text style={styles.eyebrow}>Editor de flujos</Text></HStack>
         <HStack gap={3} hAlign="between" vAlign="center" wrap="wrap"><VStack gap={2} style={{ minWidth: mobile ? '100%' : 0, flex: 1 }}><Heading level={2} style={{ fontSize: mobile ? '1.25rem' : '1.625rem', lineHeight: 1.35 }}>Diseña conexiones que avanzan.</Heading><Text color="secondary" size="sm">Una conversación. Diferentes caminos. Todo en un mismo lienzo.</Text></VStack><HStack gap={2} vAlign="center"><Button label={serverInfo ? "Guardar en servidor" : "Guardar borrador local"} isDisabled={serverBusy || serverLoading} size={mobile ? 'sm' : 'md'} icon={<Icon icon={Save} size="sm" />} onClick={saveServer} /><Button label="Probar flujo" size={mobile ? 'sm' : 'md'} variant="primary" icon={<Icon icon={Play} size="sm" />} onClick={showSimulation} /></HStack></HStack>
-        {serverInfo && <HStack gap={2} wrap="wrap" vAlign="center"><Pill icon={serverDoc?.active ? Zap : Pause}>{serverDoc?.active ? `Activo · versión ${serverDoc.publishedRevision}` : 'Sin activar'}</Pill><Button label="Mis flujos" size="sm" onClick={openSaved} isDisabled={serverBusy} /><Button label="Nuevo flujo" size="sm" onClick={newServerFlow} isDisabled={serverBusy || dirty} /><Button label="Activar versión guardada" size="sm" variant="primary" onClick={()=>activation('activate')} isDisabled={serverBusy || !serverDoc || dirty || (serverDoc.active && serverDoc.publishedRevision === serverDoc.revision)} />{serverDoc?.active && <Button label="Pausar flujo" size="sm" onClick={()=>activation('pause')} isDisabled={serverBusy} />}<Button label="Historial de ejecuciones" size="sm" onClick={openHistory} isDisabled={serverBusy || !serverDoc} /><Text size="sm" color="secondary">Cuenta de prueba · Una bienvenida por minuto y contacto</Text></HStack>}
+        {serverInfo && <HStack gap={2} wrap="wrap" vAlign="center"><Pill icon={serverDoc?.active ? Zap : Pause}>{serverDoc?.active ? `Activo · versión ${serverDoc.publishedRevision}` : 'Sin activar'}</Pill><Button label="Mis flujos" size="sm" onClick={openSaved} isDisabled={serverBusy} /><Button label="Nuevo flujo" size="sm" onClick={()=>setPanel('templates')} isDisabled={serverBusy || dirty} /><Button label="Activar versión guardada" size="sm" variant="primary" onClick={()=>activation('activate')} isDisabled={serverBusy || !serverDoc || dirty || (serverDoc.active && serverDoc.publishedRevision === serverDoc.revision)} />{serverDoc?.active && <Button label="Pausar flujo" size="sm" onClick={()=>activation('pause')} isDisabled={serverBusy} />}<Button label="Historial de ejecuciones" size="sm" onClick={openHistory} isDisabled={serverBusy || !serverDoc} /><Text size="sm" color="secondary">Cuenta de prueba · Una bienvenida por minuto y contacto</Text></HStack>}
       </VStack></LayoutHeader>} footer={<LayoutFooter hasDivider padding={2}><HStack hAlign="between" vAlign="center" gap={3} wrap="wrap"><Text size="sm" role="status" aria-live="polite" style={{ fontSize: '.75rem' }}>{status}</Text><Text size="sm" color="secondary" style={{ fontSize: '.75rem' }}>{dirty ? 'Cambios sin guardar' : serverInfo ? 'Empresa: '+serverInfo.identity.company.name : 'Solo en este navegador'} · {nodes.length} bloques · {edges.length} conexiones</Text></HStack></LayoutFooter>}>
         <LayoutContent padding={0} isScrollable={false}><Layout height="fill" padding={0} start={!compact ? <LayoutPanel width="var(--lazo-palette-width)" hasDivider padding={2} label="Biblioteca de bloques">{palette}</LayoutPanel> : undefined} end={!compact ? <LayoutPanel width="var(--lazo-inspector-width)" hasDivider padding={0} label="Propiedades del bloque">{inspector}</LayoutPanel> : undefined}>
           <LayoutContent padding={0} isScrollable={false}><VStack style={styles.canvas} gap={0}>
-            <ReactFlow nodes={renderedNodes} edges={renderedEdges} nodeTypes={nodeTypes} style={{ background: 'transparent' }} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect} isValidConnection={connection => !connectionProblem(connection, nodes, edges)} onNodeClick={selectNode} onPaneClick={() => setSelectedId(null)} defaultViewport={{ x: 20, y: 135, zoom: .9 }} nodeExtent={[[-10000, -10000], [10000, 10000]]} multiSelectionKeyCode={null} minZoom={.25} maxZoom={1.6} forceColorMode={mode} deleteKeyCode={['Backspace', 'Delete']} onNodesDelete={deleted => { if (deleted.some(node => node.id === selectedId)) setSelectedId(null); }} proOptions={{ hideAttribution: true }} ariaLabelConfig={{ 'controls.zoomIn.ariaLabel': 'Acercar el lienzo', 'controls.zoomOut.ariaLabel': 'Alejar el lienzo', 'controls.fitView.ariaLabel': 'Ajustar todo el flujo', 'controls.interactive.ariaLabel': 'Bloquear o desbloquear el lienzo', 'minimap.ariaLabel': 'Mapa del flujo' }}>
+            <ReactFlow nodes={renderedNodes} edges={renderedEdges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} style={{ background: 'transparent' }} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect} isValidConnection={connection => !connectionProblem(connection, nodes, edges)} onNodeClick={selectNode} onPaneClick={() => setSelectedId(null)} defaultViewport={{ x: 20, y: 135, zoom: .9 }} nodeExtent={[[-10000, -10000], [10000, 10000]]} multiSelectionKeyCode={null} minZoom={.25} maxZoom={1.6} forceColorMode={mode} deleteKeyCode={['Backspace', 'Delete']} onNodesDelete={deleted => { if (deleted.some(node => node.id === selectedId)) setSelectedId(null); }} proOptions={{ hideAttribution: true }} ariaLabelConfig={{ 'controls.zoomIn.ariaLabel': 'Acercar el lienzo', 'controls.zoomOut.ariaLabel': 'Alejar el lienzo', 'controls.fitView.ariaLabel': 'Ajustar todo el flujo', 'controls.interactive.ariaLabel': 'Bloquear o desbloquear el lienzo', 'minimap.ariaLabel': 'Mapa del flujo' }}>
               <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="var(--lazo-dot)" style={{ background: 'transparent' }} />
               <Controls showInteractive={false} position="bottom-left" />
               {!mobile && <MiniMap nodeColor={node => COLORS[node.data.kind]} nodeStrokeColor="var(--color-border)" pannable zoomable position="bottom-right" style={{ width: '9rem', height: '5.5rem', border: stroke, borderRadius: 'var(--radius-element)', overflow: 'hidden' }} />}
@@ -285,11 +328,22 @@ function Editor() {
         </Layout></LayoutContent>
       </Layout></VStack>
     </HStack>
+    <Drawer isOpen={panel==='templates'} onOpenChange={open=>!open&&setPanel('')} label="Elegir plantilla" width="24rem">
+      <VStack gap={3}><DrawerHeader title="Nuevo flujo" onOpenChange={()=>setPanel('')} />
+      <Button label="Bienvenida con botones" onClick={()=>newServerFlow()} />
+      <Button label="Venta con pago anticipado" onClick={()=>newServerFlow(digitalSaleFlow())} />
+      <Button label="Venta contra entrega digital" onClick={()=>newServerFlow(digitalSaleFlow('postpaid'))} /></VStack>
+    </Drawer>
+    <Drawer isOpen={panel==='insert'} onOpenChange={open=>!open&&setPanel('')} label="Insertar bloque" side="start" width="20rem">
+      <Layout height="fill" header={<LayoutHeader padding={3}><DrawerHeader title="Insertar en la conexión" onOpenChange={()=>setPanel('')} /></LayoutHeader>}>
+        <LayoutContent padding={3}><Palette onAdd={add} count={nodes.length} inserting /></LayoutContent>
+      </Layout>
+    </Drawer>
     <Drawer isOpen={panel === 'palette'} onOpenChange={open => !open && setPanel('')} label="Biblioteca de bloques" side="start" width="20rem" padding={0}><Layout height="fill" header={<LayoutHeader padding={3}><DrawerHeader title="Bloques del flujo" onOpenChange={() => setPanel('')} /></LayoutHeader>}><LayoutContent padding={3}>{palette}</LayoutContent></Layout></Drawer>
     <Drawer isOpen={panel === 'inspector'} onOpenChange={open => !open && setPanel('')} label="Propiedades del bloque" width="22rem" padding={0}><Layout height="fill" header={<LayoutHeader padding={3}><DrawerHeader title="Configurar bloque" onOpenChange={() => setPanel('')} /></LayoutHeader>}><LayoutContent padding={0}>{inspector}</LayoutContent></Layout></Drawer>
     <Drawer isOpen={panel === 'simulation'} onOpenChange={open => !open && setPanel('')} label="Simular el flujo" width="30rem" padding={0}><Layout height="fill" header={<LayoutHeader padding={4} hasDivider><DrawerHeader title="Prueba tu conversación" subtitle="Una vista previa de cómo avanza el flujo" onOpenChange={() => setPanel('')} /></LayoutHeader>}><LayoutContent padding={0}>{snapshot && <Simulation key={snapshot.name + JSON.stringify(snapshot.nodes)} flow={snapshot} onPath={setPath} />}</LayoutContent></Layout></Drawer>
     <Drawer isOpen={panel === 'saved'} onOpenChange={open=>!open&&setPanel('')} label="Flujos guardados" width="26rem"><VStack gap={4}><DrawerHeader title="Flujos de tu empresa" onOpenChange={()=>setPanel('')} />{savedFlows.length ? savedFlows.map(doc=><Button key={doc.id} label={doc.graph.name+(doc.active?' · Activo':' · Pausado')} isDisabled={dirty || serverBusy} onClick={()=>{showDocument(doc);setPanel('');setStatus('Borrador recuperado del servidor.');}} />):<Text>Todavía no guardaste ningún flujo.</Text>}{dirty&&<Text>Guarda los cambios actuales antes de abrir otro flujo.</Text>}</VStack></Drawer>
-    <Drawer isOpen={panel === 'history'} onOpenChange={open=>!open&&setPanel('')} label="Historial de ejecuciones" width="28rem"><VStack gap={4}><DrawerHeader title="Últimas ejecuciones" subtitle="El mensaje aceptado se comprueba como entregado en Conversaciones." onOpenChange={()=>setPanel('')} />{runHistory.length ? runHistory.map(run=><VStack key={run.id} gap={2} padding={3} style={styles.note}><Text weight="semibold">{({pending:'En cola',running:'En ejecución',waiting:'Esperando una opción',scheduled:'Seguimiento programado',delayed:'Pausa programada',agent_wait:'Esperando más datos',done:'Recorrido completado',failed:'Detenido por un error',cancelled:'Cancelado',interrupted:'Interrumpido; revisar antes de repetir'})[run.state]||run.state}</Text><Text size="sm" color="secondary">{new Date(run.created).toLocaleString('es-PE')}</Text>{run.reason&&<Text size="sm">{run.reason}</Text>}</VStack>):<Text>Aquí aparecerán las ejecuciones de mensajes nuevos que coincidan con la palabra clave.</Text>}</VStack></Drawer>
+    <Drawer isOpen={panel === 'history'} onOpenChange={open=>!open&&setPanel('')} label="Historial de ejecuciones" width="28rem"><VStack gap={4}><DrawerHeader title="Últimas ejecuciones" subtitle="El mensaje aceptado se comprueba como entregado en Conversaciones." onOpenChange={()=>setPanel('')} />{runHistory.length ? runHistory.map(run=><VStack key={run.id} gap={2} padding={3} style={styles.note}><Text weight="semibold">{({pending:'En cola',running:'En ejecución',waiting:'Esperando una opción',scheduled:'Seguimiento programado',delayed:'Pausa programada',agent_wait:'Esperando más datos',payment_wait:'Esperando confirmar abono',done:'Recorrido completado',failed:'Detenido por un error',cancelled:'Cancelado',interrupted:'Interrumpido; revisar antes de repetir'})[run.state]||run.state}</Text><Text size="sm" color="secondary">{new Date(run.created).toLocaleString('es-PE')}</Text>{run.reason&&<Text size="sm">{run.reason}</Text>}</VStack>):<Text>Aquí aparecerán las ejecuciones de mensajes nuevos que coincidan con la palabra clave.</Text>}</VStack></Drawer>
     <Drawer isOpen={isRestoreConfirm} onOpenChange={setRestoreConfirm} label="Restaurar ejemplo" width="24rem"><VStack gap={5}><DrawerHeader title="¿Volver al ejemplo inicial?" onOpenChange={setRestoreConfirm} /><Text>Reemplazará lo que ves en el lienzo. Tu borrador guardado se conserva hasta que vuelvas a guardar.</Text><Button label="Restaurar ejemplo inicial" onClick={restore} /><Button label="Seguir editando" variant="ghost" onClick={() => setRestoreConfirm(false)} /></VStack></Drawer>
   </VStack></Theme>;
 }

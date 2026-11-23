@@ -4,6 +4,10 @@ export const BLOCKS = {
   message: { name: 'Mensaje', description: 'Texto con variables de contacto', group: 'Conversación' },
   buttons: { name: 'Botones de respuesta', description: 'Envía hasta tres opciones y sigue la elegida', group: 'Conversación' },
   condition: { name: 'Condición', description: 'Dos caminos según la respuesta', group: 'Lógica' },
+  plan: { name: 'Oferta y plan', description: 'Define precio, moneda y contenido', group: 'Venta' },
+  charge: { name: 'Cobrar', description: 'Envía el importe y las instrucciones', group: 'Pago' },
+  confirm: { name: 'Confirmar pago', description: 'Espera la validación del abono', group: 'Pago' },
+  deliver: { name: 'Entregar producto', description: 'Envía el enlace del plan elegido', group: 'Entrega' },
   ai: { name: 'Agente IA', description: 'Responde con información de tu negocio', group: 'Conversación' },
   reminder: { name: 'Esperar sin respuesta', description: 'Continúa solo si el cliente no responde', group: 'Lógica' },
   handoff: { name: 'Traspasar a asesor', description: 'Asigna el chat y pausa la automatización', group: 'Acciones' },
@@ -20,6 +24,10 @@ export function createNode(kind, id, position = { x: 0, y: 0 }) {
     message: { label: 'Enviar mensaje', value: 'Hola {{nombre}}, ¿cómo podemos ayudarte?' },
     buttons: { label: 'Elegir una opción', value: 'Hola {{nombre}}, ¿qué te gustaría consultar?', choices: ['Ver catálogo', 'Consultar horarios'] },
     condition: { label: '¿Qué necesita el contacto?', value: 'catálogo' },
+    plan: { label: 'Elegir plan', value: '', sale: { product: '', price: '', currency: 'PEN', link: '', mode: 'prepaid', previousPlan: '' } },
+    charge: { label: 'Enviar instrucciones de pago', value: '' },
+    confirm: { label: 'Verificar abono', value: '' },
+    deliver: { label: 'Enviar enlace de acceso', value: 'Aquí tienes el acceso a tu compra:' },
     ai: { label: 'Responder con IA', value: '' },
     reminder: { label: 'Esperar antes del seguimiento', value: '30' },
     handoff: { label: 'Traspasar al equipo', value: '' },
@@ -79,6 +87,42 @@ export function chainedWelcomeFlow() {
     ['bienvenida', 'pedido', 'option-3'], ['pedido', 'fin', 'next'],
   ].map(([source, target, sourceHandle]) => ({ id: source + '-' + sourceHandle, source, target, sourceHandle, type: 'smoothstep' }));
   return { version: 1, name: 'Bienvenida con botones', nodes, edges };
+}
+
+export function digitalSaleFlow(mode = 'prepaid') {
+  const checkout = mode === 'postpaid' ? ['deliver','charge','confirm'] : ['charge','confirm','deliver'];
+  const nodes = [
+    createNode('trigger','inicio',{x:40,y:150}),
+    createNode('buttons','oferta',{x:340,y:150}),
+    createNode('plan','basico',{x:640,y:20}),
+    createNode('plan','premium',{x:640,y:280}),
+    ...checkout.map((kind,index)=>createNode(kind,kind,{x:940+index*300,y:150})),
+    createNode('end','fin',{x:1840,y:150}),
+  ];
+  nodes[0].data.value = 'quiero el ebook';
+  nodes[1].data.value = 'Elige tu plan: Básico S/ 10 o Premium S/ 20 con bonos.';
+  nodes[1].data.choices = ['Básico','Premium'];
+  for (const [node,title,price] of [[nodes[2],'Básico','10'],[nodes[3],'Premium','20']]) {
+    node.data.value=title;
+    Object.assign(node.data.sale,{price,mode});
+  }
+  const links = [
+    ['inicio','oferta','next'], ['oferta','basico','option-1'], ['oferta','premium','option-2'],
+    ['basico',checkout[0],'next'], ['premium',checkout[0],'next'],
+    ...checkout.map((kind,index)=>[kind,checkout[index+1]||'fin','next']),
+  ];
+  return {version:1,name:mode==='postpaid'?'Venta contra entrega digital':'Venta con pago anticipado',
+    nodes,edges:links.map(([source,target,sourceHandle])=>({id:source+'-'+sourceHandle,source,target,sourceHandle,type:'smoothstep'}))};
+}
+
+export function amountInCents(value) {
+  if (typeof value !== 'string' || !/^\d{1,6}([.,]\d{1,2})?$/.test(value.trim())) return 0;
+  const [whole, fraction = ''] = value.trim().split(/[.,]/);
+  return Number(whole)*100 + Number(fraction.padEnd(2,'0'));
+}
+
+export function validDeliveryLink(value) {
+  try { const url=new URL(value);return url.protocol==='https:'&&!url.username&&!url.password; } catch {return false;}
 }
 
 export function exampleFlow() {
@@ -142,7 +186,9 @@ export function validateFlow(flow) {
   if (starts.length !== 1) errors.push('El flujo necesita exactamente un bloque de inicio.');
   for (const node of nodes) {
     if (!node.data.label.trim()) errors.push('Todos los bloques necesitan un nombre.');
-    if (['message', 'condition', 'tag', 'assign', 'handoff', 'ai'].includes(node.data.kind) && !node.data.value.trim()) errors.push(`Completa el contenido de «${node.data.label || BLOCKS[node.data.kind].name}».`);
+    if (['message', 'condition', 'tag', 'assign', 'handoff', 'ai', 'plan', 'charge'].includes(node.data.kind) && !node.data.value.trim()) errors.push(`Completa el contenido de «${node.data.label || BLOCKS[node.data.kind].name}».`);
+    if (node.data.kind === 'plan' && (!/^[a-z0-9][a-z0-9_-]{0,49}$/.test(node.data.sale.product) || !amountInCents(node.data.sale.price) || !validDeliveryLink(node.data.sale.link))) errors.push('Completa el código de producto, el importe y el enlace HTTPS de «'+node.data.label+'».');
+    if (node.data.kind === 'confirm' && node.data.value.trim() && (!/^\d+$/.test(node.data.value) || +node.data.value<1 || +node.data.value>1380)) errors.push('El recordatorio de pago debe ser de 1 a 1380 minutos.');
     if (node.data.kind === 'reminder' && (!/^\d+$/.test(node.data.value) || Number(node.data.value) < 1 || Number(node.data.value) > 1380)) errors.push('La espera sin respuesta debe ser de 1 a 1380 minutos.');
     if (node.data.kind === 'wait' && (!/^\d+$/.test(node.data.value) || Number(node.data.value) < 1 || Number(node.data.value) > 10080)) errors.push(`La espera de «${node.data.label}» debe ser de 1 a 10080 minutos.`);
     if (node.data.kind === 'buttons') {
@@ -176,9 +222,40 @@ export function validateFlow(flow) {
       if (kind === 'back' && depth < 2) errors.push('Conecta «Volver al menú anterior» desde un submenú.');
       for (const edge of edges.filter(edge => edge.source === id)) contexts.push([edge.target, Math.min(2, depth + Number(kind === 'buttons'))]);
     }
+    validateSalePaths(starts[0].id,nodes,edges,errors);
     if (nodes.some(node => !visited.has(node.id))) errors.push('Hay bloques que no se alcanzan desde Inicio. Conéctalos o retíralos.');
   }
   return [...new Set(errors)];
+}
+
+function validateSalePaths(start,nodes,edges,errors) {
+  if(!nodes.some(node=>['plan','charge','confirm','deliver'].includes(node.data.kind)))return;
+  const byId=new Map(nodes.map(node=>[node.id,node.data]));
+  const pending=[[start,'',false,false,false]],seen=new Set();
+  while(pending.length) {
+    let [id,mode,charged,confirmed,delivered]=pending.pop();
+    const key=JSON.stringify([id,mode,charged,confirmed,delivered]);
+    if(seen.has(key))continue;
+    seen.add(key);
+    const node=byId.get(id);
+    if(!node)continue;
+    if(node.kind==='plan') {
+      if(mode)errors.push('Cada recorrido de venta admite un plan.');
+      mode=node.sale.mode;
+    } else if(node.kind==='charge') {
+      if(!mode||charged||mode==='postpaid'&&!delivered)errors.push('Conecta Cobrar después de elegir un plan y, en contra entrega, después de Entregar producto.');
+      charged=true;
+    } else if(node.kind==='confirm') {
+      if(!charged||confirmed)errors.push('Conecta un solo Confirmar pago después de Cobrar.');
+      confirmed=true;
+    } else if(node.kind==='deliver') {
+      if(!mode||delivered||mode==='prepaid'&&!confirmed)errors.push('En pago anticipado, conecta Entregar producto después de Confirmar pago.');
+      delivered=true;
+    } else if(node.kind==='back'&&mode) {
+      errors.push('Conecta Volver antes de registrar el plan de un pedido.');
+    }
+    for(const edge of edges.filter(edge=>edge.source===id))pending.push([edge.target,mode,charged,confirmed,delivered]);
+  }
 }
 
 export function parseDraft(raw) {
@@ -188,10 +265,15 @@ export function parseDraft(raw) {
   const ids = new Set();
   const nodes = flow.nodes.map(node => {
     if (!node || typeof node.id !== 'string' || !/^[\w-]{1,80}$/.test(node.id) || ids.has(node.id) || !Object.hasOwn(BLOCKS, node.data?.kind) || typeof node.data.label !== 'string' || node.data.label.length > 90 || typeof node.data.value !== 'string' || node.data.value.length > 2000 || !Number.isFinite(node.position?.x) || !Number.isFinite(node.position?.y) || Math.abs(node.position.x) > 20000 || Math.abs(node.position.y) > 20000) throw new Error('El borrador contiene un bloque incompatible.');
-    const { kind, label, value, choices } = node.data;
+    const { kind, label, value, choices, sale } = node.data;
     if (kind === 'buttons' && (!Array.isArray(choices) || (choices.length < 2 || choices.length > 3) || choices.some(choice => typeof choice !== 'string' || choice.length > 20))) throw new Error('El borrador contiene botones incompatibles.');
+    let cleanSale;
+    if (kind === 'plan') {
+      if (!sale || typeof sale.product!=='string' || sale.product.length>50 || typeof sale.price!=='string' || sale.price.length>12 || !['PEN','USD','EUR'].includes(sale.currency) || typeof sale.link!=='string' || sale.link.length>1500 || !['prepaid','postpaid'].includes(sale.mode) || typeof sale.previousPlan!=='string' || sale.previousPlan.length>100) throw new Error('El plan de venta tiene un formato incompatible.');
+      cleanSale={product:sale.product,price:sale.price,currency:sale.currency,link:sale.link,mode:sale.mode,previousPlan:sale.previousPlan};
+    }
     ids.add(node.id);
-    return { id: node.id, type: 'lazo', position: { x: node.position.x, y: node.position.y }, data: { kind, label, value, ...(kind === 'buttons' ? { choices } : {}) } };
+    return { id: node.id, type: 'lazo', position: { x: node.position.x, y: node.position.y }, data: { kind, label, value, ...(kind === 'buttons' ? { choices } : {}), ...(cleanSale ? {sale:cleanSale} : {}) } };
   });
   const edgeIds = new Set();
   const edges = flow.edges.map(edge => {
@@ -202,10 +284,10 @@ export function parseDraft(raw) {
   return { version: 1, name: flow.name, nodes, edges };
 }
 
-export function simulateFlow(flow, { aiOutcome = 'answered', name = 'Lucía', incoming = 'Hola', answer = 'Quiero el catálogo' } = {}) {
+export function simulateFlow(flow, { aiOutcome = 'answered', paymentConfirmed = true, name = 'Lucía', incoming = 'Hola', answer = 'Quiero el catálogo' } = {}) {
   const errors = validateFlow(flow);
   if (errors.length) return { errors, steps: [], tags: [], assigned: '', minutes: 0 };
-  const steps = [], tags = new Set(); let assigned = '', minutes = 0;
+  const steps = [], tags = new Set(); let assigned = '', minutes = 0, plan = null;
   const answers = String(answer).split('\n').map(item => item.trim()).filter(Boolean);
   const menus = [];
   let answerIndex = 0;
@@ -230,6 +312,16 @@ export function simulateFlow(flow, { aiOutcome = 'answered', name = 'Lucía', in
     }
     if (kind === 'condition') { output = normalize(answer).includes(normalize(value)) ? 'yes' : 'no'; detail = `Respuesta: «${answer}». Camino: ${output === 'yes' ? 'Sí' : 'No'}.`; }
     if (kind === 'wait') { minutes += Number(value); detail = `Se adelantan ${value} minutos. La prueba no espera en tiempo real.`; }
+    if (kind === 'plan') { plan=current.data.sale; detail='Plan '+value+' · '+plan.currency+' '+plan.price; }
+    if (kind === 'charge') detail=plan?'Cobro simulado · '+plan.currency+' '+plan.price:'Falta elegir un plan.';
+    if (kind === 'confirm') {
+      detail=paymentConfirmed?'Abono verificado en la simulación.':'Pedido pendiente. La confirmación libera la siguiente etapa.';
+      if(!paymentConfirmed) {
+        steps.push({id:current.id,kind,label,detail,minutes,output:''});
+        return {errors:[],paymentPending:true,steps,tags:[...tags],assigned,minutes};
+      }
+    }
+    if (kind === 'deliver') detail='Probar entrega del enlace del plan elegido. No se envió ningún archivo.';
     if (kind === 'ai') {
       output = aiOutcome === 'handoff' ? 'handoff' : 'answered';
       detail = output === 'handoff' ? 'Simulación: se necesita un asesor.' : 'Simulación: el agente responde con la información del negocio.';

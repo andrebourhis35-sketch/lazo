@@ -223,11 +223,18 @@ export function createServer(config,{store=openStore(config.database),fetchImpl=
         const name=encodeURIComponent(file.filename).replace(/['()*]/g,c=>'%'+c.charCodeAt(0).toString(16).toUpperCase());
         return response(res,200,file.bytes,file.mime,{'Content-Disposition':"attachment; filename=\"archivo"+(file.mime==='application/pdf'?'.pdf':file.mime==='image/png'?'.png':'.jpg')+"\"; filename*=UTF-8''"+name,'Content-Length':String(file.bytes.length),'Content-Security-Policy':"sandbox; default-src 'none'"});
       }
-      const contactMatch=route.match(/^\/contacts\/([a-f\d-]+)(?:\/(messages|read|attachments|automation))?$/);
+      const contactMatch=route.match(/^\/contacts\/([a-f\d-]+)(?:\/(messages|read|attachments|automation|orders))?$/);
       if(contactMatch) {
         const id=contactMatch[1],action=contactMatch[2],contact=store.contact(s.company_id,id);
         if(method==='GET'&&!action)return response(res,200,{contact});
         if(method==='PATCH'&&!action)return response(res,200,await authorizedJson(req,s,data=>store.updateContact(s.company_id,id,data,s.user_id)));
+        if(action==='orders'&&method==='GET')return response(res,200,{orders:flows.sales.list(s.company_id,id)});
+        if(action==='orders'&&method==='POST') {
+          admin(s);
+          const result=await authorizedJson(req,s,data=>data.action==='resend'?flows.sales.resend(s.company_id,id,data.orderId,data.requestId,s.user_id):flows.sales.confirm(s.company_id,id,data.orderId,data,s.user_id));
+          void flows.flush().catch(()=>{});
+          return response(res,200,result);
+        }
         if(action==='automation'&&method==='GET')return response(res,200,{paused:Boolean(store.contact(s.company_id,id).automation_paused),runs:flows.contactHistory(s.company_id,id)});
         if(action==='automation'&&method==='POST')return response(res,200,await authorizedJson(req,s,data=>{
           requireThat(typeof data.paused==='boolean','Estado no válido.');

@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { now, requireThat, digest } from './core.js';
+import { flowSales } from './flow-sales.js';
 import { parseDraft, validateFlow, outputsFor } from './flow-model.js';
 
 const normalize = value => value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
@@ -7,6 +8,8 @@ const buttonLifetime = 24 * 60 * 60 * 1000;
 const sendKey = (run, nodeId) => 'flow-'+digest(run.id+':'+nodeId+(run.visits?':'+run.visits:''));
 const tagKey = value => value.trim().toLocaleLowerCase('es');
 export function automationFlows(store, wa, ai) {
+  const sales=flowSales(store,wa);
+  const saleKinds=new Set(['plan','charge','confirm','deliver']);
   let task=null, stopping=false;
   const get = (company,id) => { const row=store.get('SELECT * FROM flows WHERE company_id=? AND id=?',company,id);requireThat(row,'Flujo no encontrado.',404);return row; };
   const safe = row => ({id:row.id,revision:row.revision,publishedRevision:row.published_revision,active:Boolean(row.active),updated:row.updated,graph:JSON.parse(row.draft)});
@@ -17,7 +20,7 @@ export function automationFlows(store, wa, ai) {
     store.contact(company,contact);
     store.tx(()=>{
       store.run('UPDATE contacts SET automation_paused=? WHERE company_id=? AND id=?',Number(paused),company,contact);
-      if(paused)store.run("UPDATE flow_runs SET state='cancelled',reason='El equipo tomó la conversación.',updated=? WHERE company_id=? AND contact_id=? AND state IN ('pending','scheduled','delayed','agent_wait','running','waiting')",now(),company,contact);
+      if(paused)store.run("UPDATE flow_runs SET state='cancelled',reason='El equipo tomó la conversación.',updated=? WHERE company_id=? AND contact_id=? AND state IN ('pending','scheduled','delayed','agent_wait','payment_wait','running','waiting')",now(),company,contact);
       store.audit(company,actor,paused?'flow.contact-paused':'flow.contact-resumed');
     });
     return {paused};
@@ -46,7 +49,7 @@ export function automationFlows(store, wa, ai) {
   function publish(company,id,data,actor) {
     const row=get(company,id);requireThat(data.revision===row.revision,'Guarda y vuelve a revisar la versión actual.',409);
     const draft=graph(JSON.parse(row.draft)),errors=validateFlow(draft);requireThat(!errors.length,errors[0]||'Completa el flujo.');
-    requireThat(draft.nodes.length<=20&&draft.nodes.every(n=>['trigger','message','buttons','tag','assign','handoff','reminder','back','end','ai','wait'].includes(n.data.kind)),'Las condiciones de texto siguen en simulación. Usa botones para elegir una rama real.');
+    requireThat(draft.nodes.length<=20&&draft.nodes.every(n=>['trigger','message','buttons','tag','assign','handoff','reminder','back','end','ai','wait','plan','charge','confirm','deliver'].includes(n.data.kind)),'Las condiciones de texto siguen en simulación. Usa botones para elegir una rama real.');
     const menus=draft.nodes.filter(n=>n.data.kind==='buttons');
     const agents=draft.nodes.filter(node=>node.data.kind==='ai');
     requireThat(agents.length<=1,'Usa un agente IA por flujo.');
@@ -73,17 +76,22 @@ export function automationFlows(store, wa, ai) {
     if(row.active&&row.published_revision===row.revision&&row.actor_id===actor)return safe(row);
     store.tx(()=>{
       store.run('UPDATE flows SET published=draft,published_revision=revision,activation=activation+1,active=1,actor_id=?,updated=? WHERE company_id=? AND id=?',actor,now(),company,id);
-      store.run("UPDATE flow_runs SET state='cancelled',reason='Nueva versión activada',updated=? WHERE flow_id=? AND state IN ('pending','waiting','scheduled','delayed','agent_wait')",now(),id);
+      store.run("UPDATE flow_runs SET state='cancelled',reason='Nueva versión activada',updated=? WHERE flow_id=? AND state IN ('pending','waiting','scheduled','delayed','agent_wait','payment_wait')",now(),id);
       store.audit(company,actor,'flow.activated');
     });return safe(get(company,id));
   }
   function pause(company,id,actor) {
-    get(company,id);store.tx(()=>{store.run('UPDATE flows SET active=0,updated=? WHERE company_id=? AND id=?',now(),company,id);store.run("UPDATE flow_runs SET state='cancelled',reason='Flujo pausado',updated=? WHERE company_id=? AND flow_id=? AND state IN ('pending','waiting','scheduled','delayed','agent_wait')",now(),company,id);store.audit(company,actor,'flow.paused');});return safe(get(company,id));
+    get(company,id);store.tx(()=>{store.run('UPDATE flows SET active=0,updated=? WHERE company_id=? AND id=?',now(),company,id);store.run("UPDATE flow_runs SET state='cancelled',reason='Flujo pausado',updated=? WHERE company_id=? AND flow_id=? AND state IN ('pending','waiting','scheduled','delayed','agent_wait','payment_wait')",now(),company,id);store.audit(company,actor,'flow.paused');});return safe(get(company,id));
   }
   function enqueue(message) {
     if(message.created<now()-5*60000)return;
     const cancelled=cancelReminder(message.company_id,message.contact_id,'El contacto respondió.');
     if(store.contact(message.company_id,message.contact_id).automation_paused)return;
+    if(message.type==='text'&&/\b(stop|baja|cancelar)\b/.test(normalize(message.body))) {
+      store.run("UPDATE flow_runs SET state='cancelled',reason='El contacto pidió detener la automatización.',due=NULL,updated=? WHERE company_id=? AND contact_id=? AND state IN ('pending','running','waiting','scheduled','delayed','agent_wait','payment_wait')",now(),message.company_id,message.contact_id);
+      return;
+    }
+    if(sales.enqueue(message))return;
     if(message.type==='interactive') {
       const match=/^lazo:([a-f0-9-]{36}):(option-[123])$/.exec(message.buttonId||'');
       if(!match||!message.contextId)return;
@@ -102,9 +110,6 @@ export function automationFlows(store, wa, ai) {
     }
     if(message.type!=='text')return;
     const value=normalize(message.body);
-    if(/\b(stop|baja|cancelar)\b/.test(value)) {
-      store.run("UPDATE flow_runs SET state='cancelled',reason='El contacto pidió detener la automatización.',updated=? WHERE company_id=? AND contact_id=? AND state IN ('pending','running','waiting','scheduled','delayed','agent_wait')",now(),message.company_id,message.contact_id);return;
-    }
     const waitingAgent=store.get("SELECT id FROM flow_runs WHERE company_id=? AND contact_id=? AND state='agent_wait' AND updated>? ORDER BY updated DESC LIMIT 1",message.company_id,message.contact_id,now()-buttonLifetime);
     if(waitingAgent) {
       store.run("UPDATE flow_runs SET state='pending',message_id=?,updated=? WHERE id=? AND state='agent_wait'",message.id,now(),waitingAgent.id);
@@ -143,6 +148,11 @@ export function automationFlows(store, wa, ai) {
         requireThat(++run.visits<=60,'Se alcanzó el límite del recorrido.');
         store.run('UPDATE flow_runs SET visits=?,step=?,updated=? WHERE id=?',run.visits,node.id,now(),run.id);
         const edge=draft.edges.find(e=>e.source===node.id);
+        if(saleKinds.has(node.data.kind)) {
+          const result=await sales.execute(run,node,owner.actor_id);
+          trace(run,node.data.label,result.detail,result.messageId);
+          if(result.pause)return;
+        }
         if(node.data.kind==='wait') {
           const due=now()+Number(node.data.value)*60000;
           if(due>=contact.last_inbound+buttonLifetime) {
@@ -251,8 +261,12 @@ export function automationFlows(store, wa, ai) {
       store.run("UPDATE flow_runs SET state='cancelled',reason='El menú venció sin respuesta.',updated=? WHERE state IN ('waiting','agent_wait') AND updated<=?",now(),now()-buttonLifetime);
       store.run("UPDATE flow_runs SET state='pending' WHERE state='scheduled' AND due<=?",now());
       store.run("UPDATE flow_runs SET state='pending',due=NULL WHERE state='delayed' AND due<=?",now());
+      for(const order of store.all("SELECT * FROM flow_runs WHERE state='payment_wait' AND due<=? ORDER BY due LIMIT 10",now())){
+        if(stopping)break;
+        try {await sales.remind(order);} catch {trace(order,'Recordatorio de pago','No se pudo confirmar el envío.');}
+      }
       for(const row of store.all("SELECT * FROM flow_runs WHERE state='pending' ORDER BY created,id LIMIT 10")){if(stopping)break;await execute(row);}})().finally(()=>{task=null;});return task;
   }
   async function stop(){stopping=true;if(task)await task;}
-  return {list,save,publish,pause,enqueue,runs,contactHistory,setAutomation,cancelReminder,recover,flush,stop};
+  return {sales,list,save,publish,pause,enqueue,runs,contactHistory,setAutomation,cancelReminder,recover,flush,stop};
 }

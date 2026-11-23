@@ -6,7 +6,7 @@ import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createServer} from '../src/server.js';
-import {buttonWelcomeFlow,chainedWelcomeFlow,createNode,simulateFlow} from '../src/flow-model.js';
+import {buttonWelcomeFlow,chainedWelcomeFlow,createNode,digitalSaleFlow,simulateFlow,validateFlow} from '../src/flow-model.js';
 
 function welcome(owner){
   const nodes=['trigger','message','tag','assign','end'].map((kind,i)=>createNode(kind,'n'+i,{x:i*300,y:100}));
@@ -296,6 +296,61 @@ test('agent asks once, resumes from a reply and hands off if the provider fails'
       assert.equal(f.store.get('SELECT automation_paused FROM contacts').automation_paused,succeeds?0:1);
       assert.equal(f.calls,succeeds?2:1);
       if(succeeds)assert.equal(f.sent[1].text.body,'Abrimos a las 10.');
+    } finally {await f.close();}
+  }
+});
+
+
+test('digital sale matches proof to the chosen plan and delivers at the right step', async () => {
+  for(const mode of ['prepaid','postpaid']) {
+    const f=await fixture();
+    try {
+      const graph=digitalSaleFlow(mode);
+      graph.nodes.find(node=>node.id==='charge').data.value='Paga a la cuenta de la tienda.';
+      graph.nodes.find(node=>node.id==='confirm').data.value='30';
+      graph.nodes.find(node=>node.id==='basico').data.sale.link='https://example.test/basico';
+      graph.nodes.find(node=>node.id==='premium').data.sale.link='https://example.test/premium';
+      for(const node of graph.nodes.filter(node=>node.data.kind==='plan'))node.data.sale.product='ebook-demo';
+      assert.deepEqual(validateFlow(graph),[]);
+      const sim=simulateFlow(graph,{incoming:'quiero el ebook',answer:'Premium',paymentConfirmed:false});
+      assert.equal(sim.paymentPending,true);
+      assert.equal(sim.steps.some(step=>step.kind==='deliver'),mode==='postpaid');
+      const flow=f.flows.save(f.company,null,{graph},f.user);
+      f.flows.publish(f.company,flow.id,{revision:1},f.user);
+      f.receive('quiero el ebook');
+      await f.flows.flush();
+      f.receive('',0,{type:'interactive',context:{id:'wamid.out.1'},interactive:{type:'button_reply',button_reply:f.sent[0].interactive.action.buttons[1].reply}});
+      await f.flows.flush();
+      const contact=f.store.get('SELECT id FROM contacts');
+      const path='/contacts/'+contact.id+'/orders';
+      let [order]=(await f.api(path)).body.orders;
+      assert.equal(order.cents,2000);
+      assert.equal(order.plan,'Premium');
+      assert.equal(Boolean(order.delivery_id),mode==='postpaid');
+      assert.ok(f.sent.some(message=>message.text?.body.includes('PEN 20.00')));
+      f.receive('',0,{type:'image',image:{id:'1111',mime_type:'image/png'}});
+      [order]=(await f.api(path)).body.orders;
+      assert.ok(order.proof_id);
+      assert.equal(order.confirmed_at,null);
+      assert.equal(f.store.get('SELECT due FROM flow_runs').due,null);
+      const payment={orderId:order.id,reference:'ABONO-123',amount:'20.00'};
+      assert.equal((await f.api(path,'POST',{...payment,amount:'10.00'})).status,400);
+      f.store.run("UPDATE memberships SET role='agent' WHERE company_id=?",f.company);
+      assert.equal((await f.api(path,'POST',payment)).status,403);
+      f.store.run("UPDATE memberships SET role='owner' WHERE company_id=?",f.company);
+      assert.equal((await f.api(path,'POST',payment)).status,200);
+      await f.flows.flush();
+      assert.equal((await f.api(path,'POST',payment)).status,200);
+      [order]=(await f.api(path)).body.orders;
+      assert.ok(order.confirmed_at);
+      assert.equal(order.reference,'ABONO-123');
+      assert.equal(f.sent.filter(message=>message.text?.body.includes('https://example.test/premium')).length,1);
+      assert.ok(order.delivery_id);
+      assert.equal(order.flow_state,'done');
+      const resend={action:'resend',orderId:order.id,requestId:randomUUID()};
+      assert.equal((await f.api(path,'POST',resend)).status,200);
+      assert.equal((await f.api(path,'POST',resend)).status,200);
+      assert.equal(f.sent.filter(message=>message.text?.body.includes('https://example.test/premium')).length,2);
     } finally {await f.close();}
   }
 });

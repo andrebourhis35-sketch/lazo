@@ -1,5 +1,9 @@
 # Coordinación Codex y Claude
 
+### Infoproductos y abonos (23 de noviembre de 2026)
+
+- Codex, rama codex/venta-infoproductos. Añadidos bloques de venta, cobro, confirmación por el equipo y entrega por enlace. El archivo recibido se vincula al pedido para revisión. La comprobación en cuenta y la referencia se registran por separado. Plantillas de pago anticipado y contra entrega, y botón para insertar un bloque en una conexión del lienzo.
+
 ### Agente IA y espera real (22 de noviembre de 2026)
 
 - Codex, rama codex/agente-ia-flujos. Se añade el agente con información del negocio, una aclaración y salida a un asesor. La clave de API se guarda cifrada por espacio y el propietario activa el uso. Espera fija ejecuta el siguiente bloque después de la pausa aunque haya respuesta. Esperar sin respuesta sigue siendo un recordatorio que se cancela al intervenir el cliente o el equipo.
