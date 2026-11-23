@@ -1,23 +1,9 @@
-import { mapPaths } from './sales-map.js?v=20261123';
+import { mountSalesGlobe } from './sales-globe.js?v=20261123';
 
 const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const amount=(cents,currency)=>new Intl.NumberFormat('es-PE',{style:'currency',currency,currencyDisplay:'code'}).format(cents/100);
 const date=new Intl.DateTimeFormat('es-PE',{dateStyle:'medium',timeZone:'America/Lima'});
 const options=(items,selected)=>items.map(([id,label])=>`<option value="${esc(id)}"${id===selected?' selected':''}>${esc(label)}</option>`).join('');
-
-function map(markets,active) {
-  const data=new Map(markets.map(row=>[row.country,row]));
-  const paths=Object.entries(mapPaths).map(([code,d])=>{
-    const market=data.get(code);
-    const theme=code===active?'market-selected':market?'market-active':'market-empty';
-    return `<path class="${theme}" d="${d}">${market?`<title>${esc(market.name)}: ${market.orders} pedidos</title>`:''}</path>`;
-  }).join('');
-  // Keep small markets, such as Panama, visible at the world map's scale.
-  const points={PAN:[-80,8.5],ECU:[-78.5,-1.5],PER:[-75,-9],CRI:[-84,10],SLV:[-89,14],PRT:[-8,39.5]};
-  const markers=Object.entries(points).filter(([code])=>data.has(code)).map(([code,[lon,lat]])=>
-    `<circle class="${code===active?'market-selected':'market-active'}" cx="${(lon+180)*2}" cy="${(85-lat)*2}" r="3"><title>${esc(data.get(code).name)}</title></circle>`).join('');
-  return `<svg class="sales-map" viewBox="0 0 720 287" role="img" aria-label="Mapa de países con pedidos"><g fill-rule="evenodd">${paths}</g>${markers}</svg>`;
-}
 
 export function renderSales(root,data,filters,{onFilter,onChat,onPipeline,onNewContact}) {
   const totals=data.currencies.reduce((sum,row)=>({
@@ -52,7 +38,15 @@ export function renderSales(root,data,filters,{onFilter,onChat,onPipeline,onNewC
       <section class="sales-card sales-geography">
         <h2>Pedidos por país</h2>
         <p class="sales-muted">Estimado por el prefijo del teléfono del cliente.</p>
-        ${map(data.markets,filters.country)}
+        <div class="sales-globe-stage">
+          <canvas width="640" height="640" tabindex="0" aria-label="Globo de pedidos por país" aria-describedby="globe-help"></canvas>
+          <div class="sales-globe-controls">
+            <button type="button" class="secondary" data-globe-left aria-label="Girar el globo a la izquierda">←</button>
+            <button type="button" class="secondary" data-globe-home>Centrar en América</button>
+            <button type="button" class="secondary" data-globe-right aria-label="Girar el globo a la derecha">→</button>
+          </div>
+        </div>
+        <p class="sales-globe-help" id="globe-help">Arrastra o usa las flechas para girar el globo.</p>
         ${data.markets.length?`<ul class="sales-country-list">${data.markets.map(row=>`<li><button type="button" class="secondary" data-country="${esc(row.country)}" aria-pressed="${filters.country===row.country}"><span>${esc(row.name)}</span><strong>${row.orders}</strong></button></li>`).join('')}</ul>`:'<p class="sales-muted">El mapa se resaltará cuando haya pedidos.</p>'}
       </section>
     </div>
@@ -67,6 +61,7 @@ export function renderSales(root,data,filters,{onFilter,onChat,onPipeline,onNewC
           <td>${row.access_sent?'Enviado':'Pendiente'}</td><td>${date.format(row.created)}</td>
         </tr>`).join('')}</tbody></table></div>`:'<p class="sales-muted">Los pedidos de tus flujos de venta aparecerán aquí.</p>'}
     </section>`;
+  mountSalesGlobe(root.querySelector('.sales-globe-stage'),data.markets,filters.country);
   root.onchange=event=>{
     const key=event.target.dataset.filter;
     if(key)onFilter(key,event.target.value,event.target.selectedOptions[0]?.text);

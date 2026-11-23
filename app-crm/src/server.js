@@ -21,6 +21,7 @@ const assets={
   '/app/connections-ui.js':['connections-ui.js','text/javascript; charset=utf-8'],
   '/app/meta-signup.js':['meta-signup.js','text/javascript; charset=utf-8'],
   '/app/sales-ui.js':['sales-ui.js','text/javascript; charset=utf-8'],
+  '/app/sales-globe.js':['sales-globe.js','text/javascript; charset=utf-8'],
   '/app/sales-map.js':['sales-map.js','text/javascript; charset=utf-8'],
   '/app/sales.css':['sales.css','text/css; charset=utf-8'],
   '/app/work-ui.js':['work-ui.js','text/javascript; charset=utf-8'],

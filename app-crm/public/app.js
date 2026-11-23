@@ -106,7 +106,7 @@ async function salesView() {
   const {days,currency,country}=salesFilters;
   const [data,{renderSales}]=await Promise.all([
     api('/sales-dashboard?'+new URLSearchParams({days,currency,country})),
-    import('./sales-ui.js?v=20261123'),
+    import('./sales-ui.js?v=20261123-globo'),
   ]);
   if(view!=='sales'||epoch!==workspaceEpoch||request!==salesEpoch||salesMode!=='summary')return;
   const focused=document.activeElement?.dataset.filter;
