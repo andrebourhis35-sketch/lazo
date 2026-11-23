@@ -102,3 +102,84 @@
 .visual-preview dialog{background:linear-gradient(145deg,#213754,#15263f);color:#e9f0ff;border-color:#526d97;box-shadow:0 25px 85px #0009}.visual-preview dialog::backdrop{background:#040b18c9;backdrop-filter:blur(4px)}.visual-preview dialog input,.visual-preview dialog select,.visual-preview dialog textarea{background:#10213a;border-color:#466189;color:#e5eeff}.visual-preview dialog input::placeholder{color:#8fa7ca}.visual-preview .context-changed section{background:#172c48;color:#edf3ff;border:1px solid #5873a0;box-shadow:0 25px 75px #0007}.visual-preview .context-changed section p{color:#afc1df}
 .visual-preview .scene-tile-2{bottom:38px}
 @media(min-width:621px) and (max-width:1300px){.visual-preview .scene-tile-2{bottom:20px}}
+
+/* Working space for the CRM. Reading size remains controlled in Ajustes. */
+.visual-preview{--workspace-banner-height:32px}
+.visual-preview-banner{min-height:32px;padding:5px 16px}
+.visual-preview .app[data-view]{min-height:calc(100dvh - var(--workspace-banner-height))}
+.visual-preview .app[data-view="conversations"]{height:calc(100dvh - var(--workspace-banner-height));min-height:0}
+.visual-preview .app[data-view]>main{padding:10px 14px}
+.visual-preview .app[data-view] .topbar{
+  min-height:56px;padding:6px 12px;margin-bottom:9px;border-radius:12px;
+}
+.visual-preview .app[data-view] .topbar h1{font-size:23px;margin:1px 0 0}
+.visual-preview .app[data-view] .topbar .top-actions{align-self:center;flex-direction:row;margin:0}
+.visual-preview .app[data-view] .topbar .orbita-scene{
+  top:-74px;right:142px;opacity:.79;transform-origin:75% 50%;
+  transform:perspective(800px) rotateX(var(--tilt-x,0deg)) rotateY(var(--tilt-y,0deg)) scale(.41);
+}
+.visual-preview .app[data-view] .sidebar .demo-card{display:none}
+.visual-preview .app[data-view] .crm-intro{margin:4px 0 14px}
+.visual-preview .app[data-view] .crm-intro .eyebrow{display:none}
+.visual-preview .app[data-view] .crm-intro h2{font-size:20px;margin:0 0 4px}
+.visual-preview .app[data-view] .crm-intro p{margin:0}
+.visual-preview .app[data-view] .metric-grid{gap:10px;margin-bottom:14px}
+.visual-preview .app[data-view] .metric{min-height:76px;padding:12px 44px 12px 12px}
+.visual-preview .app[data-view] .metric strong{font-size:25px}
+.visual-preview .app[data-view] .metric:before{top:20px;right:15px;width:23px;height:23px}
+.visual-preview .app[data-view] :is(th,td){padding:9px 11px}
+.visual-preview .app[data-view] :is(.settings-card,.pipeline-column,.opportunity){padding:14px}
+.visual-preview .app[data-view] :is(.settings-grid,.pipeline){gap:12px}
+.visual-preview .app[data-view="conversations"] .list-title{padding:8px 10px}
+.visual-preview .app[data-view="conversations"] .list-panel>.search{margin:0 10px 6px;padding:7px 8px;min-height:34px}
+.visual-preview .app[data-view="conversations"] .filter-disclosure{padding:0 10px 7px}
+.visual-preview .app[data-view="conversations"] .filter-disclosure summary{
+  min-height:30px;padding:6px 8px;cursor:pointer;border:1px solid var(--line);border-radius:8px;
+  color:#c9daff;font-size:12px;
+}
+.visual-preview .app[data-view="conversations"] .filter-disclosure summary:focus-visible{outline:2px solid #6a8dff}
+.visual-preview .app[data-view="conversations"] .filter-disclosure .inbox-filters{padding:7px 0 0}
+.visual-preview .app[data-view="conversations"] .conversation{padding:9px 10px;gap:8px}
+.visual-preview .app[data-view="conversations"] .messages{padding:9px 13px;gap:7px}
+.visual-preview .app[data-view="conversations"] .message .bubble{padding:6px 10px}
+@media(min-width:621px){
+  .visual-preview .app[data-view] .sidebar{
+    width:168px;margin:9px 0 9px 9px;padding:12px 9px;
+  }
+  .visual-preview .app[data-view] .sidebar .brand{font-size:29px;margin:0 5px 14px}
+  .visual-preview .app[data-view] .sidebar .brand img{width:33px}
+  .visual-preview .app[data-view] .workspace-picker select{padding:8px;font-size:12px}
+  .visual-preview .app[data-view] .nav-label{display:none}
+  .visual-preview .app[data-view] .sidebar nav{gap:4px;margin-top:10px}
+  .visual-preview .app[data-view] .sidebar nav button{min-height:36px;padding:6px;gap:7px;font-size:12px}
+  .visual-preview .app[data-view] .sidebar nav button>span{width:24px;height:24px}
+  .visual-preview .app[data-view] .sidebar nav svg{width:15px;height:15px}
+  .visual-preview .app[data-view] .sidebar-bottom{padding-top:10px}
+  .visual-preview .app[data-view] .sidebar-bottom .user{padding-top:10px}
+  .visual-preview .app[data-view] .sidebar-bottom #logout{margin-top:9px;padding:7px}
+  .visual-preview .app[data-view="conversations"] #view .inbox{grid-template-columns:200px minmax(0,1fr)}
+  .visual-preview .app[data-view="conversations"] #view .inbox.hide-list{grid-template-columns:minmax(0,1fr)}
+  .visual-preview .app[data-view="conversations"] .chat-header{min-height:44px;padding:5px 10px}
+  .visual-preview .app[data-view="conversations"] #send-form{padding:6px;gap:4px 6px}
+  .visual-preview .app[data-view="conversations"] #message{min-height:44px;height:44px}
+}
+@media(min-width:621px) and (max-width:1000px){
+  .visual-preview .app[data-view] .sidebar{width:60px;padding:11px 6px}
+  .visual-preview .app[data-view] .sidebar .brand,.visual-preview .app[data-view] .sidebar nav button{font-size:0}
+  .visual-preview .app[data-view] .sidebar .brand img{width:31px}
+  .visual-preview .app[data-view] .sidebar .brand{margin:0 2px 7px}
+  .visual-preview .app[data-view="conversations"] #view .inbox{grid-template-columns:172px minmax(0,1fr)}
+  .visual-preview .app[data-view="conversations"] #view .inbox.hide-list{grid-template-columns:minmax(0,1fr)}
+  .visual-preview .app[data-view="conversations"] .chat-actions .stage{display:none}
+}
+@media(max-width:1300px){
+  .visual-preview .app[data-view] .topbar .orbita-scene{display:none}
+}
+@media(max-width:620px){
+  .visual-preview .app[data-view]>main{padding:7px 8px}
+  .visual-preview .app[data-view] .topbar{min-height:48px;padding:5px 8px;margin-bottom:7px}
+  .visual-preview .app[data-view] .topbar h1{font-size:19px}
+  .visual-preview .app[data-view="conversations"] .topbar{flex-basis:48px}
+  .visual-preview .app[data-view] .metric{padding-inline-end:32px}
+  .visual-preview .app[data-view] .metric:before{right:11px;width:17px;height:17px}
+}

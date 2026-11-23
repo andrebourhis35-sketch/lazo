@@ -2,7 +2,7 @@
 {
   const style = document.createElement('link');
   style.rel = 'stylesheet';
-  style.href = '/app/visual-preview.css?v=20261117';
+  style.href = '/app/visual-preview.css?v=20261123-espacio';
   document.head.append(style);
   document.body.classList.add('visual-preview', 'motion-on');
   document.body.classList.remove('quiet-preview');
@@ -11,12 +11,10 @@
   banner.setAttribute('aria-label', 'Apariencia de LAZO');
   const label = document.createElement('span');
   label.textContent = 'LAZO · Órbita';
-  const detail = document.createElement('small');
-  detail.textContent = 'Isotipo provisional';
   const flows = document.createElement('a');
   flows.href = '/flujos/';
   flows.textContent = 'Flujos · laboratorio';
-  banner.append(label, detail, flows);
+  banner.append(label, flows);
   document.body.prepend(banner);
 
   const paths = {
