@@ -6,7 +6,7 @@
   --sales-muted:#465d7d;
   --sales-highlight:#315dcb;
   --sales-active:#207a73;
-  --sales-plot:#eff4fb;
+  --sales-atmosphere:#cee1fa;
   --sales-track:#dce7f9;
 }
 .visual-preview .app[data-view="sales"]{
@@ -16,7 +16,7 @@
   --sales-muted:#b5c8e4;
   --sales-highlight:#95a9ff;
   --sales-active:#55d9bc;
-  --sales-plot:#101e33;
+  --sales-atmosphere:#244b77;
   --sales-track:#3c5484;
 }
 .visual-preview .app[data-view="sales"] .topbar{
@@ -40,7 +40,15 @@
 .visual-preview .app[data-view="sales"] .sales-filters select{color-scheme:dark}
 .app[data-view="sales"] .sales-metrics,.app[data-view="sales"] .sales-grid{display:grid;gap:12px;margin-bottom:12px}
 .app[data-view="sales"] .sales-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}
-.app[data-view="sales"] .sales-grid{grid-template-columns:minmax(0,2fr) minmax(0,3fr)}
+.app[data-view="sales"] .sales-grid{
+  grid-template-columns:minmax(0,1fr) minmax(360px,min(48%,600px));
+  grid-template-areas:"money geography" "orders geography";
+  grid-template-rows:auto 1fr;
+  align-items:start;
+}
+.app[data-view="sales"] .sales-money{grid-area:money}
+.app[data-view="sales"] .sales-geography{grid-area:geography}
+.app[data-view="sales"] .sales-orders{grid-area:orders}
 .app[data-view="sales"] .sales-card{
   min-width:0;padding:14px;border:1px solid var(--sales-line);border-radius:12px;
   background:var(--sales-panel);color:var(--sales-text);
@@ -65,12 +73,11 @@
 .app[data-view="sales"] .sales-money-bar progress::-webkit-progress-value{background:var(--sales-active);border-radius:5px}
 .app[data-view="sales"] .sales-empty,.app[data-view="sales"] .sales-review{margin:9px 0;color:var(--sales-muted)}
 .app[data-view="sales"] .sales-globe-stage{
-  display:grid;justify-items:center;gap:4px;padding:4px 8px 10px;
-  background:radial-gradient(ellipse at 50% 47%,#294c8555,transparent 70%),var(--sales-plot);
-  border:1px solid var(--sales-line);border-radius:10px;
+  display:grid;justify-items:center;gap:2px;
+  background:radial-gradient(circle at 50% 46%,var(--sales-atmosphere),transparent 65%);
 }
 .app[data-view="sales"] .sales-globe-stage canvas{
-  display:block;width:min(100%,17rem);height:auto;aspect-ratio:1;
+  display:block;width:min(100%,420px);height:auto;aspect-ratio:1;
   cursor:grab;touch-action:pan-y;border-radius:50%;
 }
 .app[data-view="sales"] .sales-globe-stage canvas.is-dragging{cursor:grabbing}
@@ -82,7 +89,7 @@
 }
 .app[data-view="sales"] .sales-globe-controls button{padding:5px 8px;font-size:.78rem}
 .app[data-view="sales"] .sales-globe-help{
-  margin:6px 0;color:var(--sales-muted);font-size:.78rem;
+  margin:8px 0 0;text-align:center;color:var(--sales-muted);font-size:.78rem;
 }
 .app[data-view="sales"] .sales-country-list{list-style:none;padding:0;display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}
 .app[data-view="sales"] .sales-country-list button{display:flex;align-items:center;gap:7px;padding:5px 8px}
@@ -93,7 +100,11 @@
 .app[data-view="sales"] #back-sales-summary{margin-bottom:8px}
 @media(max-width:830px){
   .app[data-view="sales"] .sales-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .app[data-view="sales"] .sales-grid{grid-template-columns:minmax(0,1fr)}
+  .app[data-view="sales"] .sales-grid{
+    grid-template-columns:minmax(0,1fr);
+    grid-template-areas:"money" "geography" "orders";
+    grid-template-rows:auto;
+  }
 }
 @media(max-width:620px){
   .visual-preview .app[data-view="sales"] .sidebar nav{

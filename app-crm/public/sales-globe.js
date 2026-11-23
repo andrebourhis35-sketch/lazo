@@ -69,15 +69,16 @@ function traceRing(ctx,ring,project,radius) {
 }
 
 function paint(ctx,side,view,markets,selected) {
-  const radius=side*.43,center=side/2;
+  const radius=side*.448,center=side/2;
   const project=projector(view.lon,view.lat);
   ctx.clearRect(0,0,side,side);
   ctx.save();
   ctx.translate(center,center);
 
-  const glow=ctx.createRadialGradient(0,4,radius*.87,0,4,radius*1.15);
-  glow.addColorStop(0,'#426fff80');
-  glow.addColorStop(1,'#426fff00');
+  const glow=ctx.createRadialGradient(0,0,radius*.92,0,0,radius*1.116);
+  glow.addColorStop(0,'#55aeff85');
+  glow.addColorStop(.53,'#4e80ff43');
+  glow.addColorStop(1,'#4e80ff00');
   ctx.fillStyle=glow;
   ctx.fillRect(-center,-center,side,side);
 
@@ -86,9 +87,9 @@ function paint(ctx,side,view,markets,selected) {
   ctx.arc(0,0,radius,0,2*Math.PI);
   ctx.clip();
   const ocean=ctx.createRadialGradient(-radius*.38,-radius*.46,0,0,0,radius*1.27);
-  ocean.addColorStop(0,'#366cd0');
-  ocean.addColorStop(.52,'#152e65');
-  ocean.addColorStop(1,'#07152f');
+  ocean.addColorStop(0,'#407dd7');
+  ocean.addColorStop(.50,'#1a4289');
+  ocean.addColorStop(1,'#08142f');
   ctx.fillStyle=ocean;
   ctx.fillRect(-radius,-radius,radius*2,radius*2);
 
@@ -97,24 +98,29 @@ function paint(ctx,side,view,markets,selected) {
     let visible=false;
     for(const ring of rings)if(traceRing(ctx,ring,project,radius))visible=true;
     if(!visible)continue;
-    ctx.fillStyle=code===selected?'#c0d0ff':markets.has(code)?'#57efc8':'#577bb4';
+    ctx.fillStyle=code===selected?'#c0d0ff':markets.has(code)?'#57efc8':'#729cd0';
     ctx.fill('evenodd');
     ctx.strokeStyle='#101f47';
     ctx.lineWidth=side*.00125;
     ctx.stroke();
   }
-  const shade=ctx.createLinearGradient(-radius,-radius,radius,radius);
-  shade.addColorStop(0,'#abc9ff2b');
-  shade.addColorStop(.52,'#070c1b00');
-  shade.addColorStop(1,'#050a24a8');
+  const shade=ctx.createLinearGradient(-radius*.67,-radius*.67,radius*.77,radius*.77);
+  shade.addColorStop(0,'#c1eaff3d');
+  shade.addColorStop(.44,'#070c1b00');
+  shade.addColorStop(.84,'#050a24a8');
+  shade.addColorStop(1,'#020714e8');
   ctx.fillStyle=shade;
   ctx.fillRect(-radius,-radius,radius*2,radius*2);
   ctx.restore();
 
   ctx.beginPath();
   ctx.arc(0,0,radius,0,2*Math.PI);
-  ctx.strokeStyle='#91baff85';
-  ctx.lineWidth=side*.0035;
+  const rim=ctx.createLinearGradient(-radius,-radius,radius,radius);
+  rim.addColorStop(0,'#a7edff');
+  rim.addColorStop(.48,'#639affb0');
+  rim.addColorStop(1,'#4777df22');
+  ctx.strokeStyle=rim;
+  ctx.lineWidth=side*.003;
   ctx.stroke();
 
   for(const code of markets){
@@ -142,26 +148,69 @@ export function mountSalesGlobe(element,rows,selected) {
   const view=place?{lon:place[0],lat:place[1]}:{...home};
   const paintNow=()=>paint(ctx,canvas.width,view,markets,selected);
   const latitude=value=>Math.max(-75,Math.min(75,value));
-  let frame=0,drag=null;
+  const motion=matchMedia('(prefers-reduced-motion: reduce)');
+  const idleSpeed=6;
+  let drag=null,flight=null,longitudeSpeed=0,latitudeSpeed=0;
+  let idleAfter=performance.now()+650,lastFrame=0,visible=false,dragChanged=false;
+  const visibility=new IntersectionObserver(([entry])=>{visible=entry.isIntersecting});
+  visibility.observe(canvas);
+
   function move(lon,lat) {
-    cancelAnimationFrame(frame);
-    const start={...view},began=performance.now(),endLat=latitude(lat);
-    const travel=Math.atan2(Math.sin((lon-start.lon)*radians),Math.cos((lon-start.lon)*radians))/radians;
-    if(matchMedia('(prefers-reduced-motion: reduce)').matches){
-      Object.assign(view,{lon,lat:endLat});
+    if(drag)return;
+    const now=performance.now();
+    idleAfter=now+2000;
+    longitudeSpeed=latitudeSpeed=0;
+    const travel=Math.atan2(Math.sin((lon-view.lon)*radians),Math.cos((lon-view.lon)*radians))/radians;
+    const endLat=latitude(lat);
+    if(motion.matches){
+      flight=null;
+      Object.assign(view,{lon:view.lon+travel,lat:endLat});
       paintNow();
       return;
     }
-    const animate=time=>{
-      if(!canvas.isConnected)return;
-      const progress=Math.min(1,(time-began)/260);
-      const eased=1-(1-progress)**3;
-      view.lon=start.lon+travel*eased;
-      view.lat=start.lat+(endLat-start.lat)*eased;
+    flight={start:{...view},travel,endLat,began:now,duration:Math.min(1050,510+Math.abs(travel)*3)};
+  }
+
+  function animate(time) {
+    if(!canvas.isConnected){
+      visibility.disconnect();
+      return;
+    }
+    requestAnimationFrame(animate);
+    // Draw at up to 60 fps and avoid a jump after returning to a background tab.
+    const elapsed=time-lastFrame;
+    if(elapsed<16)return;
+    const dt=Math.min(elapsed,40)/1000;
+    lastFrame=time;
+    if(!visible)return;
+    if(dragChanged){
+      dragChanged=false;
       paintNow();
-      if(progress<1)frame=requestAnimationFrame(animate);
-    };
-    frame=requestAnimationFrame(animate);
+      return;
+    }
+    if(drag)return;
+    if(flight){
+      const progress=motion.matches?1:Math.min(1,(time-flight.began)/flight.duration);
+      const eased=(1-Math.cos(Math.PI*progress))/2;
+      view.lon=flight.start.lon+flight.travel*eased;
+      view.lat=flight.start.lat+(flight.endLat-flight.start.lat)*eased;
+      if(progress===1)flight=null;
+    }else if(motion.matches){
+      longitudeSpeed=latitudeSpeed=0;
+      return;
+    }else if(Math.abs(longitudeSpeed)+Math.abs(latitudeSpeed)>.25){
+      view.lon+=longitudeSpeed*dt;
+      view.lat=latitude(view.lat+latitudeSpeed*dt);
+      const decay=Math.exp(-4.8*dt);
+      longitudeSpeed*=decay;
+      latitudeSpeed*=decay;
+    }else if(time>=idleAfter&&!selected){
+      const ramp=Math.min(1,(time-idleAfter)/900);
+      view.lon+=idleSpeed*dt*ramp;
+    }else{
+      return;
+    }
+    paintNow();
   }
 
   element.querySelector('[data-globe-left]').onclick=()=>move(view.lon-35,view.lat);
@@ -175,21 +224,34 @@ export function mountSalesGlobe(element,rows,selected) {
   };
   canvas.onpointerdown=event=>{
     if(drag||event.button!==0)return;
-    cancelAnimationFrame(frame);
+    flight=null;
+    longitudeSpeed=latitudeSpeed=0;
     canvas.setPointerCapture(event.pointerId);
-    drag={id:event.pointerId,x:event.clientX,y:event.clientY,lon:view.lon,lat:view.lat};
+    const scale=125/canvas.getBoundingClientRect().width;
+    drag={id:event.pointerId,x:event.clientX,y:event.clientY,time:event.timeStamp,scale};
     canvas.classList.add('is-dragging');
   };
   canvas.onpointermove=event=>{
     if(event.pointerId!==drag?.id)return;
-    view.lon=drag.lon-(event.clientX-drag.x)*.5;
-    if(event.pointerType!=='touch')view.lat=latitude(drag.lat+(event.clientY-drag.y)*.5);
-    cancelAnimationFrame(frame);
-    frame=requestAnimationFrame(paintNow);
+    const lon=-(event.clientX-drag.x)*drag.scale;
+    const lat=event.pointerType==='touch'?0:(event.clientY-drag.y)*drag.scale;
+    const seconds=Math.max(8,event.timeStamp-drag.time)/1000;
+    const limit=value=>Math.max(-160,Math.min(160,value));
+    longitudeSpeed=longitudeSpeed*.42+limit(lon/seconds)*.58;
+    latitudeSpeed=latitudeSpeed*.42+limit(lat/seconds)*.58;
+    view.lon+=lon;
+    view.lat=latitude(view.lat+lat);
+    Object.assign(drag,{x:event.clientX,y:event.clientY,time:event.timeStamp});
+    dragChanged=true;
   };
-  canvas.onlostpointercapture=()=>{
+  canvas.onlostpointercapture=event=>{
+    if(event.pointerId!==drag?.id)return;
+    if(event.timeStamp-drag.time>95||motion.matches)longitudeSpeed=latitudeSpeed=0;
+    idleAfter=performance.now()+1800;
     drag=null;
     canvas.classList.remove('is-dragging');
   };
+  canvas.onpointercancel=()=>{longitudeSpeed=latitudeSpeed=0};
   paintNow();
+  requestAnimationFrame(animate);
 }
