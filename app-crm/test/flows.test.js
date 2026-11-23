@@ -52,6 +52,13 @@ test('catalog offers are scoped, preserve the order price and deliver only after
     const read=await f.api(path,'POST',{action:'read-proof',orderId:order.id});
     assert.equal(read.body.receipt.amount,'21.00');
     assert.equal(f.aiInputs[0].store,false);
+    const pdf=Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF\n');
+    const pdfId=f.wa.media.saveUpload(f.company,{bytes:pdf,mime:'application/pdf',filename:'prueba.pdf'});
+    f.store.run("UPDATE messages SET type='document', attachment_id=? WHERE id=?",pdfId,proof);
+    f.aiOutcomes.push({amount:'20.00',currency:'PEN',reference:'TEST-123'});
+    assert.equal((await f.api(path,'POST',{action:'read-proof',orderId:order.id})).body.receipt.amount,'20.00');
+    assert.equal(f.aiInputs[1].input[0].content[0].type,'input_file');
+    assert.equal(f.aiInputs[1].input[0].content[0].file_data,'data:application/pdf;base64,'+pdf.toString('base64'));
     assert.equal((await f.api(path)).body.orders[0].confirmed_at,null);
     assert.equal((await f.api(path,'POST',{orderId:order.id,amount:'20.00',reference:'TEST-123'})).body.manual,true);
     assert.equal((await f.api('/sales-dashboard?queue=deliver')).body.recent[0].id,order.id);

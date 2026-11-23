@@ -16,6 +16,10 @@ export function openStore(filename) {
     CREATE INDEX IF NOT EXISTS contacts_company ON contacts(company_id,updated DESC);
     CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY,company_id TEXT NOT NULL REFERENCES companies(id),contact_id TEXT NOT NULL REFERENCES contacts(id),direction TEXT NOT NULL,body TEXT NOT NULL,type TEXT NOT NULL,status TEXT NOT NULL,wa_id TEXT UNIQUE,client_id TEXT,error_code TEXT,created INTEGER NOT NULL,updated INTEGER NOT NULL,UNIQUE(company_id,client_id));
     CREATE INDEX IF NOT EXISTS messages_contact ON messages(company_id,contact_id,created);
+    CREATE TABLE IF NOT EXISTS voice_transcripts(
+      message_id TEXT PRIMARY KEY REFERENCES messages(id) ON DELETE CASCADE,
+      company_id TEXT NOT NULL REFERENCES companies(id), transcript TEXT NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS connections(company_id TEXT PRIMARY KEY REFERENCES companies(id),phone_id TEXT UNIQUE NOT NULL,waba_id TEXT NOT NULL,config TEXT NOT NULL,checked INTEGER NOT NULL DEFAULT 0,webhook_at INTEGER NOT NULL DEFAULT 0,verified INTEGER NOT NULL DEFAULT 0);
     CREATE TABLE IF NOT EXISTS status_events(wa_id TEXT PRIMARY KEY,company_id TEXT NOT NULL,status TEXT NOT NULL,error_code TEXT,updated INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS limits(key TEXT PRIMARY KEY,count INTEGER NOT NULL,expires INTEGER NOT NULL);

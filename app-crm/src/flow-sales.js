@@ -109,7 +109,7 @@ export function flowSales(store,wa) {
     if(kind==='confirm') {
       requireThat(order.charged_at,'Conecta Cobrar antes de Confirmar pago.');
       if(order.confirmed_at)return {detail:'Abono verificado por el equipo'};
-      const proof=store.get("SELECT id FROM messages WHERE company_id=? AND contact_id=? AND direction='in' AND created>=? AND attachment_id IS NOT NULL ORDER BY created DESC,id DESC LIMIT 1",run.company_id,run.contact_id,Math.floor(order.charged_at/1000)*1000);
+      const proof=store.get("SELECT id FROM messages WHERE company_id=? AND contact_id=? AND direction='in' AND type IN ('image','document') AND created>=? AND attachment_id IS NOT NULL ORDER BY created DESC,id DESC LIMIT 1",run.company_id,run.contact_id,Math.floor(order.charged_at/1000)*1000);
       if(proof&&!order.proof_id)store.run('UPDATE flow_orders SET proof_id=? WHERE id=?',proof.id,order.id);
       const due=!proof&&!order.proof_id&&node.data.value.trim()?now()+Number(node.data.value)*60000:null;
       store.run("UPDATE flow_runs SET state='payment_wait',due=?,reason=?,updated=? WHERE id=? AND state='running'",due,proof||order.proof_id?'Comprobante recibido. Falta verificar el abono.':'Pendiente de verificar el abono.',now(),run.id);

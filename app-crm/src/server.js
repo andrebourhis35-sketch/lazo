@@ -34,7 +34,7 @@ const assets={
   '/app/marca.svg':['marca.svg','image/svg+xml']
 };
 const headers={ 'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','X-Frame-Options':'DENY',
-  'Content-Security-Policy':"default-src 'self'; script-src 'self' https://connect.facebook.net; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' blob:; connect-src 'self' https://graph.facebook.com https://www.facebook.com https://connect.facebook.net; frame-src https://www.facebook.com https://web.facebook.com https://staticxx.facebook.com; frame-ancestors 'none'; base-uri 'none'; form-action 'self'" };
+  'Content-Security-Policy':"default-src 'self'; script-src 'self' https://connect.facebook.net; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' blob:; media-src blob:; connect-src 'self' https://graph.facebook.com https://www.facebook.com https://connect.facebook.net; frame-src https://www.facebook.com https://web.facebook.com https://staticxx.facebook.com; frame-ancestors 'none'; base-uri 'none'; form-action 'self'" };
 export function createServer(config,{store=openStore(config.database),fetchImpl=fetch,mailTransportFactory}={}) {
   const catalog=salesCatalog(store);
   const mail=mailService(store,config,mailTransportFactory);
@@ -252,7 +252,20 @@ export function createServer(config,{store=openStore(config.database),fetchImpl=
         const file=await wa.media.forMessage(s.company_id,fileMatch[1]);
         assertSession(s);
         const name=encodeURIComponent(file.filename).replace(/['()*]/g,c=>'%'+c.charCodeAt(0).toString(16).toUpperCase());
-        return response(res,200,file.bytes,file.mime,{'Content-Disposition':"attachment; filename=\"archivo"+(file.mime==='application/pdf'?'.pdf':file.mime==='image/png'?'.png':'.jpg')+"\"; filename*=UTF-8''"+name,'Content-Length':String(file.bytes.length),'Content-Security-Policy':"sandbox; default-src 'none'"});
+        const extension=file.mime==='audio/ogg'?'.ogg':file.mime==='application/pdf'?'.pdf':file.mime==='image/png'?'.png':'.jpg';
+        return response(res,200,file.bytes,file.mime,{'Content-Disposition':"attachment; filename=\"archivo"+extension+"\"; filename*=UTF-8''"+name,'Content-Length':String(file.bytes.length),'Content-Security-Policy':"sandbox; default-src 'none'"});
+      }
+      const voiceMatch=route.match(/^\/messages\/([a-f\d-]+)\/transcription$/);
+      if(method==='POST'&&voiceMatch){
+        const transcript=await authorizedJson(req,s,async()=>{
+          const id=voiceMatch[1];
+          const voice=store.get("SELECT attachment_id FROM messages WHERE id=? AND company_id=? AND direction='in' AND type='audio'",id,s.company_id);
+          requireThat(voice?.attachment_id,'Nota de voz no disponible.',404);
+          const text=await ai.transcribe(s.company_id,id,()=>wa.media.forMessage(s.company_id,id),()=>assertSession(s));
+          assertSession(s);
+          return text;
+        });
+        return response(res,200,{transcript});
       }
       const contactMatch=route.match(/^\/contacts\/([a-f\d-]+)(?:\/(messages|read|attachments|automation|orders))?$/);
       if(contactMatch) {
@@ -270,7 +283,7 @@ export function createServer(config,{store=openStore(config.database),fetchImpl=
               const proof=store.get(`SELECT o.proof_id,m.type FROM flow_orders o JOIN messages m ON m.id=o.proof_id
                 AND m.company_id=o.company_id AND m.contact_id=o.contact_id AND m.direction='in'
                 WHERE o.id=? AND o.company_id=? AND o.contact_id=?`,orderId,s.company_id,id);
-              requireThat(proof?.type==='image','El pedido debe tener un comprobante en imagen.',404);
+              requireThat(['image','document'].includes(proof?.type),'El pedido debe tener un comprobante en imagen o PDF.',404);
               const file=await wa.media.forMessage(s.company_id,proof.proof_id);
               assertSession(s);
               const receipt=await ai.readReceipt(s.company_id,file);
@@ -292,7 +305,8 @@ export function createServer(config,{store=openStore(config.database),fetchImpl=
         if(method==='POST'&&action==='read') {store.run('UPDATE contacts SET unread=0 WHERE company_id=? AND id=?',s.company_id,id);return response(res,200,{ok:true});}
         if(method==='GET'&&action==='messages') {
           const messages=store.all('SELECT * FROM messages WHERE company_id=? AND contact_id=? ORDER BY created DESC,id DESC LIMIT 100',s.company_id,id).reverse();
-          return response(res,200,{messages:messages.map(m=>({...m,attachment:wa.media.describe(s.company_id,m.attachment_id)})),limit:100});
+          return response(res,200,{messages:messages.map(m=>({...m,attachment:wa.media.describe(s.company_id,m.attachment_id),
+            ...(m.type==='audio'&&m.attachment_id?{transcript:ai.transcript(s.company_id,m.id)}:{})})),limit:100});
         }
         if(method==='POST'&&action==='attachments') {
           store.limit('send:'+s.company_id,30,60000);

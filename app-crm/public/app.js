@@ -284,7 +284,7 @@ async function renderChat(){
         ${order.flow_reason?`<p>${esc(order.flow_reason)}</p>`:''}
         ${order.next_action?`<p>Próxima acción: ${new Date(order.next_action).toLocaleString('es-PE')}</p>`:''}
         ${order.proof_id?`<button type="button" class="secondary" data-proof="${esc(order.proof_id)}">Ver comprobante</button>`:''}
-        ${order.proof_type==='image'&&!order.confirmed_at&&session.user.role!=='agent'?`<button type="button" class="secondary" data-scan="${esc(order.id)}">Leer imagen con IA</button><p role="status" data-receipt></p>`:''}
+        ${['image','document'].includes(order.proof_type)&&!order.confirmed_at&&session.user.role!=='agent'?`<button type="button" class="secondary" data-scan="${esc(order.id)}" title="Procesar el archivo con OpenAI">Leer con IA</button><p role="status" data-receipt></p>`:''}
         ${order.delivery_id&&session.user.role!=='agent'?`<button type="button" class="secondary" data-resend-order="${esc(order.id)}">Reenviar acceso</button>`:''}
         ${order.manual&&order.charged_at&&(order.confirmed_at||order.mode==='postpaid')&&!order.delivery_id&&session.user.role!=='agent'?`<button type="button" class="send" data-deliver-order="${esc(order.id)}">Enviar acceso</button>`:''}
         ${order.confirmed_at?`<p>Referencia: ${esc(order.reference)}</p>`:order.charged_at&&session.user.role!=='agent'?`<form data-order="${esc(order.id)}"><p>Confirma solo después de ver el abono en tu cuenta.</p><label>Importe abonado<input name="amount" required inputmode="decimal" maxlength="12"></label><label>Referencia de operación<input name="reference" required maxlength="64"></label><button class="secondary" type="submit">Registrar abono verificado</button></form>`:''}
@@ -315,7 +315,7 @@ async function renderChat(){
     list.querySelectorAll('[data-scan]').forEach(button=>button.onclick=async()=>{
       button.disabled=true;
       const summary=button.closest('details').querySelector('[data-receipt]');
-      summary.textContent='Leyendo el importe y la referencia de la imagen…';
+      summary.textContent='Leyendo el importe y la referencia del comprobante…';
       try{
         const {receipt}=await api('/contacts/'+c.id+'/orders',{method:'POST',body:{action:'read-proof',orderId:button.dataset.scan}});
         if(!current())return;
@@ -465,24 +465,55 @@ async function renderChat(){
   });
 }
 function templateFields(){const t=templates[Number($('template').value)];$('parameters').innerHTML=t?`<p class="muted">${esc(t.body)}</p>${Array.from({length:t.parameters},(_,i)=>`<label>Valor ${i+1}<input maxlength="500" required></label>`).join('')}`:'<p class="muted">No hay plantillas aprobadas compatibles.</p>';}
+function messageAttachment(m){
+  const file=m.attachment;
+  if(!file)return '';
+  const voice=file.mime==='audio/ogg',image=file.mime.startsWith('image/'),url=mediaUrls.get(m.id);
+  const preview=voice?(url?`<audio controls preload="metadata" src="${esc(url)}" aria-label="Nota de voz"></audio>`:
+    `<button class="secondary" type="button" data-preview="${m.id}">Escuchar</button>`):image?
+    `<div class="image-preview">${url?`<img src="${esc(url)}" alt="Imagen de la conversación">`:`<button class="secondary" type="button" data-preview="${m.id}">Ver imagen</button>`}</div>`:'';
+  return `<div class="message-file" data-file-id="${m.id}">
+    <strong>${voice?'Nota de voz':esc(file.filename)}</strong>
+    <small>${file.state==='ready'?(file.size/1024).toFixed(0)+' KB':'Archivo pendiente de descarga'}</small>
+    ${preview}
+    <button class="secondary" type="button" data-download="${m.id}">${voice?'Descargar audio':image?'Descargar imagen':'Descargar PDF'}</button>
+    ${voice?`<div class="voice-transcript">${m.transcript?`<strong>Transcripción</strong><p>${esc(m.transcript)}</p>`:
+    `<button class="secondary" type="button" data-transcribe="${m.id}" title="Procesar el audio con OpenAI">Transcribir</button>`}</div>`:''}
+  </div>`;
+}
 function renderMessages(scroll=false){
   if(!$('messages'))return;
   const box=$('messages'),atBottom=box.scrollHeight-box.scrollTop-box.clientHeight<70;
-  box.innerHTML=messages.map(m=>{
-    const attachment=m.attachment;
-    return `<article class="message ${m.direction==='out'?'out':''}"><div class="bubble">${attachment?`<div class="message-file" data-file-id="${m.id}"><strong>${esc(attachment.filename)}</strong><small>${attachment.state==='ready'?(attachment.size/1024).toFixed(0)+' KB':'Archivo pendiente de descarga'}</small>${attachment.mime.startsWith('image/')?`<div class="image-preview">${mediaUrls.has(m.id)?`<img src="${mediaUrls.get(m.id)}" alt="Imagen de la conversación">`:`<button class="secondary" type="button" data-preview="${m.id}">Ver imagen</button>`}</div>`:''}<button class="secondary" type="button" data-download="${m.id}">${attachment.mime==='application/pdf'?'Descargar PDF':'Descargar imagen'}</button></div>`:''}<span>${esc(m.body)}</span></div><time>${fmt(m.created)} · ${esc(statusNames[m.status]||m.status)}</time></article>`;
-  }).join('')||'<div class="empty">Aún no hay mensajes. Puedes iniciar con una plantilla aprobada.</div>';
+  box.innerHTML=messages.map(m=>`<article class="message ${m.direction==='out'?'out':''}"><div class="bubble">${messageAttachment(m)}${m.attachment?.mime==='audio/ogg'?'':`<span>${esc(m.body)}</span>`}</div><time>${fmt(m.created)} · ${esc(statusNames[m.status]||m.status)}</time></article>`).join('')||'<div class="empty">Aún no hay mensajes. Puedes iniciar con una plantilla aprobada.</div>';
   box.onclick=async e=>{
-    const button=e.target.closest('[data-preview],[data-download]');if(!button)return;
-    const id=button.dataset.preview||button.dataset.download,m=messages.find(v=>v.id===id);if(!m?.attachment)return;
+    const button=e.target.closest('[data-preview],[data-download],[data-transcribe]');if(!button)return;
+    const id=button.dataset.preview||button.dataset.download||button.dataset.transcribe,m=messages.find(v=>v.id===id);if(!m?.attachment)return;
     const epoch=workspaceEpoch,company=session.company.id,chat=active;button.disabled=true;
     try{
+      if(button.dataset.transcribe){
+        button.textContent='Transcribiendo…';
+        const {transcript}=await api('/messages/'+id+'/transcription',{method:'POST',body:{}});
+        if(epoch!==workspaceEpoch||session?.company.id!==company||view!=='conversations'||active!==chat)return;
+        const current=messages.find(message=>message.id===id);
+        if(current)current.transcript=transcript;
+        const output=$('messages')?.querySelector(`[data-file-id="${id}"] .voice-transcript`);
+        if(output)output.innerHTML=`<strong>Transcripción</strong><p>${esc(transcript)}</p>`;
+        return;
+      }
       let url=mediaUrls.get(id);
       if(!url){const blob=await api('/messages/'+id+'/attachment',{binary:true});if(epoch!==workspaceEpoch||session?.company.id!==company)return;url=URL.createObjectURL(blob);mediaUrls.set(id,url);if(mediaUrls.size>30){const first=mediaUrls.keys().next().value;URL.revokeObjectURL(mediaUrls.get(first));mediaUrls.delete(first);}}
       if(view!=='conversations'||active!==chat)return;
-      if(button.dataset.preview){const img=document.createElement('img');img.src=url;img.alt='Imagen de la conversación';button.parentElement.replaceChildren(img);}
+      if(button.dataset.preview&&m.attachment.mime==='audio/ogg'){
+        const player=document.createElement('audio');
+        player.controls=true;player.src=url;player.setAttribute('aria-label','Nota de voz');
+        button.replaceWith(player);
+        await player.play().catch(()=>{});
+      }
+      else if(button.dataset.preview){const img=document.createElement('img');img.src=url;img.alt='Imagen de la conversación';button.parentElement.replaceChildren(img);}
       else {const link=document.createElement('a');link.href=url;link.download=m.attachment.filename;document.body.append(link);link.click();link.remove();}
-    }catch(error){notice(error.message,true);}finally{if(button.isConnected)button.disabled=false;}
+    }catch(error){notice(error.message,true);}finally{
+      if(button.isConnected){button.disabled=false;if(button.dataset.transcribe)button.textContent='Transcribir';}
+    }
   };
   if(scroll||atBottom)box.scrollTop=box.scrollHeight;
 }

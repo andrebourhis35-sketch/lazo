@@ -13,6 +13,8 @@ import {mediaFilename} from '../src/media.js';
 
 const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl1sAAAAASUVORK5CYII=','base64');
 const pdf=Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF\n');
+const voice=Buffer.alloc(47);
+voice.write('OggS');voice[26]=1;voice[27]=19;voice.write('OpusHead',28);
 
 test('additive migration preserves the existing database and seeds company stages only once',()=>{
   const dir=mkdtempSync(join(tmpdir(),'lazo-migration-')),path=join(dir,'legacy.sqlite');
@@ -33,11 +35,18 @@ test('additive migration preserves the existing database and seeds company stage
 });
 
 test('daily workflow: private files, organization, shared replies, custom sales stages and real statistics',async t=>{
-  const dir=mkdtempSync(join(tmpdir(),'lazo-daily-')),assets=new Map([['30001',{bytes:png,mime:'image/png'}],['30002',{bytes:pdf,mime:'application/pdf'}],['30003',{bytes:png,mime:'image/png'}]]);
-  let uploads=0,sends=0,forbiddenRequests=0,mode='normal',delayUpload=false;
+  const dir=mkdtempSync(join(tmpdir(),'lazo-daily-')),assets=new Map([['30001',{bytes:png,mime:'image/png'}],['30002',{bytes:pdf,mime:'application/pdf'}],['30003',{bytes:png,mime:'image/png'}],['30004',{bytes:voice,mime:'audio/ogg; codecs=opus'}]]);
+  let uploads=0,sends=0,forbiddenRequests=0,mode='normal',delayUpload=false,transcriptions=0;
   const metaCalls=[];
   const fakeFetch=async(url,options={})=>{
     const u=new URL(url);metaCalls.push({host:u.hostname,path:u.pathname,method:options.method||'GET'});
+    if(u.href==='https://api.openai.com/v1/audio/transcriptions'){
+      transcriptions++;
+      assert.equal(options.body.get('file').name,'nota-de-voz.ogg');
+      assert.deepEqual(Buffer.from(await options.body.get('file').arrayBuffer()),voice);
+      await new Promise(resolve=>setTimeout(resolve,30));
+      return Response.json({text:'Hola, quiero consultar por mi pedido.'});
+    }
     if(u.hostname==='attacker.example'){forbiddenRequests++;throw new Error('Must never leak authorization');}
     if(u.pathname.endsWith('/phone_numbers'))return Response.json({data:[{id:'10001'}]});
     if(u.pathname.endsWith('/message_templates'))return Response.json({data:[]});
@@ -186,6 +195,33 @@ test('daily workflow: private files, organization, shared replies, custom sales 
       await change(company);
       assert.equal((await api(owner,'/quick-replies/'+replyId,'DELETE',{})).status,200);
       assert.equal(store.get('SELECT deleted FROM quick_replies WHERE id=?',replyId).deleted,1);
+    });
+    await t.test('voice webhook downloads Ogg Opus and saves one encrypted on-demand transcription',async()=>{
+      const payload=event([{id:'wamid.in.voice',from:'51900000001',timestamp:String(Math.floor(now()/1000)),type:'audio',
+        audio:{id:'30004',mime_type:'audio/ogg; codecs=opus',voice:true}}]);
+      assert.equal(await webhook(payload),200);
+      assert.equal(await webhook(payload),200);
+      await wa.media.warm();
+      const getVoice=async()=>(await api(owner,'/contacts/'+contact.id+'/messages')).data.messages.find(m=>m.wa_id==='wamid.in.voice');
+      const message=await getVoice(),audioPath='/messages/'+message.id,transcriptPath=audioPath+'/transcription';
+      assert.equal(message.body,'Nota de voz');
+      assert.equal(message.attachment.mime,'audio/ogg');
+      assert.equal(message.attachment.state,'ready');
+      assert.equal(message.transcript,null);
+      assert.equal((await api(owner,audioPath+'/attachment','GET',undefined,true)).data.equals(voice),true);
+      assert.equal((await api(owner,transcriptPath,'POST',{})).status,409);
+      assert.equal(transcriptions,0);
+      assert.equal((await api(owner,'/flow-ai','POST',{enabled:true,apiKey:'sk-voice-synthetic-key'})).status,200);
+      const results=await Promise.all([api(owner,transcriptPath,'POST',{}),api(agent,transcriptPath,'POST',{})]);
+      const text='Hola, quiero consultar por mi pedido.';
+      assert.ok(results.every(result=>result.status===200&&result.data.transcript===text));
+      assert.equal((await getVoice()).transcript,text);
+      assert.equal((await api(owner,transcriptPath,'POST',{})).data.transcript,text);
+      assert.equal(transcriptions,1);
+      assert.equal(store.get('SELECT transcript FROM voice_transcripts').transcript.includes(text),false);
+      await change(otherCompany);
+      assert.equal((await api(owner,transcriptPath,'POST',{})).status,404);
+      await change(company);
     });
     await t.test('statistics use persisted messages, group customer turns and record actual sales transitions',async()=>{
       await change(otherCompany);

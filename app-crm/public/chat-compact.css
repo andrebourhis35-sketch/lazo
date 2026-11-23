@@ -197,3 +197,6 @@
   .app[data-view="overview"] .overview-toolbar,.app[data-view="overview"] .overview-chat{padding:10px 12px}
   .app[data-view="overview"] #overview-source{font-size:16px}
 }
+.inbox .message-file audio{display:block;width:min(16rem,100%);max-width:100%}
+.inbox .voice-transcript p{margin:.35rem 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.inbox .voice-transcript>strong{display:block;font-size:.85em}
