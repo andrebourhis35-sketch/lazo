@@ -1,5 +1,9 @@
 # Coordinación Codex y Claude
 
+### Agente IA y espera real (22 de noviembre de 2026)
+
+- Codex, rama codex/agente-ia-flujos. Se añade el agente con información del negocio, una aclaración y salida a un asesor. La clave de API se guarda cifrada por espacio y el propietario activa el uso. Espera fija ejecuta el siguiente bloque después de la pausa aunque haya respuesta. Esperar sin respuesta sigue siendo un recordatorio que se cancela al intervenir el cliente o el equipo.
+
 ### Flujos avanzados y bandeja global (22 de noviembre de 2026)
 
 - Codex, rama codex/flujos-avanzados. Editor, motor, almacenamiento, API y CRM. Menús encadenados y retorno, seguimiento por inactividad, traspaso, historial por contacto y vista global de números autorizados. Cada chat permanece en su espacio de origen y todas las automatizaciones reales conservan la restricción de cuenta de prueba.

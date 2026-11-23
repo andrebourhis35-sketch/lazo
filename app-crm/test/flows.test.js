@@ -15,9 +15,16 @@ function welcome(owner){
 }
 async function fixture(database=':memory:'){
   let calls=0,mode='ok',hold=null;
-  const sent=[];
+  const sent=[],aiInputs=[],aiOutcomes=[];
   const config={database,origin:'http://127.0.0.1:3031',masterKey:randomBytes(32).toString('base64'),secureCookies:false};
-  const server=createServer(config,{fetchImpl:async(_,request)=>{sent.push(JSON.parse(request.body));calls++;if(hold)await hold;if(mode==='unknown')throw new Error('private upstream error');return Response.json({messages:[{id:'wamid.out.'+calls}]});}});
+  const server=createServer(config,{fetchImpl:async(url,request)=>{
+    if(url==='https://api.openai.com/v1/responses') {
+      aiInputs.push(JSON.parse(request.body));
+      const next=aiOutcomes.shift();
+      if(!next)return new Response(null,{status:503});
+      return Response.json({output:[{type:'message',content:[{type:'output_text',text:JSON.stringify(next)}]}]});
+    }
+    sent.push(JSON.parse(request.body));calls++;if(hold)await hold;if(mode==='unknown')throw new Error('private upstream error');return Response.json({messages:[{id:'wamid.out.'+calls}]});}});
   const store=server.lazo.store,wa=server.lazo.wa,flows=server.lazo.flows;
   const company=randomUUID(),user=randomUUID(),other=randomUUID();
   store.run('INSERT INTO companies VALUES(?,?,?)',company,'Empresa A',Date.now());store.run('INSERT INTO companies VALUES(?,?,?)',other,'Empresa B',Date.now());
@@ -28,7 +35,7 @@ async function fixture(database=':memory:'){
   function receive(body='Hola',age=0,fields={}){const event={object:'whatsapp_business_account',entry:[{id:'20001',changes:[{field:'messages',value:{metadata:{phone_number_id:'10001'},contacts:[{wa_id:'51900000001',profile:{name:'Lucía'}}],messages:[{id:'wamid.in.'+(++seq),from:'51900000001',timestamp:String(Math.floor((Date.now()-age)/1000)),type:'text',text:{body},...fields}]}}]}]};const raw=Buffer.from(JSON.stringify(event));const signature='sha256='+createHmac('sha256','synthetic-secret').update(raw).digest('hex');wa.receive(raw,signature);return {raw,signature};}
   server.listen(0,'127.0.0.1');await once(server,'listening');
   async function api(path,method='GET',data,extra={}){const res=await fetch(`http://127.0.0.1:${server.address().port}/api/crm${path}`,{method,headers:{Origin:config.origin,'Content-Type':'application/json','X-Lazo-Client':'1',Cookie:'lazo_dev_session='+session.secret,'X-CSRF-Token':session.csrf,'X-Lazo-Company':company,'X-Lazo-User':user,...extra},body:data?JSON.stringify(data):undefined});return {status:res.status,body:await res.json()};}
-  return {config,store,wa,flows,company,user,other,graph,receive,api,sent,get calls(){return calls;},setMode:v=>mode=v,hold:p=>hold=p,async close(){await flows.stop();await wa.media.stop();await server.lazo.mail.stop();await new Promise(r=>server.close(r));store.close();}};
+  return {config,store,wa,flows,company,user,other,graph,receive,api,sent,aiInputs,aiOutcomes,get calls(){return calls;},setMode:v=>mode=v,hold:p=>hold=p,async close(){await flows.stop();await wa.media.stop();await server.lazo.mail.stop();await new Promise(r=>server.close(r));store.close();}};
 }
 
 test('flows API: tenant, roles, CSRF, draft CAS, published snapshot and pause',async()=>{
@@ -68,8 +75,8 @@ test('ambiguous send and interrupted worker are not retried automatically',async
   const f=await fixture();try{const flow=f.flows.save(f.company,null,{graph:f.graph},f.user);f.flows.publish(f.company,flow.id,{revision:1},f.user);f.setMode('unknown');f.receive();await f.flows.flush();await f.flows.flush();assert.equal(f.calls,1);assert.equal(f.store.get("SELECT status FROM messages WHERE direction='out'").status,'unknown');assert.equal(f.flows.runs(f.company,flow.id)[0].state,'failed');f.store.run("UPDATE flow_runs SET state='running'");f.flows.recover();await f.flows.flush();assert.equal(f.calls,1);assert.equal(f.flows.runs(f.company,flow.id)[0].state,'interrupted');
   }finally{await f.close();}
 });
-test('real activation refuses unsupported waits, foreign assignments and missing test restrictions',async()=>{
-  const f=await fixture();try{const graph=structuredClone(f.graph);graph.nodes[2].data={kind:'wait',label:'Espera',value:'30'};let flow=f.flows.save(f.company,null,{graph},f.user);assert.throws(()=>f.flows.publish(f.company,flow.id,{revision:1},f.user),/simulación/);
+test('real activation refuses waits beyond the live limit, foreign assignments and missing test restrictions',async()=>{
+  const f=await fixture();try{const graph=structuredClone(f.graph);graph.nodes[2].data={kind:'wait',label:'Espera',value:'1381'};let flow=f.flows.save(f.company,null,{graph},f.user);assert.throws(()=>f.flows.publish(f.company,flow.id,{revision:1},f.user),/1380/);
     graph.nodes[2]=f.graph.nodes[2];graph.nodes[3].data.value=randomUUID();flow=f.flows.save(f.company,null,{graph},f.user);assert.throws(()=>f.flows.publish(f.company,flow.id,{revision:1},f.user),/asesor/);
     flow=f.flows.save(f.company,null,{graph:f.graph},f.user);f.wa.saveRaw(f.company,{phoneId:'10001',wabaId:'20001',appSecret:'secret',accessToken:'synthetic',graphVersion:'v25.0'},1);assert.throws(()=>f.flows.publish(f.company,flow.id,{revision:1},f.user),/prueba/);
   }finally{await f.close();}
@@ -228,4 +235,67 @@ test('global inbox lists only numbers and conversations accessible to the sessio
     assert.deepEqual(filtered.body.conversations.map(c=>c.id),[contact.id]);
     assert.equal((await f.api('/contacts/'+contact.id+'/automation')).status,404);
   } finally{await f.close();}
+});
+
+
+test('fixed wait keeps its deadline after a reply and sends just once', async () => {
+  const f=await fixture();
+  try {
+    const graph=linearGraph(['trigger','message','wait','message','end']);
+    graph.nodes[2].data.value='20';
+    graph.nodes[3].data.value='Te comparto la segunda parte.';
+    const flow=f.flows.save(f.company,null,{graph},f.user);
+    f.flows.publish(f.company,flow.id,{revision:1},f.user);
+    f.receive();
+    await f.flows.flush();
+    let run=f.store.get('SELECT state,due,updated FROM flow_runs');
+    assert.equal(run.state,'delayed');
+    assert.ok(Math.abs(run.due-run.updated-20*60000)<1000);
+    f.receive('Gracias por el mensaje');
+    await f.flows.flush();
+    assert.equal(f.calls,1);
+    assert.equal(f.store.get('SELECT due FROM flow_runs').due,run.due);
+    f.store.run('UPDATE flow_runs SET due=?',Date.now()-1);
+    await f.flows.flush();
+    await f.flows.flush();
+    assert.equal(f.calls,2);
+    assert.equal(f.sent[1].text.body,graph.nodes[3].data.value);
+  } finally {await f.close();}
+});
+
+test('agent asks once, resumes from a reply and hands off if the provider fails', async () => {
+  for(const succeeds of [true,false]) {
+    const f=await fixture();
+    try {
+      const graph=linearGraph(['trigger','ai','end','handoff']);
+      graph.nodes[1].data.value='La tienda abre a las 10.';
+      graph.nodes[3].data.value=f.user;
+      graph.edges[1].sourceHandle='answered';
+      graph.edges[2]={id:'advisor',source:'step-1',target:'step-3',sourceHandle:'handoff'};
+      const flow=f.flows.save(f.company,null,{graph},f.user);
+      assert.throws(()=>f.flows.publish(f.company,flow.id,{revision:1},f.user),/Habilita Agente IA/);
+      const apiKey='sk-synthetic-test-key-123456789';
+      assert.deepEqual((await f.api('/flow-ai','POST',{apiKey,enabled:true})).body,{configured:true,enabled:true});
+      assert.ok(!f.store.get('SELECT secret FROM flow_ai_settings').secret.includes(apiKey));
+      assert.deepEqual((await f.api('/flow-ai')).body,{configured:true,enabled:true});
+      f.flows.publish(f.company,flow.id,{revision:1},f.user);
+      f.aiOutcomes.push({decision:'clarify',text:'¿Qué horario quieres consultar?'});
+      f.receive('Hola, tengo una consulta');
+      await f.flows.flush();
+      assert.equal(f.flows.runs(f.company,flow.id)[0].state,'agent_wait');
+      assert.equal(f.sent[0].text.body,'¿Qué horario quieres consultar?');
+      if(succeeds)f.aiOutcomes.push({decision:'answer',text:'Abrimos a las 10.'});
+      f.receive('A qué hora abren');
+      await f.flows.flush();
+      assert.equal(f.aiInputs.length,2);
+      assert.equal(f.aiInputs[1].store,false);
+      assert.deepEqual(JSON.parse(f.aiInputs[1].input[0].content),{
+        knowledge:graph.nodes[1].data.value,message:'A qué hora abren',previousQuestion:'¿Qué horario quieres consultar?',
+      });
+      assert.equal(f.flows.runs(f.company,flow.id)[0].state,'done');
+      assert.equal(f.store.get('SELECT automation_paused FROM contacts').automation_paused,succeeds?0:1);
+      assert.equal(f.calls,succeeds?2:1);
+      if(succeeds)assert.equal(f.sent[1].text.body,'Abrimos a las 10.');
+    } finally {await f.close();}
+  }
 });

@@ -9,6 +9,7 @@ import { workspaceTools } from './workspace.js';
 import { mediaLimits } from './media.js';
 import { mailService } from './mail.js';
 import { automationFlows } from './flows.js';
+import { flowAI } from './flow-ai.js';
 import { embeddedSignup } from './embedded-signup.js';
 
 const root=fileURLToPath(new URL('../public/',import.meta.url));
@@ -32,7 +33,8 @@ export function createServer(config,{store=openStore(config.database),fetchImpl=
   const mail=mailService(store,config,mailTransportFactory);
   let flows;
   const auth=authentication(store,config,mail),wa=whatsapp(store,config,fetchImpl,message=>flows.enqueue(message)),workspace=workspaceTools(store);
-  flows=automationFlows(store,wa);
+  const ai=flowAI(store,config,fetchImpl);
+  flows=automationFlows(store,wa,ai);
   const signup=embeddedSignup(store,config,wa,fetchImpl);
   let fileUploads=0;
   const origin=new URL(config.origin);
@@ -143,6 +145,11 @@ export function createServer(config,{store=openStore(config.database),fetchImpl=
         return response(res,200,{ok:true},'application/json; charset=utf-8',{'Set-Cookie':cookie(fresh.secret)});
       }
       if(method==='GET'&&route==='/members')return response(res,200,{members:members(s.company_id)});
+      if(route==='/flow-ai') {
+        requireThat(s.role==='owner','Solo el propietario puede gestionar la clave de IA.',403);
+        if(method==='GET')return response(res,200,ai.settings(s.company_id));
+        if(method==='POST')return response(res,200,await authorizedJson(req,s,data=>ai.save(s.company_id,data,s.user_id)));
+      }
       if(route==='/flows') {
         admin(s);
         if(method==='GET')return response(res,200,{flows:flows.list(s.company_id)});

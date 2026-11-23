@@ -168,7 +168,7 @@ async function renderChat(){
     const data=await api('/contacts/'+c.id+'/automation');
     if(!current())return;
     const history=$('automation-history');
-    const states={pending:'En cola',running:'En ejecución',waiting:'Esperando una opción',scheduled:'Seguimiento programado',done:'Completado',cancelled:'Cancelado',failed:'Error',interrupted:'Interrumpido'};
+    const states={pending:'En cola',running:'En ejecución',waiting:'Esperando una opción',scheduled:'Seguimiento programado',delayed:'Pausa programada',agent_wait:'Esperando más datos',done:'Completado',cancelled:'Cancelado',failed:'Error',interrupted:'Interrumpido'};
     history.innerHTML=`<button class="secondary" id="toggle-chat-automation">${data.paused?'Reanudar automatización':'Tomar conversación'}</button>${data.runs.map(run=>`<details><summary>${esc(run.name)} · ${esc(states[run.state]||run.state)}</summary>${run.reason?`<p>${esc(run.reason)}</p>`:''}<ol>${run.steps.map(step=>`<li><strong>${esc(step.label)}</strong><p>${esc(step.detail)}</p>${step.body?`<p>${esc(step.body)} · ${esc(statusNames[step.status]||step.status||'')}</p>`:''}</li>`).join('')}</ol></details>`).join('')||'<p>Aún no hay ejecuciones.</p>'}`;
     $('toggle-chat-automation').onclick=async event=>{
       event.target.disabled=true;
@@ -261,6 +261,7 @@ async function settings(){
   if(view!=='settings'||session?.company.id!==company)return;
   $('view').innerHTML=`<div class="crm-intro"><div><span class="eyebrow">TU EMPRESA</span><h2>Un espacio organizado para tu equipo</h2><p class="muted">${esc(session.company.name)}</p></div></div><div class="settings-grid"><section class="settings-card"><h2>Equipo</h2><div class="member-list">${members.map(m=>`<div class="team-row"><span class="avatar">${esc(initials(m.name))}</span><div><strong>${esc(m.name)}</strong><small>${esc(m.email)} · ${roles[m.role]}</small></div>${canAdmin&&m.role!=='owner'&&m.id!==session.user.id?`<button class="secondary" data-remove="${m.id}">Retirar acceso</button>`:''}</div>`).join('')}</div>${canAdmin?`<form id="invite-form"><h3>Invitar a un colaborador</h3><label>Correo<input name="email" type="email" required></label><label>Rol<select name="role"><option value="agent">Asesor</option>${session.user.role==='owner'?'<option value="admin">Administrador</option>':''}</select></label><label class="invite-email"><input type="checkbox" name="sendEmail" value="true" ${session.emailEnabled?'checked':'disabled'}> Enviar también por correo</label><p class="muted">${session.emailEnabled?'La invitación se enviará al correo indicado.':'El correo todavía no está configurado. Puedes compartir el enlace privado.'}</p><button class="send" type="submit">Crear invitación</button><p class="muted">Recibirás un enlace privado de un solo uso, válido durante 48 horas. Compártelo con tu colaborador.</p><textarea id="invite-link" readonly hidden aria-label="Enlace privado de invitación"></textarea></form>`:''}</section>
   ${canAdmin?`<section class="settings-card"><h2>WhatsApp Business</h2><p class="muted">Configura tu API y consulta el estado de recepción en Conexiones.</p><button class="secondary" id="open-connections">Abrir Conexiones de WhatsApp</button></section>`:''}
+  ${session.user.role==='owner'?`<section class="settings-card"><h2>Agente IA</h2><p class="muted">Al habilitarlo, LAZO envía a OpenAI el texto que el agente debe responder y la información del bloque. Las consultas pueden generar cargos en tu cuenta de API.</p><form id="flow-ai-form"><p id="flow-ai-status" role="status">Cargando estado…</p><label>Clave de API de OpenAI<input name="apiKey" type="password" placeholder="sk-…" autocomplete="off" maxlength="303"></label><p class="muted">Si ya guardaste una clave, deja el campo vacío para conservarla.</p><label class="invite-email"><input type="checkbox" name="enabled" value="true"> Habilitar Agente IA para este espacio</label><button class="secondary" type="submit" disabled>Guardar ajustes de IA</button></form></section>`:''}
   ${session.user.role==='owner'?`<section class="settings-card"><h2>Otra empresa</h2><p class="muted">Cada empresa tiene su propia agenda, usuarios y conexión.</p><form id="company-form"><label>Nombre de la empresa<input name="name" maxlength="100" required></label><button class="send" type="submit">Crear empresa</button></form></section>`:''}</div>`;
   if(canAdmin){
     const tools=document.createElement('div');tools.className='settings-tools';$('view').append(tools);
@@ -288,6 +289,26 @@ async function settings(){
     });
     $('open-connections').onclick=()=>showView('connections').catch(e=>notice(e.message,true));
     document.querySelectorAll('[data-remove]').forEach(b=>b.onclick=async()=>{try{await api('/members/'+b.dataset.remove,{method:'DELETE',body:{}});members=(await api('/members')).members;await settings();notice('Acceso retirado.');}catch(e){notice(e.message,true);}});
+  }
+  const aiForm=$('flow-ai-form');
+  if(aiForm) {
+    const showAIState=status=>{
+      if($('flow-ai-form')!==aiForm)return;
+      aiForm.elements.enabled.checked=status.enabled;
+      $('flow-ai-status').textContent=status.enabled?'Habilitado':status.configured?'Deshabilitado · Clave guardada':'Falta configurar la clave';
+      aiForm.querySelector('button[type="submit"]').disabled=false;
+    };
+    api('/flow-ai').then(showAIState).catch(error=>{
+      if($('flow-ai-form')===aiForm)$('flow-ai-status').textContent=error.message;
+    });
+    bind(aiForm,async data=>{
+      try {
+        const key=data.apiKey.trim();
+        const status=await api('/flow-ai',{method:'POST',body:{enabled:data.enabled==='true',...(key?{apiKey:key}:{})}});
+        showAIState(status);
+        notice('Ajustes de IA guardados.');
+      } finally { aiForm.elements.apiKey.value=''; }
+    });
   }
   if($('company-form'))bind($('company-form'),async data=>{const c=await api('/companies',{method:'POST',body:data});await api('/companies/switch',{method:'POST',body:{companyId:c.id}});active=null;await startWorkspace();notice('Empresa creada.');});
 }
