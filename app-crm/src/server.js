@@ -11,6 +11,7 @@ import { mailService } from './mail.js';
 import { automationFlows } from './flows.js';
 import { flowAI } from './flow-ai.js';
 import { salesDashboard } from './sales-dashboard.js';
+import { salesCatalog } from './sales-catalog.js';
 import { embeddedSignup } from './embedded-signup.js';
 
 const root=fileURLToPath(new URL('../public/',import.meta.url));
@@ -35,6 +36,7 @@ const assets={
 const headers={ 'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','X-Frame-Options':'DENY',
   'Content-Security-Policy':"default-src 'self'; script-src 'self' https://connect.facebook.net; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' blob:; connect-src 'self' https://graph.facebook.com https://www.facebook.com https://connect.facebook.net; frame-src https://www.facebook.com https://web.facebook.com https://staticxx.facebook.com; frame-ancestors 'none'; base-uri 'none'; form-action 'self'" };
 export function createServer(config,{store=openStore(config.database),fetchImpl=fetch,mailTransportFactory}={}) {
+  const catalog=salesCatalog(store);
   const mail=mailService(store,config,mailTransportFactory);
   let flows;
   const auth=authentication(store,config,mail),wa=whatsapp(store,config,fetchImpl,message=>flows.enqueue(message)),workspace=workspaceTools(store);
@@ -191,6 +193,18 @@ export function createServer(config,{store=openStore(config.database),fetchImpl=
         admin(s);const replies=method==='DELETE'?workspace.removeReply(s.company_id,replyMatch[1],s.user_id):await authorizedJson(req,s,data=>workspace.saveReply(s.company_id,replyMatch[1],data,s.user_id));
         return response(res,200,{replies});
       }
+      if(route==='/sales-catalog') {
+        admin(s);
+        if(method==='GET')return response(res,200,{offers:catalog.list(s.company_id)});
+        if(method==='POST')return response(res,201,{offers:await authorizedJson(req,s,data=>catalog.save(s.company_id,null,data,s.user_id))});
+      }
+      const offerMatch=route.match(/^\/sales-catalog\/([a-f\d-]+)$/);
+      if(offerMatch&&['PUT','DELETE'].includes(method)){
+        admin(s);
+        return response(res,200,{offers:await authorizedJson(req,s,data=>method==='PUT'
+          ?catalog.save(s.company_id,offerMatch[1],data,s.user_id)
+          :catalog.archive(s.company_id,offerMatch[1],s.user_id))});
+      }
       if(method==='GET'&&route==='/sales-dashboard') {
         store.limit('sales-dashboard:'+s.user_id,90,60000);
         return response(res,200,salesDashboard(store,s.company_id,new URL(req.url,config.origin).searchParams));
@@ -248,7 +262,25 @@ export function createServer(config,{store=openStore(config.database),fetchImpl=
         if(action==='orders'&&method==='GET')return response(res,200,{orders:flows.sales.list(s.company_id,id)});
         if(action==='orders'&&method==='POST') {
           admin(s);
-          const result=await authorizedJson(req,s,data=>data.action==='resend'?flows.sales.resend(s.company_id,id,data.orderId,data.requestId,s.user_id):flows.sales.confirm(s.company_id,id,data.orderId,data,s.user_id));
+          const result=await authorizedJson(req,s,data=>{
+            const {orderId,requestId}=data;
+            if(data.action==='offer')return flows.sales.offer(s.company_id,id,data,s.user_id);
+            if(data.action==='read-proof')return (async()=>{
+              requireThat(ai.settings(s.company_id).enabled,'Habilita la IA en Ajustes para leer comprobantes.',409);
+              const proof=store.get(`SELECT o.proof_id,m.type FROM flow_orders o JOIN messages m ON m.id=o.proof_id
+                AND m.company_id=o.company_id AND m.contact_id=o.contact_id AND m.direction='in'
+                WHERE o.id=? AND o.company_id=? AND o.contact_id=?`,orderId,s.company_id,id);
+              requireThat(proof?.type==='image','El pedido debe tener un comprobante en imagen.',404);
+              const file=await wa.media.forMessage(s.company_id,proof.proof_id);
+              assertSession(s);
+              const receipt=await ai.readReceipt(s.company_id,file);
+              assertSession(s);
+              return {receipt};
+            })();
+            if(data.action==='deliver')return flows.sales.deliverManual(s.company_id,id,orderId,s.user_id);
+            if(data.action==='resend')return flows.sales.resend(s.company_id,id,orderId,requestId,s.user_id);
+            return flows.sales.confirm(s.company_id,id,orderId,data,s.user_id);
+          });
           void flows.flush().catch(()=>{});
           return response(res,200,result);
         }

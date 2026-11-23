@@ -8,8 +8,8 @@ export async function connectFlowsServer() {
     if(!result.ok){const error=new Error(body.error||'No se pudo completar la operación.');error.contextChanged=[401,403].includes(result.status)||body.code==='CONTEXT_CHANGED';throw error;}
     return body;
   };
-  const [flows,members]=await Promise.all([request('/flows'),request('/members')]);
-  return {identity,request,flows:flows.flows,members:members.members};
+  const [flows,members,catalog]=await Promise.all([request('/flows'),request('/members'),request('/sales-catalog')]);
+  return {identity,request,flows:flows.flows,members:members.members,offers:catalog.offers};
 }
 
 export function welcomeFlow(memberId) {

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { now, requireThat, digest } from './core.js';
+import { HttpError, now, requireThat, digest } from './core.js';
 import { flowSales } from './flow-sales.js';
 import { parseDraft, validateFlow, outputsFor } from './flow-model.js';
 
@@ -123,7 +123,17 @@ export function automationFlows(store, wa, ai) {
     if(store.get("SELECT count(*) n FROM flow_runs WHERE company_id=? AND state IN ('pending','running','waiting','scheduled','delayed','agent_wait')",message.company_id).n>=100)return;
     const time=now();store.run("INSERT OR IGNORE INTO flow_runs(id,company_id,flow_id,contact_id,message_id,revision,activation,snapshot,state,created,updated) VALUES(?,?,?,?,?,?,?,?,'pending',?,?)",randomUUID(),message.company_id,row.id,message.contact_id,message.id,row.published_revision,row.activation,row.published,time,time);
   }
-  const runs = (company,id) => {get(company,id);return store.all('SELECT id,state,step,reason,created,updated FROM flow_runs WHERE company_id=? AND flow_id=? ORDER BY created DESC,id DESC LIMIT 30',company,id);};
+  function runs(company,id) {
+    get(company,id);
+    return store.all(`SELECT r.id,r.state,r.step,r.reason,r.created,r.updated,r.due,r.revision,c.name AS contact,
+      (SELECT json_extract(n.value,'$.data.label') FROM json_each(r.snapshot,'$.nodes') n WHERE json_extract(n.value,'$.id')=r.step) AS block
+      FROM flow_runs r JOIN contacts c ON c.id=r.contact_id AND c.company_id=r.company_id
+      WHERE r.company_id=? AND r.flow_id=? ORDER BY r.created DESC,r.id DESC LIMIT 30`,company,id).map(run=>({
+      ...run,steps:store.all(`SELECT s.label,s.detail,s.created,m.status FROM flow_steps s
+        LEFT JOIN messages m ON m.id=s.message_id AND m.company_id=?
+        WHERE s.run_id=? ORDER BY s.id DESC LIMIT 25`,company,run.id).reverse(),
+    }));
+  }
   function permitted(run) {
     const current=store.get('SELECT * FROM flows WHERE company_id=? AND id=?',run.company_id,run.flow_id);
     return store.get("SELECT 1 FROM flow_runs WHERE id=? AND company_id=? AND state='running'",run.id,run.company_id)&&current?.active&&current.published_revision===run.revision&&current.activation===run.activation&&store.get("SELECT 1 FROM memberships WHERE company_id=? AND user_id=? AND role IN ('owner','admin')",run.company_id,current.actor_id)?current:null;
@@ -244,14 +254,21 @@ export function automationFlows(store, wa, ai) {
           });
           return;
         }
-        if(node.data.kind==='end'){store.run("UPDATE flow_runs SET state='done',updated=? WHERE id=?",now(),run.id);return;}
-        if(['trigger','tag','assign','end'].includes(node.data.kind))trace(run,node.data.label,'Paso ejecutado');
+        if(node.data.kind==='end'){
+          store.tx(()=>{
+            trace(run,node.data.label,'Recorrido finalizado');
+            store.run("UPDATE flow_runs SET state='done',updated=? WHERE id=?",now(),run.id);
+          });
+          return;
+        }
+        if(['trigger','tag','assign'].includes(node.data.kind))trace(run,node.data.label,'Paso ejecutado');
         requireThat(permitted(run),'Flujo pausado, versión sustituida o acceso retirado.',409);
         node=draft.nodes.find(n=>n.id===edge?.target);
       }
       throw new Error('Recorrido incompleto');
-    } catch {
-      store.run("UPDATE flow_runs SET state=?,reason=?,updated=? WHERE id=? AND state='running'",permitted(run)?'failed':'cancelled','Ejecución detenida. Revisa la conexión, la ventana de 24 horas y la conversación antes de repetir.',now(),run.id);
+    } catch(error) {
+      const reason=error instanceof HttpError?error.message:'Ejecución detenida. Revisa el último bloque antes de repetir.';
+      store.run("UPDATE flow_runs SET state=?,reason=?,updated=? WHERE id=? AND state='running'",permitted(run)?'failed':'cancelled',reason,now(),run.id);
     }
   }
   function recover() {store.run("UPDATE flow_runs SET state='interrupted',reason='El servicio se reinició durante la ejecución; no se reintenta automáticamente.',updated=? WHERE state='running'",now());}

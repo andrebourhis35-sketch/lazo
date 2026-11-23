@@ -65,12 +65,13 @@ const FlowNode = memo(function FlowNode({ id, data, selected }) {
     if (choiceCount) updateNodeInternals(id);
   }, [id, choiceCount, updateNodeInternals]);
   const Glyph = ICONS[data.kind];
-  return <VStack padding={4} gap={3} style={{ ...styles.node, ...(selected ? styles.nodeSelected : {}), ...(data.running ? styles.nodeRun : {}) }}>
+  return <VStack padding={4} gap={3} style={{ ...styles.node, ...(selected ? styles.nodeSelected : {}), ...(data.running ? styles.nodeRun : {}), ...(data.stopped ? {outline:'2px solid var(--color-text-danger, var(--color-text-primary))'} : {}) }}>
     {data.kind !== 'trigger' && <Handle type="target" position={Position.Left} style={styles.handle} />}
     <HStack gap={3} vAlign="center">
       <HStack hAlign="center" vAlign="center" style={{ ...styles.iconWell, color: COLORS[data.kind] }}><Icon icon={Glyph} size="md" color="inherit" /></HStack>
       <VStack gap={1} style={{ minWidth: 0 }}><Text style={styles.eyebrow}>{BLOCKS[data.kind].name}</Text><Text style={styles.nodeLabel}>{data.label}</Text></VStack>
       {data.running && <Icon icon={Check} size="sm" color="success" />}
+      {data.stopped && <Text size="sm" weight="semibold">Revisar</Text>}
     </HStack>
     <Text as="p" maxLines={3} style={styles.nodeBody}>{data.kind === 'assign' && data.assigneeLabel ? data.assigneeLabel : summarizeNode(data)}</Text>
     {data.kind === 'condition' ? <>
@@ -119,7 +120,20 @@ function Palette({ onAdd, count, inserting = false }) {
   </VStack>;
 }
 
-function Inspector({ node, onUpdate, onDuplicate, onDelete, members, thirdButtonConnected }) {
+function OfferPicker({offers,onUpdate}) {
+  const [query,setQuery]=useState('');
+  if(!offers?.length)return null;
+  const matching=offers.filter(offer=>[offer.name,offer.plan,offer.market,offer.currency].join(' ').toLowerCase().includes(query.trim().toLowerCase()));
+  return <VStack gap={2}>
+    <TextInput label="Buscar oferta en el catálogo" type="search" value={query} onChange={setQuery} hasClear />
+    {matching.slice(0,6).map(offer=><Button key={offer.id} size="sm" variant="secondary"
+      label={`${offer.name} · ${offer.plan} · ${offer.market} · ${offer.currency} ${(offer.cents/100).toFixed(2)}`}
+      onClick={()=>onUpdate({value:offer.plan,sale:{product:offer.product,price:(offer.cents/100).toFixed(2),currency:offer.currency,link:offer.link,mode:offer.mode,previousPlan:'',name:offer.name,bonuses:offer.bonuses}})} />)}
+    {!matching.length&&<Text size="sm" color="secondary">No hay ofertas con esa búsqueda.</Text>}
+  </VStack>;
+}
+
+function Inspector({ node, onUpdate, onDuplicate, onDelete, members, offers, thirdButtonConnected }) {
   if (!node) return <VStack padding={4} gap={4}><Icon icon={MousePointer2} color="accent" size="lg" /><Heading level={4}>Cada bloque tiene una función</Heading><Text color="secondary">Selecciona uno en el lienzo para editar sus propiedades.</Text></VStack>;
   const { kind, label, value } = node.data;
   const field = { trigger: 'Palabra clave', condition: 'La respuesta contiene', wait: 'Tiempo en minutos', reminder: 'Minutos sin respuesta', tag: 'Nombre de la etiqueta', assign: 'Equipo o asesor' }[kind];
@@ -129,6 +143,7 @@ function Inspector({ node, onUpdate, onDuplicate, onDelete, members, thirdButton
     {kind === 'message' ? <VStack gap={3}><TextArea label="Contenido del mensaje" value={value} onChange={next => onUpdate({ value: next.slice(0, 2000) })} rows={6} maxLength={2000} description="Personaliza el texto con el nombre del contacto." /><Button label="Insertar nombre del contacto" variant="secondary" size="sm" onClick={() => onUpdate({ value: (value + ' {{nombre}}').slice(0, 2000) })}>{'{{nombre}}'}</Button></VStack> : ['assign','handoff'].includes(kind) && members ? <VStack gap={2}><Text weight="semibold">Responsable de la empresa</Text>{members.map(member => <Button key={member.id} label={member.name} variant={value === member.id ? 'primary' : 'secondary'} onClick={() => onUpdate({ value: member.id })} />)}</VStack> : field && <TextInput label={field} value={value} inputMode={['wait','reminder'].includes(kind) ? 'numeric' : 'text'} onChange={next => onUpdate({ value: next.slice(0, kind === 'wait' ? 5 : 100) })} description={kind === 'trigger' ? 'La activación real requiere una palabra clave.' : kind === 'condition' ? 'La comparación ignora mayúsculas y tildes.' : kind === 'wait' ? 'Para envíos reales, usa de 1 a 1380 minutos dentro de la ventana de WhatsApp. En el simulador, el reloj avanza al instante.' : undefined} />}
     {kind === 'message' && <VStack gap={3}><Text style={styles.eyebrow}>Así lo verá el contacto</Text><VStack gap={2} style={styles.bubble}><Text as="p" size="sm" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>{value.replaceAll('{{nombre}}', 'Lucía') || 'Tu mensaje aparecerá aquí.'}</Text><HStack hAlign="end" gap={1} vAlign="center"><Text size="sm" color="secondary">Vista previa</Text><Icon icon={CheckCheck} size="xsm" color="accent" /></HStack></VStack></VStack>}
     {kind === 'plan' && <VStack gap={3}>
+      <OfferPicker key={node.id} offers={offers} onUpdate={onUpdate} />
       <TextInput label="Código de producto" value={node.data.sale.product} onChange={next=>onUpdate({sale:{...node.data.sale,product:next.slice(0,50)}})} description="Usa el mismo código en los planes del mismo infoproducto. Ejemplo: recetas-rapidas." />
       <TextInput label="Nombre del plan" value={value} onChange={next=>onUpdate({value:next.slice(0,100)})} />
       <TextInput label="Importe" value={node.data.sale.price} inputMode="decimal" onChange={next=>onUpdate({sale:{...node.data.sale,price:next.slice(0,12)}})} />
@@ -171,7 +186,7 @@ function Simulation({ flow, onPath }) {
   const [paymentConfirmed,setPaymentConfirmed]=useState(true);
   const [aiOutcome,setAiOutcome] = useState('answered');
   const [result, setResult] = useState(null);
-  const run = (selection = answer) => { const next = simulateFlow(flow, { name, incoming, answer: selection, aiOutcome, paymentConfirmed }); setResult(next); onPath(next.steps); };
+  const run = (selection = answer) => { const next = simulateFlow(flow, { name, incoming, answer: selection, aiOutcome, paymentConfirmed }); setResult(next); onPath(next.steps,next.stoppedAt); };
   const play = () => { if (choices) { setAnswer(''); run(''); } else run(); };
   return <VStack padding={4} gap={5}>
     <VStack padding={3} gap={2} style={styles.note}><Pill>Prueba local con datos ficticios</Pill><Text size="sm" color="secondary">No usa tu WhatsApp ni envía mensajes. Las esperas se adelantan y las acciones se muestran en este recorrido.</Text></VStack>
@@ -200,6 +215,32 @@ function Simulation({ flow, onPath }) {
   </VStack>;
 }
 
+const runStates={pending:'En cola',running:'En ejecución',waiting:'Esperando una opción',scheduled:'Seguimiento programado',
+  delayed:'Pausa programada',agent_wait:'Esperando más datos',payment_wait:'Esperando confirmar abono',
+  done:'Recorrido completado',failed:'Detenido por un error',cancelled:'Cancelado',interrupted:'Interrumpido'};
+const messageStates={accepted:'Aceptado por Meta',sent:'Enviado',delivered:'Entregado',read:'Leído',received:'Recibido',
+  failed:'Falló',unknown:'Sin confirmación',queued:'En cola'};
+
+function RunHistory({runs,onFocus}) {
+  const [expanded,setExpanded]=useState(null);
+  if(!runs.length)return <Text>No hay ejecuciones de este flujo.</Text>;
+  return runs.map(run=><VStack key={run.id} gap={2} padding={3} style={styles.note}>
+    <Text weight="semibold">{runStates[run.state]||run.state} · {run.contact}</Text>
+    <Text size="sm" color="secondary">{new Date(run.created).toLocaleString('es-PE')}</Text>
+    {run.block&&<Text size="sm">Bloque: {run.block}</Text>}
+    {run.reason&&<Text size="sm">{run.reason}</Text>}
+    {run.due&&['delayed','scheduled','payment_wait'].includes(run.state)&&<Text size="sm">Próxima acción: {new Date(run.due).toLocaleString('es-PE')}</Text>}
+    <HStack gap={2} wrap="wrap">
+      {run.steps?.length>0&&<Button size="sm" label={expanded===run.id?'Ocultar recorrido':'Ver recorrido'} onClick={()=>setExpanded(expanded===run.id?null:run.id)}/>}
+      {run.step&&<Button size="sm" label="Ubicar bloque" onClick={()=>onFocus(run)}/>}
+    </HStack>
+    {expanded===run.id&&<VStack gap={3} style={styles.timeline}>{run.steps.map((step,index)=><VStack key={index} gap={1}>
+      <Text size="sm" weight="semibold">{step.label}</Text><Text size="sm">{step.detail}</Text>
+      {step.status&&<Text size="sm" color="secondary">{messageStates[step.status]||step.status}</Text>}
+    </VStack>)}</VStack>}
+  </VStack>);
+}
+
 function Editor() {
   const initial = useRef(null); if (!initial.current) initial.current = loadInitial();
   const [nodes, setNodes, applyNodes] = useNodesState(initial.current.flow.nodes);
@@ -212,6 +253,7 @@ function Editor() {
   const [panel, setPanel] = useState('');
   const [snapshot, setSnapshot] = useState(null);
   const [path, setPath] = useState([]);
+  const [stoppedAt,setStoppedAt]=useState(null);
   const [isRestoreConfirm, setRestoreConfirm] = useState(false);
   const [serverInfo, setServerInfo] = useState(null);
   const [serverDoc, setServerDoc] = useState(null);
@@ -285,14 +327,30 @@ function Editor() {
   const saveLocal = () => { try { const clean = parseDraft(JSON.stringify(flow)); localStorage.setItem(DRAFT_KEY, JSON.stringify(clean)); setDirty(false); setStatus(issues.length ? 'Borrador guardado en este navegador. Completa las conexiones antes de simular.' : 'Borrador guardado en este navegador.'); } catch { setStatus('No se pudo guardar. Comprueba el espacio o los permisos de almacenamiento del navegador.'); } };
   const restore = () => { const next = exampleFlow(); setNodes(next.nodes); setEdges(next.edges); setName(next.name); setSelectedId('bienvenida'); setRestoreConfirm(false); mutate(); setStatus('Ejemplo restaurado. Guarda para reemplazar el borrador anterior.'); requestAnimationFrame(() => api.fitView({ padding: '12%', duration: motion ? 250 : 0 })); };
   const onConnect = connection => { try { const next = connectNodes(connection, nodes, edges); setEdges(next); mutate(); setStatus('Conexión creada. Cada salida tiene un único destino.'); } catch (error) { setStatus(error.message); } };
-  const showSimulation = () => { try { setSnapshot(parseDraft(JSON.stringify(flow))); setPath([]); setPanel('simulation'); } catch { setStatus('No se puede simular este borrador. Reduce su tamaño o mueve los bloques más cerca del inicio.'); } };
+  const showSimulation = () => { try { setSnapshot(parseDraft(JSON.stringify(flow))); setPath([]); setStoppedAt(null); setPanel('simulation'); } catch { setStatus('No se puede simular este borrador. Reduce su tamaño o mueve los bloques más cerca del inicio.'); } };
   const changeMode = () => { const next = mode === 'dark' ? 'light' : 'dark'; setMode(next); try { localStorage.setItem('lazo.lab.theme', next); } catch { /* La apariencia de esta sesión sigue funcionando. */ } };
-  const renderedNodes = useMemo(() => nodes.map(node => ({ ...node, selected: node.id === selectedId, data: { ...node.data, assigneeLabel:serverInfo?.members.find(member=>member.id===node.data.value)?.name, running: path.some(step => step.id === node.id) } })), [nodes, selectedId, path,serverInfo]);
-  const renderedEdges = useMemo(() => { const visited = new Set(traversedEdgeIds(path, edges)); return edges.map(edge => ({ ...edge, type:'insertable', data:{insert:openInsert}, animated: motion, markerEnd: { type: MarkerType.ArrowClosed }, style: { stroke: visited.has(edge.id) ? 'var(--lazo-mint)' : 'var(--color-border-emphasized)' } })); }, [edges, motion, path,openInsert]);
+  const renderedNodes = useMemo(() => nodes.map(node => ({ ...node, selected: node.id === selectedId, data: { ...node.data, assigneeLabel:serverInfo?.members.find(member=>member.id===node.data.value)?.name, running: path.some(step => step.id === node.id),stopped:node.id===stoppedAt } })), [nodes, selectedId, path,stoppedAt,serverInfo]);
+  const renderedEdges = useMemo(() => { const visited = new Set(traversedEdgeIds(path, edges)); return edges.map(edge => ({ ...edge, type:'insertable', data:{insert:openInsert}, animated: motion&&visited.has(edge.id), markerEnd: { type: MarkerType.ArrowClosed }, style: { stroke: visited.has(edge.id) ? 'var(--lazo-mint)' : 'var(--color-border-emphasized)',strokeWidth:visited.has(edge.id)?3:2 } })); }, [edges, motion, path,openInsert]);
   const palette = <Palette onAdd={add} count={nodes.length} />;
-  const inspector = <Inspector node={selected} onUpdate={update} onDuplicate={duplicate} onDelete={remove} members={serverInfo?.members} thirdButtonConnected={edges.some(edge => edge.source === selectedId && edge.sourceHandle === 'option-3')} />;
+  const inspector = <Inspector node={selected} onUpdate={update} onDuplicate={duplicate} onDelete={remove} members={serverInfo?.members} offers={serverInfo?.offers} thirdButtonConnected={edges.some(edge => edge.source === selectedId && edge.sourceHandle === 'option-3')} />;
   const selectNode = (_, node) => setSelectedId(node.id);
   const editNode = (_, node) => { setSelectedId(node.id); setPanel('inspector'); };
+  const markSimulation=(steps,stopped)=>{
+    setPath(steps);
+    setStoppedAt(stopped||null);
+    if(stopped)api.fitView({nodes:[{id:stopped}],maxZoom:1,padding:.35,duration:motion?280:0});
+  };
+  function locateRun(run) {
+    if(!nodes.some(node=>node.id===run.step)||serverDoc?.revision!==run.revision||dirty){
+      setPanel('');
+      setStatus('La ejecución pertenece a otra versión del flujo. El recorrido queda visible en Historial.');
+      return;
+    }
+    setSelectedId(run.step);
+    setStoppedAt(run.state==='failed'?run.step:null);
+    setPanel('');
+    api.fitView({nodes:[{id:run.step}],maxZoom:1,padding:.35,duration:motion?280:0});
+  }
 
   return <Theme theme={lazoTheme} mode={mode}><VStack style={styles.app} gap={0}>
       <Layout height="fill" padding={0} header={<LayoutHeader hasDivider padding={0}>
@@ -353,9 +411,9 @@ function Editor() {
     </Drawer>
     <Drawer isOpen={panel === 'palette'} onOpenChange={open => !open && setPanel('')} label="Biblioteca de bloques" side="start" width="20rem" padding={0}><Layout height="fill" header={<LayoutHeader padding={3}><DrawerHeader title="Bloques del flujo" onOpenChange={() => setPanel('')} /></LayoutHeader>}><LayoutContent padding={3}>{palette}</LayoutContent></Layout></Drawer>
     <Drawer isOpen={panel === 'inspector'} onOpenChange={open => !open && setPanel('')} label="Propiedades del bloque" width="22rem" padding={0}><Layout height="fill" header={<LayoutHeader padding={3}><DrawerHeader title="Configurar bloque" onOpenChange={() => setPanel('')} /></LayoutHeader>}><LayoutContent padding={0}>{inspector}</LayoutContent></Layout></Drawer>
-    <Drawer isOpen={panel === 'simulation'} onOpenChange={open => !open && setPanel('')} label="Simular el flujo" width="30rem" padding={0}><Layout height="fill" header={<LayoutHeader padding={4} hasDivider><DrawerHeader title="Prueba tu conversación" subtitle="Una vista previa de cómo avanza el flujo" onOpenChange={() => setPanel('')} /></LayoutHeader>}><LayoutContent padding={0}>{snapshot && <Simulation key={snapshot.name + JSON.stringify(snapshot.nodes)} flow={snapshot} onPath={setPath} />}</LayoutContent></Layout></Drawer>
+    <Drawer isOpen={panel === 'simulation'} onOpenChange={open => !open && setPanel('')} label="Simular el flujo" width="30rem" padding={0}><Layout height="fill" header={<LayoutHeader padding={4} hasDivider><DrawerHeader title="Prueba tu conversación" subtitle="Una vista previa de cómo avanza el flujo" onOpenChange={() => setPanel('')} /></LayoutHeader>}><LayoutContent padding={0}>{snapshot && <Simulation key={snapshot.name + JSON.stringify(snapshot.nodes)} flow={snapshot} onPath={markSimulation} />}</LayoutContent></Layout></Drawer>
     <Drawer isOpen={panel === 'saved'} onOpenChange={open=>!open&&setPanel('')} label="Flujos guardados" width="26rem"><VStack gap={4}><DrawerHeader title="Flujos de tu empresa" onOpenChange={()=>setPanel('')} />{savedFlows.length ? savedFlows.map(doc=><Button key={doc.id} label={doc.graph.name+(doc.active?' · Activo':' · Pausado')} isDisabled={dirty || serverBusy} onClick={()=>{showDocument(doc);setPanel('');setStatus('Borrador recuperado del servidor.');}} />):<Text>Todavía no guardaste ningún flujo.</Text>}{dirty&&<Text>Guarda los cambios actuales antes de abrir otro flujo.</Text>}</VStack></Drawer>
-    <Drawer isOpen={panel === 'history'} onOpenChange={open=>!open&&setPanel('')} label="Historial de ejecuciones" width="28rem"><VStack gap={4}><DrawerHeader title="Últimas ejecuciones" subtitle="El mensaje aceptado se comprueba como entregado en Conversaciones." onOpenChange={()=>setPanel('')} />{runHistory.length ? runHistory.map(run=><VStack key={run.id} gap={2} padding={3} style={styles.note}><Text weight="semibold">{({pending:'En cola',running:'En ejecución',waiting:'Esperando una opción',scheduled:'Seguimiento programado',delayed:'Pausa programada',agent_wait:'Esperando más datos',payment_wait:'Esperando confirmar abono',done:'Recorrido completado',failed:'Detenido por un error',cancelled:'Cancelado',interrupted:'Interrumpido; revisar antes de repetir'})[run.state]||run.state}</Text><Text size="sm" color="secondary">{new Date(run.created).toLocaleString('es-PE')}</Text>{run.reason&&<Text size="sm">{run.reason}</Text>}</VStack>):<Text>Aquí aparecerán las ejecuciones de mensajes nuevos que coincidan con la palabra clave.</Text>}</VStack></Drawer>
+    <Drawer isOpen={panel === 'history'} onOpenChange={open=>!open&&setPanel('')} label="Historial de ejecuciones" width="28rem"><VStack gap={4}><DrawerHeader title="Últimas ejecuciones" subtitle="El mensaje aceptado se comprueba como entregado en Conversaciones." onOpenChange={()=>setPanel('')} /><RunHistory runs={runHistory} onFocus={locateRun} /></VStack></Drawer>
     <Drawer isOpen={isRestoreConfirm} onOpenChange={setRestoreConfirm} label="Restaurar ejemplo" width="24rem"><VStack gap={5}><DrawerHeader title="¿Volver al ejemplo inicial?" onOpenChange={setRestoreConfirm} /><Text>Reemplazará lo que ves en el lienzo. Tu borrador guardado se conserva hasta que vuelvas a guardar.</Text><Button label="Restaurar ejemplo inicial" onClick={restore} /><Button label="Seguir editando" variant="ghost" onClick={() => setRestoreConfirm(false)} /></VStack></Drawer>
   </VStack></Theme>;
 }
