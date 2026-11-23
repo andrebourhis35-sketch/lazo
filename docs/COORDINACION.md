@@ -3,6 +3,7 @@
 ### Globo en Ventas (23 de noviembre de 2026)
 
 - Codex, rama codex/globo-ventas. Sustituye el mapa plano por un globo giratorio con iluminación y relieve visual. Los países con pedidos conservan su color; seleccionar un país lo centra en el globo.
+- Publicado globe-dfcd4ae con respaldo previo y 86 pruebas aprobadas en OVH. Se verificaron por SHA-256 los seis recursos en HTTPS público. En navegador con datos ficticios se comprobó el giro, el filtro de Panamá y el botón para volver a América. PR #69.
 
 ### Panel de ventas por moneda y país (23 de noviembre de 2026)
 
