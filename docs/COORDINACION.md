@@ -4,6 +4,8 @@
 
 - Codex, rama codex/flujos-avanzados. Editor, motor, almacenamiento, API y CRM. Menús encadenados y retorno, seguimiento por inactividad, traspaso, historial por contacto y vista global de números autorizados. Cada chat permanece en su espacio de origen y todas las automatizaciones reales conservan la restricción de cuenta de prueba.
 
+- Publicado advanced-225365b en OVH tras respaldo cifrado y 82 pruebas del CRM aprobadas. El editor pasó 11 pruebas y su diagnóstico de Astryx. HTTPS público confirmó las huellas de los recursos y el acceso sin sesión a la bandeja devolvió 401. En Brave se comprobaron los nuevos bloques y una simulación pública. La sesión de Brave no estaba iniciada. La prueba real de los menús en WhatsApp queda pendiente. PR #61.
+
 ### Tercera opción en los flujos (22 de noviembre de 2026)
 
 - Codex, rama codex/tercer-boton. Editor, modelo, ejecución y prueba de integración amplían los menús a dos o tres opciones. El ejemplo nuevo incluye «Consultar pedido». Los borradores y ejecuciones con dos botones siguen siendo compatibles.
